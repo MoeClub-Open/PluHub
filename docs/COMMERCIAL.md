@@ -78,7 +78,9 @@ Commerce 持久保存每笔退款或争议及去重事件。通知早于支付�
 
 V1 生成 `/submit.php` 跳转；V2 POST `/api/pay/create`，携带 `method=jump`、clientip、timestamp 等字段，只接受验签后的跳转响应，不执行平台返回的 HTML/JS。RSA 使用 SHA256WithRSA / PKCS#1 v1.5；私钥签请求，平台公钥验响应/通知。MD5 按字段 ASCII 排序，排除空值/sign/sign_type，不 URL 编码签名原文，拼接商户 Key。
 
-MD5 配 `keyRef`；RSA 配 `privateKeyRef` 和 `platformPublicKeyRef`，均为环境变量引用。回调：
+控制台可直接填写 MD5 商户密钥，或 RSA 商户私钥及平台公钥。插件使用 AES-256-GCM 加密存入自己的 `secrets.sqlite`，主密钥保存在同目录的 `vault.key`（权限 0600）。配置仅保存不可变的 `local:` 引用，查询配置和再次编辑均不返回密钥原文；留空保留已有值，复制支付方式复用原引用。备份必须同时保留插件数据和主密钥，修改凭证须管理员会话及近期身份确认。
+
+仍兼容 `keyRef`、`privateKeyRef`、`platformPublicKeyRef` 的环境变量引用，只有 `env:` 引用需要出现在 `secretRefs` 授权列表。回调：
 
 ```text
 https://你的域名/api/plugins/official.payments-epay/notify?pluhub_method=<支付方式ID>
