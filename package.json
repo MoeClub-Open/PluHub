@@ -1,7 +1,7 @@
 {
   "name": "pluhub-workspace",
   "private": true,
-  "version": "0.1.0-alpha.13",
+  "version": "0.1.0-alpha.14",
   "type": "module",
   "packageManager": "pnpm@10.20.0",
   "engines": {
