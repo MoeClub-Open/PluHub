@@ -2,7 +2,7 @@
 
 `official.mailer`、`official.turnstile` 分别提供发件和人机验证能力。Auth 负责邮箱登录凭据、TOTP、恢复码、WebAuthn 公钥和会话；Users 继续提供账号、角色与启用状态，通过公开 Capability 协作。验证码、邮件服务由独立插件提供，公共类型位于 Spec 的 `@pluhub/contracts/security`，Kernel 不包含认证方式的实现。
 
-默认保留密码登录；邮箱注册、邮箱登录、Turnstile 和 WebAuthn 均需管理员启用。个人账号设置通过侧栏底部账号入口或 `#/account` 访问，旧的 `#/auth?tab=security` 仍可使用。API 密钥列表独立于账号安全，创建和撤销在弹窗中完成。站点配置统一位于管理员的「安全与验证 → 登录与验证」，在同一页面管理登录注册、邮件、Turnstile、Passkey 与两步验证。
+默认保留密码登录；邮箱注册、邮箱登录、人机验证和 WebAuthn 均需管理员启用。个人账号设置通过侧栏底部账号入口或 `#/account` 访问，旧的 `#/auth?tab=security` 仍可使用。API 密钥列表独立于账号安全，创建和撤销在弹窗中完成。站点配置统一位于管理员的「安全与验证 → 登录与验证」，在同一页面管理登录注册、邮件、人机验证、Passkey 与两步验证。
 
 管理员创建用户使用 Auth 的 `POST /api/plugins/official.auth/users`：要求管理员会话及近期身份确认，先校验并哈希初始密码，再通过 Users 能力创建用户事实。无效密码不再留下无法登录的账号；Users 不依赖 Auth。
 
@@ -31,11 +31,12 @@
 
 当 SMTP 使用 Docker 内网服务名连接，且证书签发给公开域名时，可设置 `tlsServerName` 为该证书域名。此项用于 SNI 和证书主机名校验，不会关闭证书验证；省略时使用 SMTP 服务器名。相应容器需要位于可互通的 Docker 网络。
 
-`official.turnstile`：
+人机验证插件保留 `official.turnstile` 安装标识以兼容已有配置；显示名称为「人机验证」。在同一设置页选择 Turnstile、reCAPTCHA v2/v3 或极验 v4，一次启用一个服务。未设置 `provider` 的旧配置继续使用 Turnstile：
 
 ```json
 {
   "enabled": true,
+  "provider": "turnstile",
   "siteKey": "YOUR_PUBLIC_SITE_KEY",
   "secretRef": "env:TURNSTILE_SECRET",
   "secretRefs": ["env:TURNSTILE_SECRET"],
@@ -43,7 +44,13 @@
 }
 ```
 
-使用 Cloudflare 官方 `https://challenges.cloudflare.com/turnstile/v0/siteverify`。服务端校验 success、精确 hostname、action、challenge_ts，令牌最长 2048 字符、有效期最多五分钟且单次使用；本地还保存成功令牌的 SHA-256 摘要防止并发重放。失败、超时或异常响应均不放行，不只依赖浏览器组件。Secret Key 不进入前端。Console 的 CSP 仅为 Turnstile 增加固定 Cloudflare 脚本、连接与 iframe 来源；不会广泛开放第三方脚本。
+Turnstile 调用 Cloudflare 官方校验接口，服务端校验 success、精确 hostname、action、challenge_ts，令牌有效期最多五分钟且单次使用。
+
+reCAPTCHA 使用 `provider: "recaptcha"`，`recaptchaVersion` 选择 `v2`（默认）或 `v3`。Site Key、Secret Key 引用和 `hostnames` 使用相同字段；`recaptchaDomain` 可选择 `www.google.com`（默认）或官方替代域名 `www.recaptcha.net`。v2 使用复选框组件；v3 在提交受保护操作时获取新令牌，服务端额外校验 action 和 `minScore`（默认 0.5，范围 0–1）。两种版本均校验官方响应、主机名和最多两分钟的令牌时效。
+
+极验使用 `provider: "geetest"`，`siteKey` 填写 Captcha ID，`secretRef` 引用对应的 Captcha Key。前端使用极验 v4 组件，服务端以 HMAC-SHA256 对 `lot_number` 签名，通过 HTTPS 二次校验 `captcha_output`、`pass_token` 和 `gen_time`。域名策略由极验控制台管理，不复用 Turnstile/reCAPTCHA 的主机名响应校验。
+
+所有服务通过 `captcha.options@1` 和 `captcha.verify@1` 接入 Auth。浏览器统一提交 `captchaToken`；旧客户端的 `turnstileToken` 继续兼容。极验将 `getValidate()` 结果编码为 JSON 字符串传递。成功令牌按提供商与 Site Key 隔离缓存摘要，极验以流水号去重，防止更改 JSON 字段顺序绕过本地重放检查。失败、超时或异常响应均不放行，Secret Key 不进入前端。Console 仅在需要验证时加载所选提供商的组件，CSP 允许固定的官方脚本、连接与 iframe 来源。
 
 `official.auth`：
 
@@ -165,4 +172,4 @@ node scripts/identity-demo.mjs
 
 Cloudflare Siteverify 使用本地模拟服务验证协议和拒绝路径；尚未用真实 Cloudflare 站点密钥在线验证。SMTP 已通过本机协议测试及 SLC 线上服务的 TLS、认证、测试邮件接收和注册验证码请求验证；SMTP 接受不等同于收件箱投递证明。硬件交互使用 Chromium 虚拟 FIDO2 认证器，尚未测试实体密钥、系统平台认证器和跨设备同步。
 
-参考：[Turnstile 服务端校验](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)、[SimpleWebAuthn Server](https://simplewebauthn.dev/docs/packages/server)、[Nodemailer SMTP](https://nodemailer.com/smtp)、[RFC 6238](https://www.rfc-editor.org/rfc/rfc6238) 和 [WebAuthn](https://www.w3.org/TR/webauthn-3/)。
+参考：[Turnstile 服务端校验](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)、[reCAPTCHA 服务端校验](https://developers.google.com/recaptcha/docs/verify)、[reCAPTCHA v3](https://developers.google.com/recaptcha/docs/v3)、[极验 v4 服务端接口](https://docs.geetest.com/gt4/apirefer/api/server)、[SimpleWebAuthn Server](https://simplewebauthn.dev/docs/packages/server)、[Nodemailer SMTP](https://nodemailer.com/smtp)、[RFC 6238](https://www.rfc-editor.org/rfc/rfc6238) 和 [WebAuthn](https://www.w3.org/TR/webauthn-3/)。
