@@ -95,7 +95,7 @@ TOTP 密钥使用 AES-256-GCM 加密并绑定用户 ID，恢复码和邮件验�
 管理员在丢失所有第二因素时，可以在宿主停机后使用本地 CLI：
 
 ```sh
-node apps/cli/dist/index.js call auth.reset-factors@1 '{"username":"admin"}' --config ./pluhub.json
+bun apps/cli/dist/index.js call auth.reset-factors@1 '{"username":"admin"}' --config ./pluhub.json
 ```
 
 该能力仅清除指定用户的 TOTP、恢复码、安全密钥、未完成挑战和所有会话，不修改密码或用户角色，也没有对应 HTTP 重置接口。Windows PowerShell 可用变量传递该 JSON 参数。重新启动后使用既有密码登录并重新绑定；密码丢失则另用原有 `bootstrap-admin` 本地流程。

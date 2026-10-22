@@ -37,7 +37,7 @@ docker compose up -d gateway
 
 ## 数据与安全设置
 
-- 镜像使用 UID/GID 1000 的 `node` 用户，根文件系统只读；只有 `/data` 卷和 `/tmp` 临时目录可写。
+- 镜像使用 UID/GID 1000 的 `bun` 用户，根文件系统只读；只有 `/data` 卷和 `/tmp` 临时目录可写。
 - `/data` 保存配置、各插件 SQLite、Auth 的 `security.key`、BYOK 的 `vault.key` 和插件安装数据。不得只备份数据库而遗漏密钥。
 - Compose 禁用额外 Linux capabilities，启用 `no-new-privileges`，限制容器日志大小；新装 Native/Process 插件仍是管理员授权的本机代码。
 - `docker compose stop` 会发送 SIGTERM；45 秒宽限覆盖默认 30 秒排空。升级采用停机替换。
