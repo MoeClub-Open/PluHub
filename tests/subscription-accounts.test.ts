@@ -205,7 +205,7 @@ it("keeps subscription administration session-only, encrypts tokens and survives
   }
 });
 it.each(["codex", "claude-subscription", "antigravity"])(
-  "completes %s PKCE with state validation and single-use callbacks",
+  "completes %s authorization with state validation and single-use callbacks",
   async (provider) => {
     const api = providerApi(provider);
     process.env.PLUHUB_SUBSCRIPTION_OAUTH_SECRET = "mock-client-secret";
@@ -229,7 +229,9 @@ it.each(["codex", "claude-subscription", "antigravity"])(
       expect(start.status).toBe(200);
       const flow = await start.json(),
         url = new URL(flow.url);
-      expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+      expect(url.searchParams.get("code_challenge_method")).toBe(
+        provider === "antigravity" ? null : "S256",
+      );
       const callback = new URL(url.searchParams.get("redirect_uri")!);
       callback.searchParams.set("code", "good-code");
       callback.searchParams.set("state", "wrong");
@@ -257,11 +259,14 @@ it.each(["codex", "claude-subscription", "antigravity"])(
           code: "good-code",
           redirect_uri: url.searchParams.get("redirect_uri"),
         });
-        expect(
-          createHash("sha256").update(body.code_verifier).digest("base64url"),
-        ).toBe(url.searchParams.get("code_challenge"));
-        if (provider === "antigravity")
+        if (provider === "antigravity") {
+          expect(body.code_verifier).toBeUndefined();
           expect(body.client_secret).toBe("mock-client-secret");
+        } else {
+          expect(
+            createHash("sha256").update(body.code_verifier).digest("base64url"),
+          ).toBe(url.searchParams.get("code_challenge"));
+        }
         return Response.json({
           access_token: "oauth-access",
           refresh_token: "oauth-refresh",
@@ -611,7 +616,7 @@ it("keeps provider denial and unsupported device flows out of stored accounts", 
       )
     ).json();
     expect(providers.find((p: any) => p.provider === "antigravity").ready).toBe(
-      false,
+      true,
     );
     expect(
       (

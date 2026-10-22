@@ -13,9 +13,11 @@ Codex、Claude、Antigravity 分别由以下独立插件提供：
 
 管理入口分别是 /settings/subscriptions/codex、/settings/subscriptions/claude-subscription、/settings/subscriptions/antigravity。个人 BYOSUB 仅显示已安装且运行的提供商。
 
-Codex 支持设备授权；浏览器授权使用 PKCE 和一次性 state。使用站点回调时须先向服务商登记 /api/plugins/official.upstream-<provider>/oauth/callback。服务商固定回调地址时，页面接收授权码或完整回调地址。Antigravity 的 OAuth 客户端密钥通过环境变量引用配置。密钥、刷新令牌和上游返回的敏感内容不出现在列表或日志中。
+平台与个人订阅采用相同的手动回调流程：复制授权链接或在新标签页打开提供商登录，登录后将完整回调链接粘贴回原页面，完成授权。回调指向本机地址，不需要网关服务器监听对应端口；本地页面无法打开时，仍可复制地址栏中的完整链接。也可导入已有单账号授权 JSON。
 
-凭证分别保存在各插件的数据目录，以 AES-256-GCM 加密。每个目录拥有自己的 vault.key；也可设置 masterKeyRef 引用独立环境变量。OAuth 设置可在线保存；修改解密主密钥必须离线迁移。账号禁用、授权失效、冷却和配额状态分别维护；租约在请求完成或取消后释放。
+提供商原生客户端参数内置，与 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 的接入方式一致，无需在后台配置 OAuth 应用。Codex、Claude 使用 PKCE，Antigravity 使用原生安装应用公开客户端凭据；所有提供商均校验一次性 state、会话归属及有效期。底层保留已有自定义客户端配置和设备授权 API 的兼容能力。密钥、刷新令牌和上游返回的敏感内容不出现在列表或日志中。
+
+凭证分别保存在各插件的数据目录，以 AES-256-GCM 加密。每个目录拥有自己的 vault.key；也可设置 masterKeyRef 引用独立环境变量。修改解密主密钥必须离线迁移。账号禁用、授权失效、冷却和配额状态分别维护；租约在请求完成或取消后释放。
 
 ## 从旧聚合插件迁移
 
