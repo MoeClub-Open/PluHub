@@ -7,7 +7,7 @@
 | billing | `billing.credit@1`、`billing.balance@1`；用量与账单 | USD 整数微单位钱包、唯一来源账本、请求预留、结算、待核对、管理员审计调整 |
 | commerce | `commerce.payment@1`、`commerce.entitlements@1`；充值与订阅 | 商品价格快照、订单、单次支付、周期额度、权益到期、取消续订、持久 outbox |
 | payments-stripe | `payments.stripe@1`；Stripe 支付配置 | Checkout 单次支付和持续订阅、原始字节 Webhook 验签、异步支付、周期发放 |
-| payments-epay | `payments.epay@1`；易支付配置 | V1/V2 与 MD5/RSA 独立配置、V2 响应验签、支付回调、预付周期与手动续费 |
+| payments-epay | `payments.epay@1`；易支付配置 | 多支付方式与商户、V1/V2 与 MD5/RSA 独立配置、V2 响应验签、支付回调、预付周期与手动续费 |
 | byok | `credentials.select@1`、`credentials.resolve@1`；自带凭证 | 按用户和渠道隔离的加密 API Key / OAuth 授权、过期刷新、撤销 |
 | rate-limit | 流量策略 | 按用户、Key、渠道聚合 RPM/TPM/并发，以及 HTTP/SSE 输出字节限速 |
 | protocol-converter | `ai.converter@1`；协议转换 | 四协议请求/响应与流式编解码能力；入口、标准上游通过此能力调用；本地转换预览 |
@@ -64,11 +64,15 @@ Commerce 持久保存每笔退款或争议及去重事件。通知早于支付�
 
 易支付各平台的退款接口不统一，首期保持商户后台退款、人工核对并在用户管理中追加有原因的余额调整，不虚构自动退款支持。
 
-当前商品是固定金额、单价格周期。优惠码、税费、试用、按比例变更、银行退款发起、支付方式管理和发票 PDF 暂未实现。上述退款及争议链路已由隔离模拟服务验证，仍须使用实际 Stripe 测试商户完成事件回放后再开放收款。
+当前商品是固定金额、单价格周期。优惠码、税费、试用、按比例变更、银行退款发起、Stripe 保存付款工具管理和发票 PDF 暂未实现。上述退款及争议链路已由隔离模拟服务验证，仍须使用实际 Stripe 测试商户完成事件回放后再开放收款。
 
 协议参考：[退款对象](https://docs.stripe.com/api/refunds/object)、[争议对象](https://docs.stripe.com/api/disputes/object)、[Invoice Payments](https://docs.stripe.com/api/invoice-payment/list)。
 
 ### 易支付
+
+在易支付页添加支付方式，可同时启用支付宝、微信支付及 QQ 钱包，也可配置多个平台或商户。每条配置拥有固定 ID、名称、独立启停、V1/V2 与 MD5/RSA 设置；可复制商户参数后切换支付类型，新增方式默认停用。用户购买时按实际方式选择，订单保存所选配置及名称，幂等键不能跨方式复用。
+
+停用方式或关闭易支付只阻止新订单，已存在且保留配置的订单仍可接收回调。删除配置后该方式的待付款订单不能验签，建议先停用并等待订单完成。旧单配置及无方式 ID 的历史订单回调继续兼容，原环境变量引用保留。
 
 配置 V1/V2 与 MD5/RSA。文档标准组合是 **V1 + MD5、V2 + RSA**；另外两种为兼容模式，须确认具体商户平台支持。
 
@@ -77,10 +81,10 @@ V1 生成 `/submit.php` 跳转；V2 POST `/api/pay/create`，携带 `method=jump
 MD5 配 `keyRef`；RSA 配 `privateKeyRef` 和 `platformPublicKeyRef`，均为环境变量引用。回调：
 
 ```text
-https://你的域名/api/plugins/official.payments-epay/notify
+https://你的域名/api/plugins/official.payments-epay/notify?pluhub_method=<支付方式ID>
 ```
 
-只有验签成功的 `TRADE_SUCCESS` 才入账，重复通知返回 success 而不重复发放。金额严格解析为整数分并核对订单。易支付周期套餐是预付权益，没有自动续扣；用户到期重新购买。自然月/年按 UTC 日历计算并处理月底/闰年。
+通知地址随订单生成。Commerce 核对回调方式与订单绑定，易支付同时核对该方式的商户与支付类型；支付流水按方式 ID 隔离，避免不同商户的交易号碰撞。只有验签成功的 `TRADE_SUCCESS` 才入账，重复通知返回 success 而不重复发放。金额严格解析为整数分并核对订单。易支付周期套餐是预付权益，没有自动续扣；用户到期重新购买。自然月/年按 UTC 日历计算并处理月底/闰年。
 
 ## BYOK 和订阅授权
 
