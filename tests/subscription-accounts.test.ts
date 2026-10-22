@@ -248,6 +248,12 @@ it.each(["codex", "claude-subscription", "antigravity"])(
       callback.searchParams.set("state", url.searchParams.get("state")!);
       let calls = 0;
       transport = (i) => {
+        if (i.url === "https://www.googleapis.com/oauth2/v2/userinfo?alt=json")
+          return Response.json({ email: "subscription@example.com" });
+        if (i.url === "https://api.anthropic.com/api/oauth/profile")
+          return Response.json({
+            account: { email: "subscription@example.com" },
+          });
         calls++;
         expect(i.publicOnly).toBe(true);
         const body =
