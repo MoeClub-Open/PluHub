@@ -26,7 +26,7 @@
     "format:check": "prettier --check packages apps tests scripts deploy vitest.config.ts compose.yaml"
   },
   "devDependencies": {
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@types/semver": "7.8.0",
