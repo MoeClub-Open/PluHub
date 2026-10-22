@@ -525,15 +525,15 @@ it.each([false, true])(
           },
         },
       ];
-      f.setResponse(
-        () =>
-          new Response(
-            frames
-              .map((frame) => "data: " + JSON.stringify(frame) + "\n\n")
-              .join(""),
-            { headers: { "content-type": "text/event-stream" } },
-          ),
-      );
+      f.setResponse((input) => {
+        expect(input.url).toContain(":streamGenerateContent?alt=sse");
+        return new Response(
+          frames
+            .map((frame) => "data: " + JSON.stringify(frame) + "\n\n")
+            .join(""),
+          { headers: { "content-type": "text/event-stream" } },
+        );
+      });
       const response = await f.send(64, stream);
       expect(response.status).toBe(200);
       expect(await response.text()).not.toContain('"error"');
