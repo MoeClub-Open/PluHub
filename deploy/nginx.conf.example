@@ -1,0 +1,21 @@
+# Put this map in the http context (outside server blocks).
+map $http_upgrade $pluhub_connection {
+    default upgrade;
+    '' close;
+}
+
+# Put this location inside your HTTPS virtual host. Keep TLS and server_name there.
+location / {
+    proxy_pass http://127.0.0.1:18100;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $pluhub_connection;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_read_timeout 600s;
+    proxy_send_timeout 600s;
+    client_max_body_size 2m;
+}

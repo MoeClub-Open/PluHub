@@ -1,0 +1,28 @@
+{
+  "name": "@pluhub/kernel",
+  "version": "0.1.0-alpha.14",
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@pluhub/contracts": "link:../../../PluHub-Spec",
+    "@pluhub/engine": "workspace:*",
+    "@pluhub/frontend-host": "workspace:*",
+    "@pluhub/runtime": "workspace:*",
+    "@pluhub/sdk": "workspace:*",
+    "ajv": "8.20.0",
+    "semver": "7.8.5"
+  }
+}

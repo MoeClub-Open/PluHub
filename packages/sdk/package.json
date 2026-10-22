@@ -1,0 +1,22 @@
+{
+  "name": "@pluhub/sdk",
+  "version": "0.1.0-alpha.13",
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@pluhub/contracts": "link:../../../PluHub-Spec"
+  }
+}

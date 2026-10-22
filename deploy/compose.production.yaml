@@ -1,0 +1,32 @@
+# Copy beside .env on the deployment host. Build the versioned image separately.
+services:
+  gateway:
+    image: ${PLUHUB_IMAGE:?Set PLUHUB_IMAGE to a tested immutable release tag}
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${PLUHUB_BIND_ADDRESS:-127.0.0.1}:${PLUHUB_PORT:-18100}:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PLUHUB_PUBLIC_ORIGIN: "${PLUHUB_PUBLIC_ORIGIN:-http://localhost:18100}"
+      NODE_OPTIONS: --max-old-space-size=768
+    volumes:
+      - pluhub-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=1000,gid=1000
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 256
+    stop_grace_period: 45s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  pluhub-data:

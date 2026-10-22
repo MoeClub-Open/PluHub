@@ -1,0 +1,114 @@
+name: Verify locked stack
+on:
+  workflow_call:
+    inputs:
+      host_ref:
+        type: string
+        default: ""
+      plugins_ref:
+        type: string
+        default: ""
+      export_image:
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: MoeClub-Open/PluHub
+          ref: ${{ inputs.host_ref || github.sha }}
+          path: PluHub
+          persist-credentials: false
+      - name: Resolve companion revisions
+        id: stack
+        working-directory: PluHub
+        run: node scripts/ci-stack.mjs >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: MoeClub-Open/PluHub-Spec
+          ref: ${{ steps.stack.outputs.spec }}
+          path: PluHub-Spec
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: MoeClub-Open/PluHub-SDK-Go
+          ref: ${{ steps.stack.outputs.go }}
+          path: PluHub-SDK-Go
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: MoeClub-Open/PluHub-Plugins
+          ref: ${{ inputs.plugins_ref || steps.stack.outputs.plugins }}
+          path: PluHub-Plugins
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.20.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: 1.27.0
+          cache: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: 3.13.5
+      - name: Contracts and compatibility
+        working-directory: PluHub-Spec
+        run: pnpm install --frozen-lockfile && pnpm build && pnpm test && pnpm check:compat
+      - name: Host build and static checks
+        working-directory: PluHub
+        run: pnpm install --frozen-lockfile && pnpm build && pnpm typecheck && pnpm format:check
+      - name: Official plugins
+        working-directory: PluHub-Plugins
+        run: pnpm install --frozen-lockfile && pnpm build && pnpm typecheck && pnpm test
+      - name: Go SDK
+        working-directory: PluHub-SDK-Go
+        run: |
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go test -race ./...
+      - name: Full integration and public package boundaries
+        working-directory: PluHub
+        run: |
+          pnpm test
+          node scripts/check-boundaries.mjs
+          pnpm pack:all
+          node scripts/verify-routing-packages.mjs
+          node scripts/verify-identity-packages.mjs
+          pnpm bench
+      - name: Deployable image and persistence
+        working-directory: PluHub
+        run: |
+          docker build --build-context spec=../PluHub-Spec --build-context plugins=../PluHub-Plugins -t pluhub:ci .
+          PLUHUB_DOCKER_IMAGE=pluhub:ci pnpm test:docker
+          python -B -m unittest discover -s tests -p 'backup*_test.py'
+          sudo env PATH="$PATH" PLUHUB_DOCKER_IMAGE=pluhub:ci python -B scripts/verify-backup-manager.py
+      - name: Export the tested image
+        if: inputs.export_image
+        run: docker save pluhub:ci | gzip -1 > pluhub-image.tar.gz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: inputs.export_image
+        with:
+          name: tested-image
+          path: pluhub-image.tar.gz
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: linux-verification
+          path: |
+            PluHub/output/bench.json
+            PluHub/output/docker-smoke.json
+            PluHub/output/backup-manager-smoke.json
+            PluHub/output/packages/RELEASE_LOCK.json
+            PluHub/output/registry/v1/index.json
+          if-no-files-found: warn

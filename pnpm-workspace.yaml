@@ -1,0 +1,12 @@
+packages:
+  - packages/*
+  - apps/*
+
+onlyBuiltDependencies:
+  - esbuild
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - x64

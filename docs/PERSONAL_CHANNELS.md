@@ -1,0 +1,50 @@
+# 个人渠道与 API Key 绑定
+
+普通用户从「个人渠道」添加上游，选择 OpenAI、Anthropic、Gemini、DeepSeek、OpenRouter、New API 或自定义预设，填写地址、密钥和模型映射。预设用于填充可编辑的连接信息，不是渠道类型。每个用户最多保存 64 个渠道，每个渠道最多 256 个模型；渠道可启停、改名、轮换密钥、删除及使用流程图组合功能。
+
+渠道与凭证按用户隔离。上游密钥使用现有 AES-256-GCM Vault 加密，不返回给浏览器；管理写入要求控制台会话。保存采用 revision 检查，拒绝覆盖过期编辑。流程图支持条件、提示词、思考强度、输出预算、TPS、渠道内模型重定向和调用上游；个人流程不能引用平台自动路由策略或注入其他上游连接。
+
+BYOAPI 可粘贴 New API 导出的连接 JSON，或使用 base_url/api_key 等常见属性填充连接。保存前即可获取模型目录，返回结果不包含密钥，只有确认保存后才创建渠道。目录查询沿用公网校验、超时与响应大小上限。
+
+## BYOSUB 自带订阅
+
+「个人渠道 → 自带订阅」管理用户自己的 Codex、Claude、Antigravity 授权，可导入单账号授权 JSON 或走 OAuth PKCE。账号加密存储与刷新由订阅账号插件维护，个人渠道只保存绑定引用。个人订阅与管理员的平台订阅账号隔离，双方不能相互引用；管理操作限本人控制台会话，网关 API Key 不能管理授权。
+
+添加授权后点击「添加渠道」，填写模型映射，继续使用同一套流程图、Playground 和 API Key 绑定。订阅授权仅发送到对应提供商的官方上游；兼容网关地址和网关 API Key 应使用 BYOAPI。Codex 默认 CLI 接入，可按实际授权选择 SIWC；CLI 接入拒绝其不支持的输出预算和 temperature，测试调用会省略预算参数。订阅渠道不自动抓取或推测模型权限，模型列表由用户按实际授权填写。
+
+个人订阅支持按需刷新、一次同账号 401 刷新重试、429/额度冷却与并发占用；取消、异常和结束时释放占用。停用或删除授权后，绑定 Key 不回落到平台收费渠道。个人订阅调用保留用量与调用记录，不从平台钱包扣模型费；平台订阅渠道继续按平台规则计费。
+
+旧的平台渠道凭证入口保留。其共享刷新与客户端取消分离，凭证撤销或轮换后，旧刷新不会重建或覆盖凭证。
+
+## 原价与消耗倍率
+
+模型 `inputPrice` / `outputPrice` 始终表示原价（USD / 百万 Token）。可填写原价，或点击「匹配平台原价」填入同名模型的已配置原价。此操作仅补空值。
+
+- 自动：分别以 `upstreamInputPrice / inputPrice` 和 `upstreamOutputPrice / outputPrice` 计算消耗倍率。未填写某一侧上游报价时，该侧按原价估算 1×；缺原价时倍率未知。
+- 手动：有效输入/输出价格 = 对应原价 × 渠道 `consumptionMultiplier`，允许 0，默认 1。
+- 调用成本（USD）= `(输入 Token × 有效输入价 + 输出 Token × 有效输出价) / 1,000,000`。调用日志按微美元四舍五入。原价目录不随倍率变化。
+- 原价和有效价均为 0 时倍率显示 1×；原价 0 且上游报价非 0 时倍率显示未知，仍可按报价估算成本。价格缺失不当成免费。
+
+New API 预设可读取公开 `/api/ratio_config`，把上游基础 Token 价格作为报价预览，用户确认应用并保存后生效，保留模型原价。转换规则为 `input = model_ratio × 2`，`output = input × completion_ratio`，不导入按次价格；公开报价不包含用户分组折扣、缓存和特殊服务层费用，可手动覆盖。模型目录同步与价格同步都有超时和响应体大小限制，不自动发起文本生成。
+
+个人渠道成本由用户与上游服务商结算，PluHub 钱包不扣个人上游的模型费用；调用记录中的成本用于估算。平台渠道继续走既有计费规则。
+
+## 密钥与路由
+
+创建 API Key 时可选择「平台默认路由」、一个指定平台渠道，或一个个人渠道。个人渠道自动绑定该渠道的凭证；平台渠道可另选属于自己的匹配凭证。已有 Key 可在「渠道绑定」弹窗修改绑定，不需要轮换 Key，下一次请求生效。
+
+客户端使用标准 `Authorization: Bearer <PluHub Key>`，不需要额外传凭证 ID。每次请求检查渠道所有权、启停和凭证有效性。已绑定 Key 的 `x-pluhub-channel` / `x-pluhub-credential` 不能覆盖其绑定。Key 的模型允许范围仍按客户端公开模型名检查。绑定渠道删除、停用或凭证撤销后拒绝新请求，不回落到平台收费渠道。已经开始的流按既有排空与取消机制结束。
+
+未绑定的旧 Key 保留平台路由和旧 `x-pluhub-credential` 行为；显式指定 `x-pluhub-channel` 可选择当前用户的渠道。`/v1/models` 按 Key 绑定返回模型；控制台模型目录和 Playground 可选择个人渠道，选择应与调用 Key 的绑定一致。同名模型在不同渠道各自独立。
+
+## 公网连接边界
+
+个人渠道禁止 URL 中的用户名、密码、查询串和片段；默认仅允许公网 HTTP(S)。传输层在实际连接的 DNS 解析中检查所有地址，阻止本机、内网、链路本地、保留地址及 IPv6 过渡/映射地址，不跟随重定向。管理员可通过 BYOK 插件 `allowedPrivateOrigins` 配置精确来源例外，用于受信任私有上游或本地模拟测试。该设置不向用户开放；生产默认无例外。
+
+数据随 `/data` 备份，包括 BYOK SQLite 与 `vault.key`。升级会为旧数据库增加个人渠道表和 Key 绑定字段，旧凭证及 Key 不受影响。
+
+参考 AxonHub 的渠道内模型映射与 API Key 渠道限制边界：
+
+- https://github.com/looplj/axonhub/blob/unstable/docs/en/guides/channel-management.md
+- https://github.com/looplj/axonhub/blob/unstable/docs/en/guides/api-key-profiles.md
+- https://docs.newapi.pro/zh/docs/guide/console/settings/rate-settings

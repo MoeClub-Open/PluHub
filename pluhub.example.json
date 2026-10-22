@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "dataDir": ".pluhub/data",
+  "drainTimeoutMs": 30000,
+  "plugins": [
+    {
+      "path": "../PluHub-Plugins/plugins/listener",
+      "grants": [
+        "http.listen"
+      ],
+      "config": {
+        "port": 8080,
+        "host": "127.0.0.1"
+      }
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/http-transport",
+      "grants": [],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/console",
+      "grants": [
+        "http.route"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/users",
+      "grants": [
+        "api.register"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/auth",
+      "grants": [
+        "api.register",
+        "identity.provide",
+        "hooks.register"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/ai-router",
+      "grants": [
+        "api.register",
+        "http.route"
+      ],
+      "config": {
+        "upstreams": {},
+        "models": {}
+      }
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/ingress-openai-chat",
+      "grants": [
+        "http.route"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/upstream-openai-chat",
+      "grants": [
+        "secrets.read"
+      ],
+      "config": {
+        "secretRefs": []
+      }
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/ingress-openai-responses",
+      "grants": [
+        "http.route"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/upstream-openai-responses",
+      "grants": [
+        "secrets.read"
+      ],
+      "config": {
+        "secretRefs": []
+      }
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/ingress-anthropic",
+      "grants": [
+        "http.route"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/upstream-anthropic",
+      "grants": [
+        "secrets.read"
+      ],
+      "config": {
+        "secretRefs": []
+      }
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/ingress-gemini",
+      "grants": [
+        "http.route"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/upstream-gemini",
+      "grants": [
+        "secrets.read"
+      ],
+      "config": {
+        "secretRefs": []
+      }
+    },
+    {
+      "config": {},
+      "grants": [
+        "api.register"
+      ],
+      "path": "../PluHub-Plugins/plugins/model-catalog"
+    },
+    {
+      "config": {},
+      "grants": [
+        "api.register",
+        "hooks.register"
+      ],
+      "path": "../PluHub-Plugins/plugins/observability"
+    },
+    {
+      "config": {},
+      "grants": [
+        "api.register"
+      ],
+      "path": "../PluHub-Plugins/plugins/leaderboard"
+    },
+    {
+      "config": {},
+      "grants": [
+        "api.register"
+      ],
+      "path": "../PluHub-Plugins/plugins/playground"
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/billing",
+      "grants": [
+        "api.register",
+        "hooks.register"
+      ],
+      "config": {
+        "enabled": false
+      }
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/commerce",
+      "grants": [
+        "api.register"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/payments-stripe",
+      "grants": [
+        "api.register",
+        "secrets.read"
+      ],
+      "config": {
+        "enabled": false
+      }
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/payments-epay",
+      "grants": [
+        "api.register",
+        "secrets.read"
+      ],
+      "config": {
+        "enabled": false
+      }
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/byok",
+      "grants": [
+        "api.register",
+        "secrets.read"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/rate-limit",
+      "grants": [
+        "api.register",
+        "hooks.register"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/upstream-codex",
+      "grants": [
+        "secrets.read",
+        "api.register"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/upstream-claude-subscription",
+      "grants": [
+        "secrets.read",
+        "api.register"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/upstream-antigravity",
+      "grants": [
+        "secrets.read",
+        "api.register"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/auto-router",
+      "grants": [
+        "api.register",
+        "secrets.read"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/token-speed",
+      "grants": [
+        "api.register"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/mailer",
+      "grants": [
+        "api.register",
+        "secrets.read"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/turnstile",
+      "grants": [
+        "api.register",
+        "secrets.read"
+      ],
+      "config": {}
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/tickets",
+      "grants": [
+        "api.register"
+      ],
+      "config": {}
+    }
+  ]
+}

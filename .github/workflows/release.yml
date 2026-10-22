@@ -1,0 +1,48 @@
+name: Publish tested image
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+    with:
+      export_image: true
+  publish:
+    needs: verify
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: tested-image
+      - name: Publish exactly the image that passed verification
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]
+          [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          docker load -i pluhub-image.tar.gz
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+          image=ghcr.io/moeclub-open/pluhub
+          docker tag pluhub:ci "$image:$RELEASE_TAG"
+          docker tag pluhub:ci "$image:sha-$RELEASE_SHA"
+          docker push "$image:$RELEASE_TAG"
+          docker push "$image:sha-$RELEASE_SHA"
+          docker image inspect --format '{{json .RepoDigests}}' "$image:$RELEASE_TAG" > image-digests.json
+          docker logout ghcr.io
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: published-image-digests
+          path: image-digests.json
+          if-no-files-found: error
