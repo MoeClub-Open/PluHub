@@ -17,6 +17,14 @@ let transport: (
 const providerApi = (provider: string) =>
   "/api/plugins/official.upstream-" + provider;
 const api = providerApi("codex");
+function accountDiscovery(input: any) {
+  if (input.url === "https://www.googleapis.com/oauth2/v2/userinfo?alt=json")
+    return Response.json({ email: "subscription@example.com" });
+  if (input.url === "https://api.anthropic.com/api/oauth/profile")
+    return Response.json({ account: { email: "subscription@example.com" } });
+  if (input.url.endsWith("/v1internal:loadCodeAssist"))
+    return Response.json({ cloudaicompanionProject: "test-project" });
+}
 async function setup(extra: string[] = [], configs: any = {}) {
   let transportPath = "";
   (globalThis as any).__subscriptionAccountsTransport = (
@@ -248,12 +256,8 @@ it.each(["codex", "claude-subscription", "antigravity"])(
       callback.searchParams.set("state", url.searchParams.get("state")!);
       let calls = 0;
       transport = (i) => {
-        if (i.url === "https://www.googleapis.com/oauth2/v2/userinfo?alt=json")
-          return Response.json({ email: "subscription@example.com" });
-        if (i.url === "https://api.anthropic.com/api/oauth/profile")
-          return Response.json({
-            account: { email: "subscription@example.com" },
-          });
+        const discovery = accountDiscovery(i);
+        if (discovery) return discovery;
         calls++;
         expect(i.publicOnly).toBe(true);
         const body =
@@ -325,7 +329,9 @@ it.each(["codex", "claude-subscription", "antigravity"])(
     });
     try {
       let calls = 0;
-      transport = () => {
+      transport = (input) => {
+        const discovery = accountDiscovery(input);
+        if (discovery) return discovery;
         calls++;
         return Response.json({
           access_token: "web-only-secret",
