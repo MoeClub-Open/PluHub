@@ -7,7 +7,7 @@ WORKDIR /src/PluHub
 COPY . .
 COPY --from=spec . /src/PluHub-Spec
 COPY --from=plugins . /src/PluHub-Plugins
-RUN pnpm bootstrap && pnpm build:all && pnpm pack:all && node deploy/docker/prepare.mjs
+RUN pnpm bootstrap && pnpm build:all && pnpm pack:all && bun deploy/docker/prepare.ts
 RUN cd /image && npm install --omit=dev --ignore-scripts --no-audit --no-fund ./packages/*.tgz
 
 FROM bun AS runtime

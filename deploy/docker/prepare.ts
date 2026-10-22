@@ -1,5 +1,9 @@
 import { mkdir, readdir, cp, readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { digest } from "../../packages/control/dist/index.js";
+import type { ImagePluginCatalog } from "./sync-bundled-plugins.ts";
 const out = "/image";
+const catalog: ImagePluginCatalog = { imageId: randomUUID(), plugins: {} };
 await cp("output/registry", out + "/registry", { recursive: true });
 await mkdir(out + "/packages", { recursive: true });
 const release = JSON.parse(
@@ -15,8 +19,20 @@ for (const name of await readdir("../PluHub-Plugins/plugins")) {
   await mkdir(target, { recursive: true });
   for (const file of ["manifest.json", "package.json", "dist"])
     await cp(source + "/" + file, target + "/" + file, { recursive: true });
+  const manifest = JSON.parse(
+    await readFile(target + "/manifest.json", "utf8"),
+  );
+  catalog.plugins["/opt/pluhub/plugins/" + name] = {
+    id: manifest.id,
+    version: manifest.version,
+    integrity: await digest(target),
+  };
 }
 await cp("deploy/docker", out + "/deploy/docker", { recursive: true });
+await writeFile(
+  out + "/deploy/docker/bundled-plugins.json",
+  JSON.stringify(catalog) + "\n",
+);
 await mkdir(out + "/scripts", { recursive: true });
 await cp(
   "scripts/migrate-channel-graphs.mjs",

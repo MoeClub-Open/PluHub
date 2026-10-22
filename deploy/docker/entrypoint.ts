@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { spawnSync, spawn } from "node:child_process";
+import { syncBundledPlugins } from "./sync-bundled-plugins.ts";
 const cli = "/opt/pluhub/node_modules/@pluhub/cli/dist/index.js";
 const file = process.env.PLUHUB_CONFIG ?? "/data/pluhub.json";
 const args = process.argv.slice(2);
@@ -97,6 +98,7 @@ if (!existsSync(file)) {
   });
   renameSync(file + ".init", file);
 }
+if (args[0] === "start") await syncBundledPlugins(file);
 // The shell entrypoint holds an exclusive flock across container PID namespaces.
 // A stale PID from a crashed container cannot identify a process in this namespace.
 try {
