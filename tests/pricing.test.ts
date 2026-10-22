@@ -86,7 +86,7 @@ async function setup(enabled = true) {
       "upstream-gemini",
     ],
     {
-      billing: { enabled, groups: { vip: { name: "VIP", multiplier: 0.8 } } },
+      billing: { enabled },
       "ai-router": router,
     },
     mock,
@@ -111,29 +111,16 @@ async function setup(enabled = true) {
     f.kernel.invoke<any>("billing.balance@1", { userId: me.id });
   return { ...f, admin, me, invoke, balance };
 }
-it("charges cache-aware usage with channel, group and user factors and exposes an immutable own receipt", async () => {
+it("charges cache-aware usage with the channel multiplier and exposes an immutable own receipt", async () => {
   const f = await setup();
   try {
-    const saved = await f.request(
-      "/api/plugins/official.billing/admin/pricing-user",
-      "PUT",
-      {
-        userId: f.me.id,
-        group: "vip",
-        userMultiplier: 1.1,
-        reason: "pricing test",
-      },
-      f.admin,
-    );
-    expect(saved.status).toBe(200);
-    await saved.json();
     const response = await f.invoke("alias");
     expect(response.status).toBe(200);
     expect(
       (await response.json()).usage.prompt_tokens_details.cached_tokens,
     ).toBe(600);
-    // (400*3 + 100*15 + 600*.3) * .5 * .8 * 1.1 = 1267.2 -> 1268.
-    expect(await f.balance()).toMatchObject({ balance: 998732, held: 0 });
+    // (400*3 + 100*15 + 600*.3) * .5 = 1440.
+    expect(await f.balance()).toMatchObject({ balance: 998560, held: 0 });
     const ledger = await (
       await f.request(
         "/api/plugins/official.billing/ledger",
@@ -144,12 +131,9 @@ it("charges cache-aware usage with channel, group and user factors and exposes a
     ).json();
     const receipt = JSON.parse(ledger[0].receipt);
     expect(receipt).toMatchObject({
-      amount: 1268,
+      amount: 1440,
       pricing: {
-        group: "vip",
         multiplier: 0.5,
-        groupMultiplier: 0.8,
-        userMultiplier: 1.1,
       },
       usage: { cacheRead: 600, reasoning: 40 },
     });
@@ -161,7 +145,7 @@ it("charges cache-aware usage with channel, group and user factors and exposes a
         f.admin,
       )
     ).json();
-    expect(requests.data[0].cost_micro_usd).toBe(1268);
+    expect(requests.data[0].cost_micro_usd).toBe(1440);
     expect(JSON.parse(requests.data[0].usage_json)).toMatchObject({
       cacheRead: 600,
       reasoning: 40,
@@ -169,9 +153,6 @@ it("charges cache-aware usage with channel, group and user factors and exposes a
     expect(JSON.parse(requests.data[0].pricing_json)).toMatchObject({
       input: 3,
       output: 15,
-      group: "vip",
-      groupMultiplier: 0.8,
-      userMultiplier: 1.1,
     });
     const quote = await f.request(
       "/api/plugins/official.billing/quote",
@@ -179,7 +160,7 @@ it("charges cache-aware usage with channel, group and user factors and exposes a
       { model: "demo", usage: { input: 1000, output: 100, cacheRead: 600 } },
       f.admin,
     );
-    expect((await quote.json()).amount).toBe(1268);
+    expect((await quote.json()).amount).toBe(1440);
   } finally {
     await f.close();
   }
@@ -318,10 +299,6 @@ it("snapshots prices and billing policy before a streamed request executes", asy
       f.kernel.configure({
         "official.billing": {
           enabled: true,
-          groups: {
-            default: { name: "Changed", multiplier: 5 },
-            vip: { name: "VIP", multiplier: 0.8 },
-          },
         },
         "official.ai-router": {
           ...router,
@@ -341,57 +318,9 @@ it("snapshots prices and billing policy before a streamed request executes", asy
     await f.close();
   }
 });
-it("rejects invalid tiers and deleting assigned groups, and isolates pricing administration", async () => {
+it("rejects invalid pricing tiers without changing balances", async () => {
   const f = await setup();
   try {
-    const created = await f.request(
-      "/api/plugins/official.auth/users",
-      "POST",
-      { username: "pricing-user", password: "pricing-user-password" },
-      f.admin,
-    );
-    const user = await created.json();
-    const login = await f.request("/api/plugins/official.auth/login", "POST", {
-      username: "pricing-user",
-      password: "pricing-user-password",
-    });
-    const ordinary = {
-      cookie: login.headers.get("set-cookie")!.split(";")[0]!,
-    };
-    await login.json();
-    for (const [method, path, body] of [
-      ["GET", "/admin/pricing-user?userId=" + f.me.id, undefined],
-      [
-        "PUT",
-        "/admin/pricing-user",
-        {
-          userId: user.id,
-          group: "vip",
-          userMultiplier: 0,
-          reason: "unauthorized",
-        },
-      ],
-    ] as const) {
-      const denied = await f.request(
-        "/api/plugins/official.billing" + path,
-        method,
-        body,
-        ordinary,
-      );
-      expect(denied.status).toBe(403);
-      await denied.text();
-    }
-    const saved = await f.request(
-      "/api/plugins/official.billing/admin/pricing-user",
-      "PUT",
-      { userId: user.id, group: "vip", userMultiplier: 0.7, reason: "assign" },
-      f.admin,
-    );
-    expect(saved.status).toBe(200);
-    await saved.json();
-    expect(() =>
-      f.kernel.configure({ "official.billing": { enabled: true, groups: {} } }),
-    ).toThrow("still assigned");
     expect(() =>
       f.kernel.configure({
         "official.ai-router": {
@@ -410,15 +339,6 @@ it("rejects invalid tiers and deleting assigned groups, and isolates pricing adm
         },
       }),
     ).toThrow("strictly increasing");
-    const policy = await (
-      await f.request(
-        "/api/plugins/official.billing/pricing-policy?userId=" + f.me.id,
-        "GET",
-        undefined,
-        ordinary,
-      )
-    ).json();
-    expect(policy).toMatchObject({ group: "vip", userMultiplier: 0.7 });
     expect(await f.balance()).toMatchObject({ balance: 1000000, held: 0 });
   } finally {
     await f.close();
