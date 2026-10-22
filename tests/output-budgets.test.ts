@@ -493,6 +493,68 @@ it("reserves atomically for concurrent calls and retains the admitted request's 
 });
 
 it.each([false, true])(
+  "bills the final Gemini snapshot after provisional thinking counts and an empty-text signature (stream=%s)",
+  async (stream) => {
+    const f = await budgetFixture({ target: "gemini" });
+    try {
+      f.router.upstreams.primary.consumptionMultiplier = 0.2;
+      f.kernel.configure({ "official.ai-router": f.router });
+      const frames = [
+        {
+          candidates: [{ content: { parts: [{ text: "ok" }] } }],
+          usageMetadata: {
+            promptTokenCount: 20,
+            candidatesTokenCount: 2,
+            thoughtsTokenCount: 128,
+          },
+        },
+        {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: "", thoughtSignature: "test-signature" }],
+              },
+              finishReason: "STOP",
+            },
+          ],
+          usageMetadata: {
+            promptTokenCount: 20,
+            candidatesTokenCount: 2,
+            thoughtsTokenCount: 30,
+          },
+        },
+      ];
+      f.setResponse(
+        () =>
+          new Response(
+            frames
+              .map((frame) => "data: " + JSON.stringify(frame) + "\n\n")
+              .join(""),
+            { headers: { "content-type": "text/event-stream" } },
+          ),
+      );
+      const response = await f.send(64, stream);
+      expect(response.status).toBe(200);
+      expect(await response.text()).not.toContain('"error"');
+      expect(f.reservations()[0]).toMatchObject({
+        status: "settled",
+        actual: 17,
+      });
+      expect(await f.balance()).toMatchObject({ balance: 999983, held: 0 });
+      const row = (await f.logs())[0]!;
+      expect(row).toMatchObject({ status: "success", cost_micro_usd: 17 });
+      expect(JSON.parse(row.usage_json)).toEqual({
+        input: 20,
+        output: 32,
+        reasoning: 30,
+      });
+    } finally {
+      await f.close();
+    }
+  },
+);
+
+it.each([false, true])(
   "holds a provider output-limit violation for review without silently billing extra (stream=%s)",
   async (stream) => {
     const f = await budgetFixture();
