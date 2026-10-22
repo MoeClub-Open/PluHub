@@ -11,26 +11,30 @@
       "config": {
         "port": 8080,
         "host": "127.0.0.1"
-      }
+      },
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/http-transport",
       "grants": [],
-      "config": {}
+      "config": {},
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/console",
       "grants": [
         "http.route"
       ],
-      "config": {}
+      "config": {},
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/users",
       "grants": [
         "api.register"
       ],
-      "config": {}
+      "config": {},
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/auth",
@@ -39,7 +43,8 @@
         "identity.provide",
         "hooks.register"
       ],
-      "config": {}
+      "config": {},
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/ai-router",
@@ -50,14 +55,16 @@
       "config": {
         "upstreams": {},
         "models": {}
-      }
+      },
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/ingress-openai-chat",
       "grants": [
         "http.route"
       ],
-      "config": {}
+      "config": {},
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/upstream-openai-chat",
@@ -66,14 +73,16 @@
       ],
       "config": {
         "secretRefs": []
-      }
+      },
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/ingress-openai-responses",
       "grants": [
         "http.route"
       ],
-      "config": {}
+      "config": {},
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/upstream-openai-responses",
@@ -82,14 +91,16 @@
       ],
       "config": {
         "secretRefs": []
-      }
+      },
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/ingress-anthropic",
       "grants": [
         "http.route"
       ],
-      "config": {}
+      "config": {},
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/upstream-anthropic",
@@ -98,14 +109,16 @@
       ],
       "config": {
         "secretRefs": []
-      }
+      },
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/ingress-gemini",
       "grants": [
         "http.route"
       ],
-      "config": {}
+      "config": {},
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/upstream-gemini",
@@ -114,14 +127,16 @@
       ],
       "config": {
         "secretRefs": []
-      }
+      },
+      "enabled": true
     },
     {
       "config": {},
       "grants": [
         "api.register"
       ],
-      "path": "../PluHub-Plugins/plugins/model-catalog"
+      "path": "../PluHub-Plugins/plugins/model-catalog",
+      "enabled": true
     },
     {
       "config": {},
@@ -129,21 +144,24 @@
         "api.register",
         "hooks.register"
       ],
-      "path": "../PluHub-Plugins/plugins/observability"
+      "path": "../PluHub-Plugins/plugins/observability",
+      "enabled": true
     },
     {
       "config": {},
       "grants": [
         "api.register"
       ],
-      "path": "../PluHub-Plugins/plugins/leaderboard"
+      "path": "../PluHub-Plugins/plugins/leaderboard",
+      "enabled": false
     },
     {
       "config": {},
       "grants": [
         "api.register"
       ],
-      "path": "../PluHub-Plugins/plugins/playground"
+      "path": "../PluHub-Plugins/plugins/playground",
+      "enabled": true
     },
     {
       "path": "../PluHub-Plugins/plugins/billing",
@@ -153,14 +171,16 @@
       ],
       "config": {
         "enabled": false
-      }
+      },
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/commerce",
       "grants": [
         "api.register"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/payments-stripe",
@@ -170,7 +190,8 @@
       ],
       "config": {
         "enabled": false
-      }
+      },
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/payments-epay",
@@ -180,7 +201,8 @@
       ],
       "config": {
         "enabled": false
-      }
+      },
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/byok",
@@ -188,7 +210,8 @@
         "api.register",
         "secrets.read"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/rate-limit",
@@ -196,7 +219,8 @@
         "api.register",
         "hooks.register"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/upstream-codex",
@@ -204,7 +228,8 @@
         "secrets.read",
         "api.register"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/upstream-claude-subscription",
@@ -212,7 +237,8 @@
         "secrets.read",
         "api.register"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/upstream-antigravity",
@@ -220,7 +246,8 @@
         "secrets.read",
         "api.register"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/auto-router",
@@ -228,14 +255,16 @@
         "api.register",
         "secrets.read"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/token-speed",
       "grants": [
         "api.register"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/mailer",
@@ -243,7 +272,8 @@
         "api.register",
         "secrets.read"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/turnstile",
@@ -251,14 +281,16 @@
         "api.register",
         "secrets.read"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/tickets",
       "grants": [
         "api.register"
       ],
-      "config": {}
+      "config": {},
+      "enabled": false
     }
   ]
 }

@@ -1,5 +1,5 @@
-/** Product preset shared by init, demo and integration fixtures.
- * Compatibility adapters remain installable, but are not needed for new sites. */
+/** Bundled plugins shared by init, demo and integration fixtures.
+ * Optional features are installed disabled; compatibility adapters stay opt-in. */
 export const defaultPluginNames = [
   "listener",
   "http-transport",
@@ -25,6 +25,22 @@ export const defaultPluginNames = [
   "upstream-codex",
   "upstream-claude-subscription",
   "upstream-antigravity",
+  ...["openai-chat", "openai-responses", "anthropic", "gemini"].flatMap(
+    (protocol) => ["ingress-" + protocol, "upstream-" + protocol],
+  ),
+];
+
+/** A fresh gateway exposes only its core product and standard protocols. */
+export const defaultEnabledPluginNames = [
+  "listener",
+  "http-transport",
+  "console",
+  "users",
+  "auth",
+  "ai-router",
+  "model-catalog",
+  "observability",
+  "playground",
   ...["openai-chat", "openai-responses", "anthropic", "gemini"].flatMap(
     (protocol) => ["ingress-" + protocol, "upstream-" + protocol],
   ),

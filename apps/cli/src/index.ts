@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { scaffold } from "./scaffold.js";
 import { withPublicOrigin } from "./public-origin.js";
-import { defaultPluginNames } from "./presets.js";
+import { defaultPluginNames, defaultEnabledPluginNames } from "./presets.js";
 import { verifyData } from "./verify-data.js";
 import { readFile, access, mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
@@ -66,6 +66,7 @@ async function main() {
       );
       plugins.push({
         path,
+        enabled: defaultEnabledPluginNames.includes(name),
         grants: manifest.permissions,
         config:
           name === "listener"

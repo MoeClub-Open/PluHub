@@ -137,6 +137,32 @@ try {
   ).json();
   assert.equal(system.runtime.name, "Bun");
   assert.equal(system.runtime.version, "1.4.3");
+  const installed = await (
+    await request("/api/host/plugins", { headers: { cookie } })
+  ).json();
+  assert.equal(installed.filter((p) => p.state === "Active").length, 17);
+  for (const id of [
+    "billing",
+    "commerce",
+    "payments-stripe",
+    "payments-epay",
+    "byok",
+    "leaderboard",
+    "tickets",
+    "mailer",
+    "turnstile",
+    "auto-router",
+    "rate-limit",
+    "token-speed",
+    "upstream-codex",
+    "upstream-claude-subscription",
+    "upstream-antigravity",
+  ])
+    assert.notEqual(
+      installed.find((p) => p.id === "official." + id)?.state,
+      "Active",
+    );
+  report.defaultActivePlugins = 17;
   const key = await (
     await request("/api/plugins/official.auth/keys", {
       method: "POST",

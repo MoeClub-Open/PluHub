@@ -3,7 +3,11 @@ import { spawn } from "node:child_process";
 import { readFile, writeFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fixture } from "./helpers.js";
-import { defaultPluginNames } from "../apps/cli/dist/presets.js";
+import {
+  defaultPluginNames,
+  defaultEnabledPluginNames,
+} from "../apps/cli/dist/presets.js";
+import { createKernel } from "../packages/control/dist/index.js";
 
 it("keeps init and example defaults aligned without redundant compatibility adapters", async () => {
   const f = await fixture(["users"]);
@@ -12,7 +16,14 @@ it("keeps init and example defaults aligned without redundant compatibility adap
     const result = await new Promise<number | null>((done, reject) => {
       const child = spawn(
         process.execPath,
-        [resolve("apps/cli/dist/index.js"), "init", "--config", file],
+        [
+          resolve("apps/cli/dist/index.js"),
+          "init",
+          "--config",
+          file,
+          "--port",
+          "0",
+        ],
         { stdio: "ignore" },
       );
       child.on("error", reject);
@@ -31,6 +42,38 @@ it("keeps init and example defaults aligned without redundant compatibility adap
     expect(
       example.plugins.map((p: any) => p.path.split("/").pop()).sort(),
     ).toEqual([...defaultPluginNames].sort());
+    for (const value of [config, example])
+      expect(
+        value.plugins
+          .filter((p: any) => p.enabled !== false)
+          .map((p: any) => p.path.replaceAll("\\", "/").split("/").pop())
+          .sort(),
+      ).toEqual([...defaultEnabledPluginNames].sort());
+    const kernel = await createKernel(config);
+    try {
+      await kernel.start();
+      expect(
+        kernel
+          .list()
+          .filter((p) => p.state === "Active")
+          .map((p) => p.id)
+          .sort(),
+      ).toEqual(
+        defaultEnabledPluginNames.map((name) => "official." + name).sort(),
+      );
+      const paths = kernel.extensions().map((p) => p.path);
+      expect(paths).toContain("/playground");
+      for (const path of [
+        "/commerce",
+        "/billing",
+        "/byok",
+        "/tickets",
+        "/leaderboard",
+      ])
+        expect(paths).not.toContain(path);
+    } finally {
+      await kernel.shutdown();
+    }
   } finally {
     await f.close();
   }

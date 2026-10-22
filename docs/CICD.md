@@ -11,8 +11,8 @@
 推送 `v主版本.次版本.修订版本[-预发布]` 标签触发镜像交付。完整验证成功后导出实际通过测试的镜像，再由独立、具有 packages 写权限的任务发布至 `ghcr.io/moeclub-open/pluhub`，同时写入版本标签与 `sha-<提交ID>` 标签；不会在发布任务重新构建镜像。发布的 RepoDigest 和测试回执保存在 Actions Artifacts。
 
 ```sh
-git tag v0.1.0-alpha.14
-git push origin v0.1.0-alpha.14
+git tag v0.1.0-alpha.15
+git push origin v0.1.0-alpha.15
 ```
 
 生产部署应固定镜像 digest，在维护锁下停机备份，恢复验证通过后再切换。当前源代码推送不会自动停止 SLC，也不会将本机 SSH 凭据上传到 GitHub；SLC 的维护发布及每日备份使用部署主机工具。定时窗口与恢复命令见 [Docker 部署](DOCKER.md)。镜像发布与线上部署的结果应分别核实。
