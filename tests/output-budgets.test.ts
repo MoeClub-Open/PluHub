@@ -495,9 +495,10 @@ it("reserves atomically for concurrent calls and retains the admitted request's 
 it.each([false, true])(
   "bills the final Gemini snapshot after provisional thinking counts and an empty-text signature (stream=%s)",
   async (stream) => {
-    const f = await budgetFixture({ target: "gemini" });
+    const f = await budgetFixture({ target: "antigravity" });
     try {
       f.router.upstreams.primary.consumptionMultiplier = 0.2;
+      f.router.upstreams.primary.projectId = "test-project";
       f.kernel.configure({ "official.ai-router": f.router });
       const frames = [
         {
