@@ -432,7 +432,7 @@ it("supports all Epay version/signature combinations with signed V2 responses an
   delete process.env.PLUHUB_EPAY_PUBLIC;
   delete (globalThis as any).__pluhubBusinessTransport;
 });
-it("reserves and settles usage, isolates encrypted BYOK, enforces limits and keeps unknown usage for review", async () => {
+it("reserves and settles usage, enforces limits and keeps unknown usage for review", async () => {
   let calls = 0;
   let lastKey = "";
   transport = (i) => {
@@ -538,54 +538,6 @@ it("reserves and settles usage, isolates encrypted BYOK, enforces limits and kee
     );
     expect(reconciled.status).toBe(200);
     await reconciled.json();
-    const saved = await f.request(
-      "/api/plugins/official.byok/credentials",
-      "POST",
-      {
-        name: "personal",
-        channel: "primary",
-        kind: "key",
-        key: "personal-secret",
-      },
-      admin,
-    );
-    expect(saved.status).toBe(201);
-    const credential = await saved.json();
-    const list = await (
-      await f.request(
-        "/api/plugins/official.byok/credentials",
-        "GET",
-        undefined,
-        admin,
-      )
-    ).json();
-    expect(JSON.stringify(list)).not.toContain("personal-secret");
-    const database = await readFile(
-      join(f.config.dataDir, "official.byok", "credentials.sqlite"),
-    );
-    expect(database.includes(Buffer.from("personal-secret"))).toBe(false);
-    const own = await invoke("hi", { "x-pluhub-credential": credential.id });
-    expect(own.status).toBe(200);
-    await own.json();
-    expect(lastKey).toBe("Bearer personal-secret");
-    expect(
-      (await f.kernel.invoke<any>("billing.balance@1", { userId: me.id }))
-        .balance,
-    ).toBe(99982);
-    await expect(
-      f.kernel.invoke("credentials.resolve@1", {
-        id: credential.id,
-        userId: "another-user",
-      }),
-    ).rejects.toThrow("not found");
-    const badChannel = await f.request(
-      "/api/plugins/official.byok/credentials",
-      "POST",
-      { name: "ssrf", channel: "http://127.0.0.1", key: "x" },
-      admin,
-    );
-    expect(badChannel.status).toBe(400);
-    await badChannel.json();
     f.kernel.configure({ "official.rate-limit": { user: { rpm: 1 } } });
     const first = await invoke("hi");
     await first.json();
@@ -595,66 +547,6 @@ it("reserves and settles usage, isolates encrypted BYOK, enforces limits and kee
     expect(
       (await f.kernel.invoke<any>("billing.balance@1", { userId: me.id })).held,
     ).toBe(0);
-    const revoke = await f.request(
-      "/api/plugins/official.byok/revoke",
-      "POST",
-      { id: credential.id },
-      admin,
-    );
-    await revoke.json();
-    await expect(
-      f.kernel.invoke("credentials.resolve@1", {
-        id: credential.id,
-        userId: me.id,
-      }),
-    ).rejects.toThrow("not found");
-    f.kernel.configure({
-      "official.byok": {
-        oauth: {
-          primary: {
-            clientId: "public-client",
-            tokenUrl: "https://oauth.example/token",
-          },
-        },
-      },
-    });
-    const oauthResponse = await f.request(
-      "/api/plugins/official.byok/credentials",
-      "POST",
-      {
-        name: "OAuth",
-        channel: "primary",
-        kind: "oauth",
-        oauth: {
-          access_token: "expired",
-          refresh_token: "refresh-only",
-          expires_at: Date.now() - 1000,
-        },
-      },
-      admin,
-    );
-    expect(oauthResponse.status).toBe(201);
-    const oauth = await oauthResponse.json();
-    let refreshCalls = 0;
-    transport = async (i) => {
-      expect(i.url).toBe("https://oauth.example/token");
-      expect(new URLSearchParams(i.body).get("refresh_token")).toBe(
-        "refresh-only",
-      );
-      refreshCalls++;
-      await new Promise((r) => setTimeout(r, 10));
-      return Response.json({ access_token: "new-token", expires_in: 3600 });
-    };
-    const refreshed = await Promise.all(
-      [1, 2, 3].map(() =>
-        f.kernel.invoke<any>("credentials.resolve@1", {
-          id: oauth.id,
-          userId: me.id,
-        }),
-      ),
-    );
-    expect(refreshCalls).toBe(1);
-    expect(refreshed.every((c) => c.secret === "new-token")).toBe(true);
   } finally {
     await f.close();
     delete process.env.PLUHUB_TEST_UPSTREAM_KEY;

@@ -84,23 +84,11 @@ https://你的域名/api/plugins/official.payments-epay/notify
 
 ## BYOK 和订阅授权
 
-用户在「自带凭证」选择管理员配置的渠道，输入 API Key 或主动导入 OAuth JSON：
+用户在「个人渠道」保存自己的上游地址、API Key 和模型映射；订阅授权在「自带订阅」中由各提供商插件管理。API Key 可绑定个人渠道，请求也可用 `x-pluhub-channel` 选择个人渠道。平台渠道使用管理员配置的上游授权，不提供用户覆盖平台凭证的接口。
 
-```json
-{"access_token":"<授权令牌>","refresh_token":"<可选>","expires_at":1799999999000,"account_id":"<可选>","project_id":"<可选>"}
-```
+个人密钥采用 AES-256-GCM 加密，AAD 绑定 ID、用户、渠道和类型。主密钥可用 `masterKeyRef` 引用 32 字节 Base64 环境变量，或首次启动生成权限 0600 的 `vault.key`。备份时保留数据库和主密钥；更换主密钥不会自动重加密旧数据。
 
-`expires_at` 是毫秒。请求使用自己的 PluHub Key 认证，可通过 Key 绑定个人渠道和凭证；显式调用也支持 `x-pluhub-credential` 和 `x-pluhub-channel`。个人上游地址受 SSRF 检查，私网目标需要管理员显式授权。凭证只能用于归属用户及绑定渠道，列表不返回令牌，管理操作要求控制台会话。
-
-AES-256-GCM 加密，AAD 绑定 ID/用户/渠道/类型。主密钥可用 `masterKeyRef` 引用 32 字节 Base64 环境变量，或首次启动生成权限 0600 的 `vault.key`。备份时必须同时保留数据库和主密钥；更换主密钥不会自动重加密旧数据。
-
-管理员可在 BYOK 配置中按渠道设置 OAuth 客户端（不硬编码其他软件的 client secret）：
-
-```json
-{"oauth":{"my-channel":{"tokenUrl":"https://授权服务/token","clientId":"你的客户端ID","clientSecretRef":"env:OAUTH_CLIENT_SECRET"}},"secretRefs":["env:OAUTH_CLIENT_SECRET"]}
-```
-
-临近过期刷新令牌并加密保存，合并同一凭证的并发刷新。没有刷新配置时明确提示重新授权。各提供商的独立插件提供设备授权或 PKCE 浏览器授权，不读取本机登录文件，见 [订阅上游插件](SUBSCRIPTION_UPSTREAMS.md)。
+各订阅提供商插件负责 OAuth 授权、刷新和账号占用，见 [订阅上游插件](SUBSCRIPTION_UPSTREAMS.md)。
 
 渠道配置示例（与普通模型映射组合）：
 

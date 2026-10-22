@@ -651,7 +651,7 @@ it("executes a physical channel's graph for every mapped model and checks the fi
   }
 });
 
-it("uses graphs on all provider protocols, auto-router selections and BYOK final-channel bindings", async () => {
+it("uses graphs on all provider protocols and auto-router selections", async () => {
   const f = await setup();
   try {
     const router = structuredClone(f.router);
@@ -722,14 +722,6 @@ it("uses graphs on all provider protocols, auto-router selections and BYOK final
         f.admin,
       )
     ).json();
-    const key = await (
-      await f.request(
-        "/api/plugins/official.byok/credentials",
-        "POST",
-        { channel: "p", name: "test", key: "local-test-only" },
-        f.admin,
-      )
-    ).json();
     const request = {
       model: "smart",
       messages: [{ role: "user", text: "hi" }],
@@ -741,10 +733,8 @@ it("uses graphs on all provider protocols, auto-router selections and BYOK final
       request,
       features: ["text"],
       principalId: user.id,
-      credentialId: key.id,
     });
     expect(plan.upstreamId).toBe("p");
-    expect(plan.upstream.credentialId).toBe(key.id);
     expect(plan.workflows.map((w: any) => w.profile)).toEqual(["smart", "p"]);
     expect(plan.preparedRequest.messages).toHaveLength(3);
     expect(plan.reasoning.effort).toBe("low");
@@ -771,7 +761,6 @@ it("uses graphs on all provider protocols, auto-router selections and BYOK final
         request,
         features: ["text"],
         principalId: user.id,
-        credentialId: key.id,
       }),
     ).rejects.toMatchObject({ code: "credential_channel" });
     const controller = new AbortController();
@@ -789,7 +778,7 @@ it("uses graphs on all provider protocols, auto-router selections and BYOK final
   }
 });
 
-it("migrates legacy graphs equivalently and rejects graph-only BYOK and cyclic routes", async () => {
+it("migrates legacy graphs equivalently and rejects cyclic routes", async () => {
   const f = await setup();
   try {
     const config = {
@@ -822,23 +811,6 @@ it("migrates legacy graphs equivalently and rejects graph-only BYOK and cyclic r
       "outputPolicy",
     ])
       expect(after[field]).toEqual(before[field]);
-    const channels = await (
-      await f.request(
-        "/api/plugins/official.byok/channels",
-        "GET",
-        undefined,
-        f.admin,
-      )
-    ).json();
-    expect(channels.map((c: any) => c.id)).not.toContain("composed");
-    const denied = await f.request(
-      "/api/plugins/official.byok/credentials",
-      "POST",
-      { channel: "composed", name: "bad", key: "unused" },
-      f.admin,
-    );
-    expect(denied.status).toBe(400);
-    await denied.text();
     router.upstreams.composed.flow.nodes.at(-1).target = "flow";
     f.kernel.configure({ "official.ai-router": router });
     await expect(f.kernel.invoke("ai.routing@1", input)).rejects.toMatchObject({

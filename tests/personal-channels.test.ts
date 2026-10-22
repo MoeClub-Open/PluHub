@@ -442,10 +442,7 @@ it("rejects cross-user binding, header overrides, revoked credentials, disabled/
         (await f.request(path, method, body, f.bob.cookie)).status,
       ).toBeGreaterThanOrEqual(400);
     }
-    for (const headers of [
-      { "x-pluhub-channel": "preset" },
-      { "x-pluhub-credential": "other-credential" },
-    ])
+    for (const headers of [{ "x-pluhub-channel": "preset" }])
       expect((await f.invoke(key.token, false, headers)).status).toBe(403);
     expect(
       (await f.invoke(bobKey.token, false, { "x-pluhub-channel": channel.id }))
