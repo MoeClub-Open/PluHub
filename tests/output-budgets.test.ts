@@ -376,6 +376,57 @@ it("supports Codex CLI estimation and fixed prices while strict token billing re
   }
 });
 
+it.each([false, true])(
+  "settles Codex SSE without Content-Type for streaming and collected responses (stream=%s)",
+  async (stream) => {
+    const f = await budgetFixture({ target: "codex" });
+    try {
+      f.router.upstreams.primary.consumptionMultiplier = 0.2;
+      f.kernel.configure({ "official.ai-router": f.router });
+      f.setResponse(
+        () =>
+          new Response(
+            new TextEncoder().encode(
+              `event: response.completed\ndata: ${JSON.stringify({ type: "response.completed", response: responseBody("codex") })}\n\n`,
+            ),
+          ),
+      );
+      const response = await f.send(undefined, stream);
+      expect(response.status).toBe(200);
+      const text = await response.text();
+      expect(text).toContain("ok");
+      expect(text).not.toContain('"error"');
+      expect(f.reservations()[0]).toMatchObject({
+        status: "settled",
+        actual: 8,
+      });
+      expect(await f.balance()).toMatchObject({ balance: 999992, held: 0 });
+      expect((await f.logs())[0]).toMatchObject({
+        status: "success",
+        cost_micro_usd: 8,
+      });
+    } finally {
+      await f.close();
+    }
+  },
+);
+
+it("rejects an unframed Codex response without Content-Type", async () => {
+  const f = await budgetFixture({ target: "codex" });
+  try {
+    f.setResponse(
+      () => new Response(new TextEncoder().encode("not an event stream")),
+    );
+    const response = await f.send();
+    expect(response.status).toBe(502);
+    expect((await response.json()).error.code).toBe("upstream_truncated");
+    expect(f.reservations()[0].status).toBe("review");
+    expect((await f.balance()).balance).toBe(1_000_000);
+  } finally {
+    await f.close();
+  }
+});
+
 it("keeps estimation optional and does not rewrite requests when billing is disabled", async () => {
   const f = await budgetFixture({ mode: "estimate" });
   try {
