@@ -38,10 +38,10 @@ export async function scaffold(directory: string, id = "example.hello") {
           "@pluhub/sdk":
             "link:" +
             dirname(dirname(fileURLToPath(import.meta.resolve("@pluhub/sdk")))),
-          react: "19.2.0",
-          "react-dom": "19.2.0",
+          react: "19.3.1",
+          "react-dom": "19.3.1",
         },
-        devDependencies: { esbuild: "0.25.12" },
+        devDependencies: { esbuild: "0.28.2" },
       },
       null,
       2,

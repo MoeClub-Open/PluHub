@@ -4,7 +4,7 @@
 
 当前版本为可运行 Alpha，交付范围和实际验证记录见 [实现与验收记录](docs/IMPLEMENTATION.md)。
 
-正式支持 **Linux x64、Node.js 24**。默认单节点运行，用户与认证分别使用本地 SQLite，不需要 PostgreSQL、Redis 或消息队列。
+正式支持 **Linux x64、Bun 1.4.3**。默认单节点运行，用户与认证分别使用本地 SQLite，不需要 PostgreSQL、Redis 或消息队列。
 
 ## 四仓布局
 
@@ -16,7 +16,7 @@ Dev/
 └── PluHub-Plugins/     # 独立发布的官方插件
 ~~~
 
-开发时通过公开包入口链接本地依赖；插件不导入宿主私有源码。其他三个仓库需位于主仓同级目录。远端仓库与 npm 包尚未发布时，直接使用交付的本地四仓。
+开发时通过公开包入口链接本地依赖；插件不导入宿主私有源码。其他三个仓库需位于主仓同级目录，CI 通过完整提交 ID 固定版本组合。
 
 源码归属、共享库分组、构建产物和维护入口见 [工程结构](docs/STRUCTURE.md)。
 
@@ -24,14 +24,14 @@ Docker 部署见 [容器部署指南](docs/DOCKER.md)：`docker compose build` �
 
 ## 开始运行
 
-安装 Node.js 24.22.0、pnpm 10.20.0；开发 Go 插件时安装 Go 1.27.0。
+运行时安装 Bun 1.4.3；源码构建使用 Node.js 24.22.0、pnpm 10.20.0。开发 Go 插件时安装 Go 1.27.0。
 
 ~~~sh
 cd PluHub
 pnpm bootstrap
 pnpm build:all
-node apps/cli/dist/index.js init
-node apps/cli/dist/index.js start
+bun apps/cli/dist/index.js init
+bun apps/cli/dist/index.js start
 ~~~
 
 打开 http://127.0.0.1:8080 ，按「站点信息 → 公开门户 → 确认设置 → 管理员账号」完成首次部署；已有管理员的实例直接登录。初始化配置包含 32 个默认插件，协议转换与旧版流程兼容插件可按需安装；管理员通过独立管理入口创建用户、管理插件、配置渠道与模型映射。用户可浏览模型、创建及撤销自己的 API Key，并在 Playground 发起流式对话。完整 Key 仅在创建时返回一次。[整站排行榜](docs/LEADERBOARD.md) 提供用户用量榜和模型热度榜。新增计费、Stripe/易支付、商品订阅、BYOK、流量策略和订阅上游，配置与边界见 [商业能力](docs/COMMERCIAL.md)。自动路由与单请求 TPS 的模式、原生决策接口及分词语义见 [自动路由](docs/AUTO_ROUTING.md)。邮箱注册、邮件发送、Turnstile、TOTP 与 Passkey 配置见 [账号安全](docs/IDENTITY.md)。
@@ -70,7 +70,7 @@ init --port 9000 可指定端口，--config /path/pluhub.json 可指定配置文
 渠道可以通过工作流组合条件、提示词、思考强度、输出预算、TPS 和上游选择；支持隐式/显式模型重定向。配置见 [渠道工作流](docs/WORKFLOWS.md)。真实上游及转换测试的范围、预算和结果见 [联调说明](docs/LIVE_TESTING.md)。
 
 ~~~sh
-node apps/cli/dist/index.js create-plugin ./hello-plugin --id example.hello
+bun apps/cli/dist/index.js create-plugin ./hello-plugin --id example.hello
 cd hello-plugin
 pnpm install
 pnpm build
@@ -79,7 +79,7 @@ pnpm build
 模板只导入公开 SDK，同时生成后端 API 和可注销的前端模块。返回主仓后安装：
 
 ~~~sh
-node apps/cli/dist/index.js plugin install ./hello-plugin --grant api.register
+bun apps/cli/dist/index.js plugin install ./hello-plugin --grant api.register
 ~~~
 
 CLI 安装在宿主停机时使用，完成后启动宿主。控制台支持安装、启停和检查插件更新；声明支持在线升级的插件通过新执行图切换，其余插件重启升级，界面会显示实际更新方式。Go 示例见同级 PluHub-SDK-Go/examples/echo。

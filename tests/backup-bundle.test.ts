@@ -16,10 +16,37 @@ import { execFileSync } from "node:child_process";
 import {
   createBackupBundle,
   backupPacket,
+  sourceVerification,
 } from "../deploy/docker/backup-bundle.mjs";
 import { decryptBackupFile } from "../deploy/docker/backup-format.mjs";
 
 const imageId = "sha256:" + "1".repeat(64);
+it("binds an optional stopped-data validation record to the exact source image", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "pluhub-source-check-"));
+  try {
+    expect(await sourceVerification(directory, imageId)).toBeUndefined();
+    const record = { schemaVersion: 1, passed: true, imageId, databases: 14 };
+    await writeFile(
+      join(directory, "source-verification.json"),
+      JSON.stringify(record),
+    );
+    expect(await sourceVerification(directory, imageId)).toEqual(record);
+    for (const value of [
+      null,
+      { ...record, passed: false },
+      { ...record, databases: -1 },
+      { ...record, imageId: "sha256:" + "2".repeat(64) },
+    ]) {
+      await writeFile(
+        join(directory, "source-verification.json"),
+        JSON.stringify(value),
+      );
+      await expect(sourceVerification(directory, imageId)).rejects.toThrow();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), "pluhub-bundle-test-"));
   const data = join(directory, "data"),

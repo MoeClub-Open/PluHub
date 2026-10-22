@@ -132,6 +132,11 @@ try {
   });
   const cookie = login.headers.get("set-cookie").split(";")[0];
   await login.body?.cancel();
+  const system = await (
+    await request("/api/host/status", { headers: { cookie } })
+  ).json();
+  assert.equal(system.runtime.name, "Bun");
+  assert.equal(system.runtime.version, "1.4.3");
   const key = await (
     await request("/api/plugins/official.auth/keys", {
       method: "POST",
@@ -176,7 +181,16 @@ try {
   report.checks.push("shared-volume-exclusive-lock");
   const asset = await request("/extensions/official.ai-router/ui.js");
   assert.ok((await asset.text()).includes("mount"));
-  assert.equal(run(["inspect", "--format", "{{.Config.User}}", name]), "node");
+  assert.equal(run(["inspect", "--format", "{{.Config.User}}", name]), "bun");
+  assert.equal(
+    run(["exec", name, "bun", "-p", "process.versions.bun"]),
+    "1.4.3",
+  );
+  assert.equal(
+    run(["exec", name, "node", "-p", "process.versions.bun"]),
+    "1.4.3",
+  );
+  report.runtime = { name: "Bun", version: "1.4.3" };
   assert.equal(
     run(["inspect", "--format", "{{.HostConfig.ReadonlyRootfs}}", name]),
     "true",

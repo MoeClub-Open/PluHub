@@ -248,6 +248,8 @@ export function attachManagement(
           audit: auditing,
           storage,
           runtime: {
+            name: process.versions.bun ? "Bun" : "Node.js",
+            version: process.versions.bun ?? process.version,
             node: process.version,
             platform: process.platform,
             arch: process.arch,

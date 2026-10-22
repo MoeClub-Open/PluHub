@@ -1,6 +1,6 @@
 {
   "name": "@pluhub/cli",
-  "version": "0.1.0-alpha.16",
+  "version": "0.1.0-alpha.17",
   "type": "module",
   "license": "Apache-2.0",
   "bin": {

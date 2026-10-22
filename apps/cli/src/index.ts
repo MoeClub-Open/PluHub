@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { scaffold } from "./scaffold.js";
 import { withPublicOrigin } from "./public-origin.js";
 import { defaultPluginNames } from "./presets.js";

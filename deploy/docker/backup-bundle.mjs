@@ -33,6 +33,22 @@ export function backupPacket(value) {
   return { key, imageId: value.imageId, environment: value.environment };
 }
 
+export async function sourceVerification(directory, imageId) {
+  const file = join(directory, "source-verification.json");
+  if (!(await regular(file, true))) return undefined;
+  const value = JSON.parse(await readFile(file, "utf8"));
+  if (
+    value?.schemaVersion !== 1 ||
+    value.passed !== true ||
+    value.imageId !== imageId ||
+    !/^sha256:[a-f0-9]{64}$/.test(imageId ?? "") ||
+    !Number.isSafeInteger(value.databases) ||
+    value.databases < 0
+  )
+    throw Error("Invalid source image validation record");
+  return value;
+}
+
 async function regular(file, optional = false) {
   let info;
   try {
@@ -109,6 +125,7 @@ export async function createBackupBundle({
   await tree(root, excluded, await stat(dirname(output)));
   await regular(join(deploymentDirectory, "compose.yaml"));
   const withEnv = await regular(join(deploymentDirectory, ".env"), true);
+  const verified = await sourceVerification(deploymentDirectory, imageId);
   const temporary = await mkdtemp(join(tmpdir(), "pluhub-bundle-"));
   const staging = join(
     dirname(output),
@@ -127,6 +144,12 @@ export async function createBackupBundle({
     );
     if (withEnv)
       await copyFile(join(deploymentDirectory, ".env"), join(metadata, ".env"));
+    if (verified)
+      await writeFile(
+        join(metadata, "source-verification.json"),
+        JSON.stringify(verified) + "\n",
+        { mode: 0o600 },
+      );
     await writeFile(
       join(metadata, "runtime-environment.json"),
       JSON.stringify(environment) + "\n",
@@ -257,11 +280,17 @@ export async function runBackupCommand(command, args, configFile) {
     } else {
       if (!values.get("--deployment") || values.has("--input"))
         throw Error("Invalid backup arguments");
-      const { verifyData } =
-        await import("/opt/pluhub/node_modules/@pluhub/cli/dist/verify-data.js");
-      const config = JSON.parse(await readFile(configFile, "utf8"));
-      config.dataDir = resolve(dirname(configFile), config.dataDir);
-      await verifyData(config);
+      // The host controller validates stopped data using the exact source image.
+      // Its mounted record avoids binding old plugin locks to tool-image artifacts.
+      if (
+        !(await sourceVerification(values.get("--deployment"), input.imageId))
+      ) {
+        const { verifyData } =
+          await import("/opt/pluhub/node_modules/@pluhub/cli/dist/verify-data.js");
+        const config = JSON.parse(await readFile(configFile, "utf8"));
+        config.dataDir = resolve(dirname(configFile), config.dataDir);
+        await verifyData(config);
+      }
       result = await createBackupBundle({
         dataDirectory: "/data",
         configFile,

@@ -144,6 +144,8 @@ try {
   const report = {
     capturedAt: new Date().toISOString(),
     node: process.version,
+    runtime: process.versions.bun ? "Bun" : "Node.js",
+    runtimeVersion: process.versions.bun ?? process.version,
     platform: process.platform,
     os: release(),
     cpu: cpus()[0]?.model,

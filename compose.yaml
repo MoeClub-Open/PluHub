@@ -15,7 +15,6 @@ services:
         required: false
     environment:
       PLUHUB_PUBLIC_ORIGIN: "${PLUHUB_PUBLIC_ORIGIN:-http://localhost:8080}"
-      NODE_OPTIONS: --max-old-space-size=768
     volumes:
       - pluhub-data:/data
     read_only: true

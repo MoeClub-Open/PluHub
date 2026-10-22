@@ -5,22 +5,23 @@
   "type": "module",
   "packageManager": "pnpm@10.20.0",
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=24 <25",
+    "bun": ">=1.4.3 <1.5"
   },
   "scripts": {
     "build": "pnpm -r --workspace-concurrency=1 build",
     "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
-    "test": "vitest run",
+    "test": "bun --bun node_modules/vitest/vitest.mjs run",
     "check": "pnpm typecheck && pnpm build && pnpm test",
-    "dev": "node apps/cli/dist/index.js start",
-    "demo": "node scripts/demo.mjs",
+    "dev": "bun apps/cli/dist/index.js start",
+    "demo": "bun scripts/demo.mjs",
     "bootstrap": "node scripts/workspace.mjs bootstrap",
     "build:all": "node scripts/workspace.mjs build",
     "test:all": "node scripts/workspace.mjs test",
     "test:docker": "node scripts/verify-docker.mjs",
     "test:live": "node scripts/verify-live-gateway.mjs",
     "test:live:byo": "node scripts/verify-live-byo.mjs",
-    "bench": "node scripts/bench.mjs",
+    "bench": "bun scripts/bench.mjs",
     "pack:all": "node scripts/pack.mjs",
     "format": "prettier --write packages apps tests scripts deploy vitest.config.ts compose.yaml",
     "format:check": "prettier --check packages apps tests scripts deploy vitest.config.ts compose.yaml"

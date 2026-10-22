@@ -204,6 +204,12 @@ def create_offline(args):
             journal = intent
             if was_running:
                 docker("stop", "--time", "40", item["Id"])
+            verified = json.loads(helper([item["Image"], "verify-data"], "--mount", "type=volume,source=" + volume + ",target=/data", recovery=(directory, journal)))
+            if not verified.get("passed") or not isinstance(verified.get("databases"), list):
+                raise BackupError("The source image did not validate its own data")
+            verification = staging / "source-verification.json"
+            private_json(verification, {"schemaVersion": 1, "passed": True, "imageId": item["Image"], "databases": len(verified["databases"])})
+            os.chown(verification, 1000, 1000)
             receipt = json.loads(helper([tool_image, "backup-bundle", "--output", "/backups/data.phb", "--deployment", "/deployment"], "--mount", "type=volume,source=" + volume + ",target=/data", *mount(staging, "/deployment", True), *mount(record, "/backups"), packet={"key": base64.b64encode(key).decode(), "imageId": item["Image"], "environment": item["Config"].get("Env") or []}, recovery=(directory, journal)))
             archive = record / "data.phb"
             with archive.open("rb") as stream:
