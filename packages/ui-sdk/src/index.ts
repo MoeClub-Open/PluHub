@@ -25,18 +25,30 @@ export function createClient(
   refresh: () => void = () => {},
   sessionExpired?: () => void,
   i18n?: UIInternationalization,
+  confirmIdentity?: () => Promise<void>,
 ): UIHost {
   return {
     i18n,
     async request<T>(path: string, init: RequestInit = {}) {
       const headers = new Headers(init.headers);
       if (init.body) headers.set("content-type", "application/json");
-      const r = await fetch(path, {
-        ...init,
-        headers,
-        credentials: "same-origin",
-      });
-      const data = await r.json();
+      const send = () =>
+        fetch(path, { ...init, headers, credentials: "same-origin" });
+      let r = await send();
+      let data = await r.json();
+      if (
+        r.status === 403 &&
+        data.error?.code === "reauth_required" &&
+        !["GET", "HEAD", "OPTIONS"].includes(
+          (init.method ?? "GET").toUpperCase(),
+        ) &&
+        confirmIdentity
+      ) {
+        await confirmIdentity();
+        init.signal?.throwIfAborted();
+        r = await send();
+        data = await r.json();
+      }
       if (!r.ok) {
         if (
           r.status === 401 &&
