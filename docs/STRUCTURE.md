@@ -30,7 +30,7 @@ PluHub-Plugins/
 │   ├── identity/            # 邮箱格式校验等身份公共工具
 │   ├── storage/             # SQLite 与事务
 │   └── ui/                  # React 挂载、组件和复用表单
-├── scripts/build.mjs        # 前后端独立 Bundle
+├── scripts/build.ts        # 前后端独立 Bundle
 └── tests/
 ~~~
 
