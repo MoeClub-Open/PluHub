@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: MoeClub-Open/PluHub
           ref: ${{ inputs.host_ref || github.sha }}
@@ -28,19 +28,19 @@ jobs:
         id: stack
         working-directory: PluHub
         run: node scripts/ci-stack.mjs >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: MoeClub-Open/PluHub-Spec
           ref: ${{ steps.stack.outputs.spec }}
           path: PluHub-Spec
           persist-credentials: false
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: MoeClub-Open/PluHub-SDK-Go
           ref: ${{ steps.stack.outputs.go }}
           path: PluHub-SDK-Go
           persist-credentials: false
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: MoeClub-Open/PluHub-Plugins
           ref: ${{ inputs.plugins_ref || steps.stack.outputs.plugins }}
