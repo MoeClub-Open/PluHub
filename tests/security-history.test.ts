@@ -688,7 +688,7 @@ it("prunes expired and excess events, persists history on restart and migrates t
     try {
       expect(
         (db.prepare("PRAGMA user_version").get() as any).user_version,
-      ).toBe(7);
+      ).toBe(11);
       const r = await restarted.fetch(
         new Request("http://localhost" + auth + "/security/history", {
           headers: admin,

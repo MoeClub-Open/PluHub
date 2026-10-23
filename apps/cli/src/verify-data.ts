@@ -22,7 +22,12 @@ export async function verifyData(config: Parameters<typeof createKernel>[0]) {
       }
       if (!entry.isFile()) continue;
       const secret = /(?:\.sqlite(?:-wal|-shm)?|\.key)$/.test(entry.name);
-      const info = await lstat(file);
+      const info = await lstat(file).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT" && /\.sqlite-(wal|shm)$/.test(entry.name))
+          return undefined;
+        throw error;
+      });
+      if (!info) continue;
       if (secret && process.platform !== "win32" && info.mode & 0o077)
         throw new Error(
           "Data file permissions must exclude group/other access: " +
