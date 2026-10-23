@@ -26,7 +26,7 @@ GET /v1/models 列出密钥授权范围内的可用模型别名。所有生成�
 
 图片支持 PNG/JPEG/GIF/WebP 的 base64 data URL，以及协议能够表达的 HTTP(S) 地址。Gemini 远程图片需要显式 MIME；跨协议无法表达 low/high 图片 detail 时拒绝。多模态工具结果仅 Anthropic 原协议支持，其余目标明确拒绝。Gemini 的纯文本/标量工具结果包装为 response.result 对象；有序内容块与工具结果保持原次序。
 
-不支持音频、视频、文件、图片输出、服务商托管工具、持久 Responses、previous_response_id、后台 Responses、多候选或任意供应商附加字段。Gemini responseSchema 使用其专用 Schema 方言，当前要求 responseJsonSchema，避免不完整转换。Gemini 可见文本上的签名暂不支持；思考块和函数调用签名已支持。不支持的请求字段或目标组合明确拒绝，函数工具由客户端执行。Schema 名称是 OpenAI 的元数据；转换到不具名的 Anthropic/Gemini 时保留 Schema 与严格约束，不能表达的 description 或 relaxed 模式拒绝。
+不支持音频、视频、文件、图片输出、除 OpenAI 内置网页搜索外的服务商托管工具、持久 Responses、previous_response_id、后台 Responses、多候选或任意供应商附加字段。Gemini responseSchema 使用其专用 Schema 方言，当前要求 responseJsonSchema，避免不完整转换。Gemini 可见文本上的签名暂不支持；思考块和函数调用签名已支持。不支持的请求字段或目标组合明确拒绝，函数工具由客户端执行。Schema 名称是 OpenAI 的元数据；转换到不具名的 Anthropic/Gemini 时保留 Schema 与严格约束，不能表达的 description 或 relaxed 模式拒绝。
 
 Responses 是请求级无状态调用，上游请求设置 store: false，支持 include: ["reasoning.encrypted_content"]。call_id 用于工具往返，输出 item.id 独立保留。增量与 done/completed 快照合并时检查前缀一致性，避免重复文本和工具参数；最后快照的加密思考内容也会保留。
 
@@ -45,3 +45,19 @@ OpenAI 实现参考：
 - https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events
 
 New API 已完成四类入口到 Chat 上游、Chat/Responses 入口到 Responses 上游，以及普通/流式工具往返的 16 次真实生成验证。具体模型、预算、报告和未覆盖范围见 [联调说明](LIVE_TESTING.md)。本地矩阵与该网关实测不代表全部供应商接口兼容认证。
+
+## 内置网页搜索
+
+Responses 入口支持 `web_search`、`web_search_preview` 与 `web_search_preview_2025_03_11`，可与函数工具一起声明。搜索配置、指定搜索工具的 `tool_choice`、`include: ["web_search_call.action.sources"]` 发送到 Responses/Codex 上游。上游是否允许搜索取决于模型与账号授权，网关不模拟工具执行。
+
+Chat 入口接受 `web_search_options`，也可接收上述搜索工具声明并转换到 Responses/Codex。原生 Chat 上游仅传递 `search_context_size`、`user_location`，需要支持搜索的模型；指定搜索工具、源列表或其他 Responses 搜索控制不能转换时明确拒绝。当前没有实现 Anthropic/Gemini 原生搜索及其跨协议转换。
+
+搜索活动是服务端工具事件，不转成待客户端执行的函数调用。普通响应保留 `web_search_call` 和 URL 引用；SSE 保留搜索状态、完成快照与引用事件。增量、结束项和最终完整快照按调用 ID / 引用去重；多个文本部分的引用偏移映射到客户端聚合正文。Responses 多轮输入可包含搜索调用项及带 URL 引用的 assistant 消息。Chat 返回标准 `annotations`，搜索活动放在 `extra_content.web_search_calls`，可重新作为对话历史接入 Responses。Playground 将 URL 引用渲染为可点击链接。
+
+工具分支将搜索视为有工具请求，自动路由排除不支持相应控制或接口的候选。调用元数据只记录搜索次数，不记录查询词和检索正文。搜索调用附加费用尚未单独定价或结算，既有计费仅涵盖 Token / 配置的按次费用。
+
+参考：[OpenAI Web search](https://developers.openai.com/api/docs/guides/tools-web-search)、[Responses streaming events](https://developers.openai.com/api/reference/resources/responses/streaming-events)。
+
+## 其他端点
+
+当前没有 `/v1/images/generations`、`/v1/images/edits`、图片变体、Embeddings、音频或视频端点；Responses 的 `image_generation` 等媒体工具也未接入。图片输入识别与生成图片是不同的能力，配置模型别名或接口路径不会自动增加这些端点。后续接入需同时提供对应请求/响应、二进制或多部分传输、用量和计价契约。
