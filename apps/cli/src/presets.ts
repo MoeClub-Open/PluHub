@@ -25,6 +25,8 @@ export const defaultPluginNames = [
   "upstream-codex",
   "upstream-claude-subscription",
   "upstream-antigravity",
+  "ingress-openai-media",
+  "upstream-openai-media",
   ...["openai-chat", "openai-responses", "anthropic", "gemini"].flatMap(
     (protocol) => ["ingress-" + protocol, "upstream-" + protocol],
   ),

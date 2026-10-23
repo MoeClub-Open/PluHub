@@ -380,6 +380,7 @@ it("supports all Epay version/signature combinations with signed V2 responses an
         }
         const fields: any = {
           pid: "123",
+          type: "alipay",
           out_trade_no: order.id,
           trade_no: "unique-trade",
           trade_status: "TRADE_SUCCESS",
@@ -394,7 +395,7 @@ it("supports all Epay version/signature combinations with signed V2 responses an
         async function notify(value: any) {
           const response = await f.kernel.fetch(
             new Request(
-              "http://localhost/api/plugins/official.payments-epay/notify?" +
+              "http://localhost/api/plugins/official.payments-epay/notify?pluhub_method=default&" +
                 new URLSearchParams(value),
             ),
           );

@@ -761,8 +761,9 @@ it("uses graphs on all provider protocols and auto-router selections", async () 
         request,
         features: ["text"],
         principalId: user.id,
+        channelId: "personal:missing",
       }),
-    ).rejects.toMatchObject({ code: "credential_channel" });
+    ).rejects.toMatchObject({ code: "channel_not_found" });
     const controller = new AbortController();
     controller.abort();
     await expect(

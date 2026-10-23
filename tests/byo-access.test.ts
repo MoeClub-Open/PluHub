@@ -15,6 +15,9 @@ let transport: (
 };
 const providers = ["codex", "claude-subscription", "antigravity"];
 async function setup() {
+  transport = () => {
+    throw new Error("Unexpected provider request");
+  };
   let extraPath = "";
   (globalThis as any).__byoTransport = (input: any, signal: AbortSignal) =>
     transport(input, signal);
@@ -34,14 +37,6 @@ async function setup() {
     ],
     {
       billing: { enabled: true },
-      byok: {
-        oauth: {
-          platform: {
-            clientId: "client",
-            tokenUrl: "https://oauth.example/token",
-          },
-        },
-      },
       "ai-router": {
         upstreams: {
           platform: {
@@ -157,7 +152,11 @@ async function setup() {
     const r = await f.request(
       auth + "/keys",
       "POST",
-      { name: "client", channelId, models: ["demo"] },
+      {
+        name: "client",
+        channelIds: channelId ? [channelId] : [],
+        models: ["demo"],
+      },
       owner.headers,
     );
     expect(r.status).toBe(201);
@@ -651,7 +650,7 @@ it("discovers unsaved API models without storing or returning credentials", asyn
       f.alice.headers,
     );
     expect(r.status).toBe(200);
-    expect(await r.json()).toEqual({ models: ["m1", "m2"] });
+    expect(await r.json()).toEqual({ models: ["m1", "m2"], errors: [] });
     expect(
       await (
         await f.request(
@@ -672,119 +671,6 @@ it("discovers unsaved API models without storing or returning credentials", asyn
     await denied.json();
     expect(calls).toBe(1);
   } finally {
-    await f.close();
-  }
-});
-it("keeps shared legacy refresh alive after one caller cancels and never recreates revoked credentials", async () => {
-  const f = await setup();
-  let release: () => void = () => {};
-  let started: () => void = () => {};
-  const beginning = new Promise<void>((r) => {
-    started = r;
-  });
-  let calls = 0;
-  try {
-    const r = await f.request(
-      byok + "/credentials",
-      "POST",
-      {
-        name: "Legacy",
-        channel: "platform",
-        kind: "oauth",
-        oauth: {
-          access_token: "expired",
-          refresh_token: "refresh",
-          expires_at: Date.now() - 1000,
-        },
-      },
-      f.alice.headers,
-    );
-    expect(r.status).toBe(201);
-    const cred = await r.json();
-    transport = async () => {
-      calls++;
-      started();
-      await new Promise<void>((r) => {
-        release = r;
-      });
-      return Response.json({ access_token: "fresh", expires_in: 3600 });
-    };
-    const ctrl = new AbortController();
-    const first = f.kernel
-      .invoke(
-        "credentials.resolve@1",
-        { id: cred.id, userId: f.alice.id },
-        ctrl.signal,
-      )
-      .catch((e) => e);
-    const second = f.kernel.invoke<any>("credentials.resolve@1", {
-      id: cred.id,
-      userId: f.alice.id,
-    });
-    await beginning;
-    ctrl.abort();
-    await first;
-    release();
-    expect((await second).secret).toBe("fresh");
-    expect(calls).toBe(1);
-    const r2 = await f.request(
-      byok + "/credentials",
-      "POST",
-      {
-        name: "Revoked",
-        channel: "platform",
-        kind: "oauth",
-        oauth: {
-          access_token: "expired",
-          refresh_token: "refresh",
-          expires_at: Date.now() - 1000,
-        },
-      },
-      f.alice.headers,
-    );
-    const cred2 = await r2.json();
-    let onStart: () => void = () => {};
-    const ready = new Promise<void>((r) => {
-      onStart = r;
-    });
-    transport = async () => {
-      onStart();
-      await new Promise<void>((r) => {
-        release = r;
-      });
-      return Response.json({
-        access_token: "should-not-exist",
-        expires_in: 3600,
-      });
-    };
-    const pending = f.kernel
-      .invoke("credentials.resolve@1", { id: cred2.id, userId: f.alice.id })
-      .catch((e) => e);
-    await ready;
-    await (
-      await f.request(
-        byok + "/revoke",
-        "POST",
-        { id: cred2.id },
-        f.alice.headers,
-      )
-    ).json();
-    release();
-    expect((await pending).code).toBe("credential_not_found");
-    expect(
-      (
-        await (
-          await f.request(
-            byok + "/credentials",
-            "GET",
-            undefined,
-            f.alice.headers,
-          )
-        ).json()
-      ).some((c: any) => c.id === cred2.id),
-    ).toBe(false);
-  } finally {
-    release();
     await f.close();
   }
 });

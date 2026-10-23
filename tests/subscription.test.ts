@@ -72,7 +72,7 @@ function encodeRequest(protocol: Protocol, request: any): any {
     };
   return { contents: [{ role: "user", parts: [{ text: "hi" }] }] };
 }
-it("runs subscription adapters through the compatible ingress matrix and rejects unsupported CLI output limits", async () => {
+it("runs subscription adapters through the compatible ingress matrix and omits CLI output overrides", async () => {
   const protocols: Protocol[] = [
     "openai-chat",
     "openai-responses",
@@ -198,18 +198,6 @@ it("runs subscription adapters through the compatible ingress matrix and rejects
             tools: [],
           };
           const body = encodeRequest(protocol, request);
-          // Anthropic's encoder supplies a required default max_tokens; Codex CLI explicitly rejects such overrides.
-          if (kind === "codex" && protocol === "anthropic") {
-            const rejected = await f.request(
-              "/v1/messages",
-              "POST",
-              body,
-              admin,
-            );
-            expect(rejected.status).toBe(400);
-            await rejected.json();
-            continue;
-          }
           const path =
             protocol === "openai-chat"
               ? "/v1/chat/completions"
@@ -231,7 +219,7 @@ it("runs subscription adapters through the compatible ingress matrix and rejects
             );
         }
     }
-    expect(calls).toBe(22);
+    expect(calls).toBe(24);
   } finally {
     await f.close();
     delete process.env.PLUHUB_TEST_UPSTREAM_KEY;

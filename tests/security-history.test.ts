@@ -679,7 +679,9 @@ it("prunes expired and excess events, persists history on restart and migrates t
     } finally {
       await restarted.shutdown();
     }
-    db.exec("DROP TABLE security_events; PRAGMA user_version=6;");
+    db.exec(
+      "DROP TABLE security_events; ALTER TABLE api_keys ADD COLUMN channel_id TEXT; ALTER TABLE api_keys ADD COLUMN credential_id TEXT; ALTER TABLE api_keys DROP COLUMN channel_ids_json; ALTER TABLE api_keys DROP COLUMN secret; PRAGMA user_version=6;",
+    );
     restarted = await createKernel(f.config);
     attachManagement(restarted, f.file, f.config);
     await restarted.start();

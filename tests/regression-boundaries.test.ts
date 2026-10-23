@@ -5,59 +5,20 @@ const users = "/api/plugins/official.users/users";
 const auth = "/api/plugins/official.auth";
 const billing = "/api/plugins/official.billing";
 
-it("offers only enabled physical BYOK channels and rejects credentials bound to virtual providers", async () => {
-  const f = await fixture(undefined, {
-    "ai-router": {
-      upstreams: {
-        direct: {
-          protocol: "openai-chat",
-          baseUrl: "https://upstream.example",
-          keyRef: "env:PLUHUB_BYOK_TEST_KEY",
-        },
-        stopped: {
-          protocol: "openai-chat",
-          baseUrl: "https://disabled.example",
-          keyRef: "env:PLUHUB_BYOK_TEST_KEY",
-          enabled: false,
-        },
-        smart: { protocol: "auto-router" },
-        composed: { protocol: "workflow" },
-      },
-      models: {},
-    },
-  });
+it("does not expose retired platform credential endpoints", async () => {
+  const f = await fixture(["users", "auth", "byok", "http-transport"]);
   try {
     const admin = await f.admin();
-    const api = "/api/plugins/official.byok";
-    const available = await (
-      await f.request(api + "/channels", "GET", undefined, admin)
-    ).json();
-    expect(available.map((channel: any) => channel.id)).toEqual(["direct"]);
-    for (const channel of ["smart", "composed", "stopped"]) {
+    for (const method of ["GET", "POST", "DELETE"]) {
       const response = await f.request(
-        api + "/credentials",
-        "POST",
-        { channel, name: "unusable", key: "test-only" },
+        "/api/plugins/official.byok/credentials",
+        method,
+        method === "GET" ? undefined : {},
         admin,
       );
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({
-        error: { code: "invalid_channel" },
-      });
+      expect(response.status).toBe(404);
+      await response.text();
     }
-    expect(
-      await (
-        await f.request(api + "/credentials", "GET", undefined, admin)
-      ).json(),
-    ).toEqual([]);
-    const created = await f.request(
-      api + "/credentials",
-      "POST",
-      { channel: "direct", name: "usable", key: "test-only" },
-      admin,
-    );
-    expect(created.status).toBe(201);
-    expect(await created.json()).toHaveProperty("id");
   } finally {
     await f.close();
   }

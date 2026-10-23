@@ -367,10 +367,11 @@ it("supports Codex CLI estimation and fixed prices while strict token billing re
     await response.json();
     expect(JSON.parse(f.reservations()[1].budget).mode).toBe("fixed");
     response = await f.send(32);
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
     await response.json();
-    expect(f.sent).toHaveLength(2);
-    expect(await f.balance()).toMatchObject({ balance: 998960, held: 0 });
+    expect(f.sent).toHaveLength(3);
+    expect(f.sent[2].max_output_tokens).toBeUndefined();
+    expect(await f.balance()).toMatchObject({ balance: 997960, held: 0 });
   } finally {
     await f.close();
   }
@@ -548,6 +549,7 @@ it.each([false, true])(
         input: 20,
         output: 32,
         reasoning: 30,
+        cacheRead: 0,
       });
     } finally {
       await f.close();
@@ -654,7 +656,7 @@ it("migrates previous reservations without losing money or inventing historical 
     );
     try {
       db.exec(
-        "ALTER TABLE reservations DROP COLUMN budget; ALTER TABLE reservations DROP COLUMN reported_usage; PRAGMA user_version=5;",
+        "ALTER TABLE reservations DROP COLUMN budget; ALTER TABLE reservations DROP COLUMN reported_usage; CREATE TABLE pricing_users(user_id TEXT PRIMARY KEY,group_id TEXT NOT NULL,user_multiplier REAL NOT NULL); PRAGMA user_version=5;",
       );
       db.prepare(
         "INSERT INTO reservations(id,user_id,amount,status,created_at,pricing) VALUES(?,?,100,'reserved',?,?)",

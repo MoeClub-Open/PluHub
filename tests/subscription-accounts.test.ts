@@ -26,6 +26,9 @@ function accountDiscovery(input: any) {
     return Response.json({ cloudaicompanionProject: "test-project" });
 }
 async function setup(extra: string[] = [], configs: any = {}) {
+  transport = (i) =>
+    accountDiscovery(i) ??
+    Response.json({ error: "unmocked provider request" }, { status: 500 });
   let transportPath = "";
   (globalThis as any).__subscriptionAccountsTransport = (
     i: any,
@@ -791,9 +794,13 @@ it("enforces pool bindings, concurrency, cooldown, disabled and invalid-grant st
     const a = await f.create("codex", undefined, { maxConcurrency: 1 }),
       b = await f.create();
     const l = await f.acquire([a.id]);
-    await expect(f.acquire([a.id])).rejects.toMatchObject({
-      code: "subscription_unavailable",
-    });
+    const queue = new AbortController();
+    const blocked = f.acquire([a.id], "codex", queue.signal);
+    const cancelled = expect(blocked).rejects.toThrow(
+      "cancel queued acquisition",
+    );
+    queue.abort(new Error("cancel queued acquisition"));
+    await cancelled;
     const other = await f.acquire([a.id, b.id]);
     expect(other.accountId).toBe(b.id);
     await f.report(l, 429, "90");
@@ -816,7 +823,7 @@ it("enforces pool bindings, concurrency, cooldown, disabled and invalid-grant st
       code: "subscription_unavailable",
     });
     await expect(f.acquire([b.id], "antigravity")).rejects.toMatchObject({
-      code: "subscription_not_found",
+      code: "subscription_unavailable",
     });
     await expect(f.acquire([])).rejects.toMatchObject({
       code: "subscription_binding",
@@ -943,11 +950,15 @@ it("retries a rejected authorization once, stops after a second 401 and releases
         { headers: { "content-type": "text/event-stream" } },
       );
     };
-    const events = await f.kernel.invoke<AsyncIterableIterator<any>>(
-      "ai.upstream.codex@1",
-      input,
-    );
-    await expect(events.next()).rejects.toThrow();
+    await expect(
+      (async () => {
+        const events = await f.kernel.invoke<AsyncIterableIterator<any>>(
+          "ai.upstream.codex@1",
+          input,
+        );
+        await events.next();
+      })(),
+    ).rejects.toMatchObject({ code: "upstream_error" });
     expect((await f.list())[0].active).toBe(0);
     expect(calls).toBe(1);
   } finally {

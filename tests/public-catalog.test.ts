@@ -61,6 +61,9 @@ it("publishes active platform model aliases and original prices without credenti
       inputPrice: 2,
       outputPrice: 4,
       contextWindow: 128000,
+      channel: { id: "live", name: "live", scope: "platform" },
+      consumptionMultiplier: 1,
+      billing: { input: 2, output: 4 },
       features: ["text", "tools", "stream", "usage"],
     });
     expect(JSON.stringify(models)).not.toMatch(

@@ -485,14 +485,14 @@ it("rejects cross-user binding, header overrides, revoked credentials, disabled/
     );
     expect(enabledResponse.status).toBe(200);
     await enabledResponse.text();
-    const revoke = await f.request(
-      api + "/revoke",
-      "POST",
-      { id: channel.id },
-      f.alice.cookie,
+    const credentials = new DatabaseSync(
+      join(f.config.dataDir, "official.byok/credentials.sqlite"),
     );
-    expect(revoke.status).toBe(200);
-    await revoke.text();
+    try {
+      credentials.prepare("DELETE FROM credentials WHERE id=?").run(channel.id);
+    } finally {
+      credentials.close();
+    }
     expect((await f.invoke(key.token)).status).toBe(403);
     const removed = await f.request(
       api + "/personal-channels?id=" + encodeURIComponent(channel.id),

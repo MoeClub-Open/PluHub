@@ -26,7 +26,7 @@ GET /v1/models 列出密钥授权范围内的可用模型别名。所有生成�
 
 图片支持 PNG/JPEG/GIF/WebP 的 base64 data URL，以及协议能够表达的 HTTP(S) 地址。Gemini 远程图片需要显式 MIME；跨协议无法表达 low/high 图片 detail 时拒绝。多模态工具结果仅 Anthropic 原协议支持，其余目标明确拒绝。Gemini 的纯文本/标量工具结果包装为 response.result 对象；有序内容块与工具结果保持原次序。
 
-不支持音频、视频、文件、图片输出、除 OpenAI 内置网页搜索外的服务商托管工具、持久 Responses、previous_response_id、后台 Responses、多候选或任意供应商附加字段。Gemini responseSchema 使用其专用 Schema 方言，当前要求 responseJsonSchema，避免不完整转换。Gemini 可见文本上的签名暂不支持；思考块和函数调用签名已支持。不支持的请求字段或目标组合明确拒绝，函数工具由客户端执行。Schema 名称是 OpenAI 的元数据；转换到不具名的 Anthropic/Gemini 时保留 Schema 与严格约束，不能表达的 description 或 relaxed 模式拒绝。
+会话协议转换暂不支持音频、视频、文件、图片输出、除 OpenAI 内置网页搜索外的服务商托管工具、持久 Responses、previous_response_id、后台 Responses、多候选或任意供应商附加字段。Gemini responseSchema 使用其专用 Schema 方言，当前要求 responseJsonSchema，避免不完整转换。Gemini 可见文本上的签名暂不支持；思考块和函数调用签名已支持。不支持的请求字段或目标组合明确拒绝，函数工具由客户端执行。Schema 名称是 OpenAI 的元数据；转换到不具名的 Anthropic/Gemini 时保留 Schema 与严格约束，不能表达的 description 或 relaxed 模式拒绝。
 
 Responses 是请求级无状态调用，上游请求设置 store: false，支持 include: ["reasoning.encrypted_content"]。call_id 用于工具往返，输出 item.id 独立保留。增量与 done/completed 快照合并时检查前缀一致性，避免重复文本和工具参数；最后快照的加密思考内容也会保留。
 
@@ -54,10 +54,31 @@ Chat 入口接受 `web_search_options`，也可接收上述搜索工具声明并
 
 搜索活动是服务端工具事件，不转成待客户端执行的函数调用。普通响应保留 `web_search_call` 和 URL 引用；SSE 保留搜索状态、完成快照与引用事件。增量、结束项和最终完整快照按调用 ID / 引用去重；多个文本部分的引用偏移映射到客户端聚合正文。Responses 多轮输入可包含搜索调用项及带 URL 引用的 assistant 消息。Chat 返回标准 `annotations`，搜索活动放在 `extra_content.web_search_calls`，可重新作为对话历史接入 Responses。Playground 将 URL 引用渲染为可点击链接。
 
-工具分支将搜索视为有工具请求，自动路由排除不支持相应控制或接口的候选。调用元数据只记录搜索次数，不记录查询词和检索正文。搜索调用附加费用尚未单独定价或结算，既有计费仅涵盖 Token / 配置的按次费用。
+工具分支将搜索视为有工具请求，自动路由排除不支持相应控制或接口的候选。调用元数据只记录搜索次数，不记录查询词和检索正文。模型价格可配置 `pricing.webSearch`（USD / 次）；按已完成的搜索调用 ID 去重结算，计入价格、用量及账单快照，并应用渠道倍率。未配置时不追加搜索费。Responses 的 `max_tool_calls` 原样传递；预留使用该上限，未指定时按 3 次估算。原生 Chat 无法报告工具次数，配置独立搜索费时要求改用 Responses 上游。
 
 参考：[OpenAI Web search](https://developers.openai.com/api/docs/guides/tools-web-search)、[Responses streaming events](https://developers.openai.com/api/reference/resources/responses/streaming-events)。
 
-## 其他端点
+## 图片、向量与音频
 
-当前没有 `/v1/images/generations`、`/v1/images/edits`、图片变体、Embeddings、音频或视频端点；Responses 的 `image_generation` 等媒体工具也未接入。图片输入识别与生成图片是不同的能力，配置模型别名或接口路径不会自动增加这些端点。后续接入需同时提供对应请求/响应、二进制或多部分传输、用量和计价契约。
+`official.ingress-openai-media` 和 `official.upstream-openai-media` 独立安装与启停；新站点预装但默认停用。媒体上游复用 OpenAI Chat / Responses 连接的凭证、认证及公网上游策略，不能指向 Codex、Claude 或 Antigravity 的文本订阅接口。
+
+| 入口                            | 请求                                 | 响应                                  |
+| ------------------------------- | ------------------------------------ | ------------------------------------- |
+| `POST /v1/embeddings`           | 文本、文本批次、Token 数组           | JSON 向量 / base64、输入 Token 用量   |
+| `POST /v1/images/generations`   | JSON                                 | JSON 图片或图片 SSE                   |
+| `POST /v1/images/edits`         | JSON 图片引用或 multipart 文件、遮罩 | JSON 图片或图片 SSE                   |
+| `POST /v1/audio/speech`         | JSON 文本与音色                      | 音频二进制流或 `stream_format: "sse"` |
+| `POST /v1/audio/transcriptions` | multipart 音频文件                   | JSON、文本、字幕或转写 SSE            |
+| `POST /v1/audio/translations`   | multipart 音频文件                   | JSON、文本或字幕                      |
+
+模型配置 `operations` 选择允许的端点，例如 `["images/generations", "images/edits"]`。省略时只允许 `chat`（四类会话协议）；图片、音频和向量模型不会出现在 Playground 对话选择器中。公开及个人目录保留各自模型端点和渠道价格，媒体模型的接入示例使用对应接口。个人模型仍按所属用户隔离，API Key 的渠道及模型限制同样生效。
+
+渠道流程继续提供渠道/模型选择、重定向、请求限流与 OpenAI 协议准入。媒体请求不能执行文本提示词、思考强度、输出 Token 上限、TPS 或任务分类节点，防止配置静默失效。高级接口组合的 `mediaPaths` 按操作名配置相对路径，例如 `{ "embeddings": "/v1/vector" }`，不会误用会话的 `path`。
+
+媒体请求体最多 32 MiB，JSON 响应及单个媒体 SSE 事件最多 64 MiB；Listener 的请求体上限也需满足实际上传大小。重复文件和表单字段保持顺序，模型选择字段不得重复。音频采用拉取和背压，取消会中断上游连接；SSE 必须出现对应完成事件，中断、错误和取消不产生成功结算。请求日志保留操作、状态、耗时及可核实用量，不保存图片、音频、提示词或搜索正文。
+
+Embeddings 以提供商输入 Token 计费。图片和音频首期使用明确的按次价格或固定金额表达式，不把媒体 Token 当作普通文本 Token，也不根据文件体积猜测音频时长；上游提供的 Token 总量仍可记录。计费未启用或个人渠道不扣平台钱包；平台计费启用时，媒体未配置固定价格会在调用前拒绝。
+
+图片变体、视频、Realtime、Files 和 Responses 的 `image_generation` 工具尚未接入。媒体端点支持 OpenAI 兼容服务的原生接口，不提供 Gemini / Anthropic 媒体协议转换；提供商自身是否支持模型、格式和参数，以其接口响应为准。
+
+参考：[Images](https://developers.openai.com/api/reference/resources/images)、[Embeddings](https://developers.openai.com/api/reference/resources/embeddings/methods/create)、[Speech](https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create)、[Transcriptions](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)。
