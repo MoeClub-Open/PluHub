@@ -2,18 +2,18 @@
 
 当前共有 34 个官方插件，新站默认安装 32 个。以下为主要商业插件；预付计费、Stripe、易支付默认关闭。已有配置必须显式安装和授权，普通启动不会自动扩大权限。部署范围为单节点。
 
-| 插件 | 能力 / 页面 | 行为 |
-| --- | --- | --- |
-| billing | `billing.credit@1`、`billing.balance@1`；用量与账单 | USD 整数微单位钱包、唯一来源账本、请求预留、结算、待核对、管理员审计调整 |
-| commerce | `commerce.payment@1`、`commerce.entitlements@1`；充值与订阅 | 商品价格快照、订单、单次支付、周期额度、权益到期、取消续订、持久 outbox |
-| payments-stripe | `payments.stripe@1`；Stripe 支付配置 | Checkout 单次支付和持续订阅、原始字节 Webhook 验签、异步支付、周期发放 |
-| payments-epay | `payments.epay@1`；易支付配置 | 多支付方式与商户、V1/V2 与 MD5/RSA 独立配置、V2 响应验签、支付回调、预付周期与手动续费 |
-| byok | `credentials.select@1`、`credentials.resolve@1`；自带凭证 | 按用户和渠道隔离的加密 API Key / OAuth 授权、过期刷新、撤销 |
-| rate-limit | 流量策略 | 按用户、Key、渠道聚合 RPM/TPM/并发，以及 HTTP/SSE 输出字节限速 |
-| protocol-converter | `ai.converter@1`；协议转换 | 四协议请求/响应与流式编解码能力；入口、标准上游通过此能力调用；本地转换预览 |
-| upstream-codex | `ai.upstream.codex@1` | 官方 SIWC Responses 模式及 CLI 兼容模式 |
-| upstream-claude-subscription | `ai.upstream.claude-subscription@1` | Claude OAuth Bearer 认证、Messages JSON/SSE |
-| upstream-antigravity | `ai.upstream.antigravity@1` | Project 请求包装、Gemini JSON/SSE、外层 response 解包 |
+| 插件                         | 能力 / 页面                                                 | 行为                                                                                   |
+| ---------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| billing                      | `billing.credit@1`、`billing.balance@1`；用量与账单         | USD 整数微单位钱包、唯一来源账本、请求预留、结算、待核对、管理员审计调整               |
+| commerce                     | `commerce.payment@1`、`commerce.entitlements@1`；充值与订阅 | 商品价格快照、订单、单次支付、周期额度、权益到期、取消续订、持久 outbox                |
+| payments-stripe              | `payments.stripe@1`；Stripe 支付配置                        | Checkout 单次支付和持续订阅、原始字节 Webhook 验签、异步支付、周期发放                 |
+| payments-epay                | `payments.epay@1`；易支付配置                               | 多支付方式与商户、V1/V2 与 MD5/RSA 独立配置、V2 响应验签、支付回调、预付周期与手动续费 |
+| byok                         | `credentials.select@1`、`credentials.resolve@1`；自带凭证   | 按用户和渠道隔离的加密 API Key / OAuth 授权、过期刷新、撤销                            |
+| rate-limit                   | 流量策略                                                    | 按用户、Key、渠道聚合 RPM/TPM/并发，以及 HTTP/SSE 输出字节限速                         |
+| protocol-converter           | `ai.converter@1`；协议转换                                  | 四协议请求/响应与流式编解码能力；入口、标准上游通过此能力调用；本地转换预览            |
+| upstream-codex               | `ai.upstream.codex@1`                                       | 官方 SIWC Responses 模式及 CLI 兼容模式                                                |
+| upstream-claude-subscription | `ai.upstream.claude-subscription@1`                         | Claude OAuth Bearer 认证、Messages JSON/SSE                                            |
+| upstream-antigravity         | `ai.upstream.antigravity@1`                                 | Project 请求包装、Gemini JSON/SSE、外层 response 解包                                  |
 
 ## 计费规则
 
@@ -100,14 +100,34 @@ https://你的域名/api/plugins/official.payments-epay/notify?pluhub_method=<�
 
 ```json
 {
-  "codex-plan":{"protocol":"codex","authMode":"siwc","baseUrl":"https://api.openai.com/v1","keyRef":"env:CODEX_ACCESS_TOKEN"},
-  "codex-cli":{"protocol":"codex","authMode":"cli","baseUrl":"https://chatgpt.com/backend-api/codex","keyRef":"env:CODEX_ACCESS_TOKEN","accountId":"你的账号ID"},
-  "claude-plan":{"protocol":"claude-subscription","baseUrl":"https://api.anthropic.com","keyRef":"env:CLAUDE_ACCESS_TOKEN"},
-  "google-plan":{"protocol":"antigravity","baseUrl":"https://cloudcode-pa.googleapis.com","keyRef":"env:GOOGLE_ACCESS_TOKEN","projectId":"你的项目ID"}
+  "codex-plan": {
+    "protocol": "codex",
+    "authMode": "siwc",
+    "baseUrl": "https://api.openai.com/v1",
+    "keyRef": "env:CODEX_ACCESS_TOKEN"
+  },
+  "codex-cli": {
+    "protocol": "codex",
+    "authMode": "cli",
+    "baseUrl": "https://chatgpt.com/backend-api/codex",
+    "keyRef": "env:CODEX_ACCESS_TOKEN",
+    "accountId": "你的账号ID"
+  },
+  "claude-plan": {
+    "protocol": "claude-subscription",
+    "baseUrl": "https://api.anthropic.com",
+    "keyRef": "env:CLAUDE_ACCESS_TOKEN"
+  },
+  "google-plan": {
+    "protocol": "antigravity",
+    "baseUrl": "https://cloudcode-pa.googleapis.com",
+    "keyRef": "env:GOOGLE_ACCESS_TOKEN",
+    "projectId": "你的项目ID"
+  }
 }
 ```
 
-订阅授权是否允许模型调用取决于实际账号和服务商，不凭模型目录推断。CLI 模式强制流式上游，非流式入口可收集后返回；不支持 maxTokens/temperature 覆盖，明确拒绝。因 Anthropic 入口必须指定 max_tokens，不能组合 CLI 模式；可使用 SIWC 或其他兼容上游。启用预付计费且要求输出预算时也不能使用 CLI 平台费用模式，可使用 BYOK。
+订阅授权是否允许模型调用取决于实际账号和服务商，不凭模型目录推断。CLI 模式强制流式上游，非流式入口可收集后返回；自动忽略归一化后的 maxTokens/temperature，兼容客户端默认输出参数及 Anthropic 入口必填的 max_tokens。SIWC 模式保留这些参数。CLI 平台计费在 automatic/estimate 策略下按站点默认输出 Token 数估算预留、按实际上游 Usage 结算，不声明已执行输出上限；bounded 策略仍拒绝无法执行硬上限的 Token 计费请求，固定按次计费可用。
 
 三个订阅适配器已通过本地认证头、请求包装、JSON/SSE、取消和入口组合验证；没有用户真实订阅授权，未宣称服务商实测成功。
 
