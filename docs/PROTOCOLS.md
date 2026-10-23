@@ -9,7 +9,7 @@
 | Anthropic Messages      | POST /v1/messages                                                  | /v1/messages              |
 | Gemini                  | POST /v1beta/models/:model:generateContent、:streamGenerateContent | 对应 GenerateContent 接口 |
 
-GET /v1/models 列出已配置的公开模型别名。所有生成入口要求用户认证。
+GET /v1/models 列出密钥授权范围内的可用模型别名。所有生成入口要求用户认证。控制台模型目录另外展示本人 BYOAPI/BYOSUB 模型，公开目录仅展示平台模型。单个连接可在 `interfaces` 中组合多种入口与上游接口，按入口及模型匹配规则确定转换目标、路径与认证；配置方式与隔离边界见 [个人渠道](PERSONAL_CHANNELS.md#多接口组合)。
 
 支持文本、图片输入、多轮消息、客户端函数工具定义/调用/结果、普通 JSON、SSE、思考内容/签名、拒答、安全过滤、结束原因与缓存/思考用量。基础 HTTP 矩阵为 4 个入口 × 4 个上游 × 普通/流式 × 无工具/有工具，共 64 个本地模拟组合，另有 32 次工具结果回传；扩展矩阵另以 32 次 HTTP 调用验证图片、JSON Schema 和思考内容。模型身份由重定向策略决定，见 [渠道工作流](WORKFLOWS.md)。
 

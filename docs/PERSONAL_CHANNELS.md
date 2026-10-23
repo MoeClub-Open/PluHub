@@ -37,7 +37,17 @@ New API 预设可读取公开 `/api/ratio_config`，把上游基础 Token 价格
 
 客户端使用标准 `Authorization: Bearer <PluHub Key>`，不需要额外传凭证 ID。未指定渠道时按模型匹配可用绑定，平台渠道优先，同名个人模型按绑定顺序匹配；`x-pluhub-channel` 可显式选择已绑定渠道，不能越过绑定范围。每次请求检查渠道所有权、启停和凭证有效性；Key 的模型允许范围仍按客户端公开模型名检查。绑定渠道不可用时不会扩大到未绑定渠道，个人订阅授权失效也不会自动改走平台收费渠道。已经开始的流按既有排空与取消机制结束。
 
-未绑定的 Key 使用平台路由；显式指定 `x-pluhub-channel` 可选择当前用户的渠道。`/v1/models` 返回绑定渠道的可用模型并按默认匹配顺序去重；模型目录与价格试算使用相同授权范围，价格和倍率以实际匹配的渠道为准。控制台模型目录和 Playground 可选择个人渠道，选择应与调用 Key 的绑定一致。同名模型在不同渠道各自独立。
+未绑定的 Key 使用平台路由；显式指定 `x-pluhub-channel` 可选择当前用户的渠道。`/v1/models` 返回绑定渠道的可用模型并按默认匹配顺序去重；模型目录与价格试算使用相同授权范围，价格和倍率以实际匹配的渠道为准。登录后的控制台模型目录与 Playground 默认合并展示平台模型及当前用户可用的个人模型，按渠道保留独立身份与价格。Playground 使用“渠道 ID + 模型 ID”选择并显式发送 `x-pluhub-channel`，同名模型不会覆盖或误用其他渠道；未登录的公开目录只展示平台模型。API Key 的目录和路由仍遵守自身绑定范围，不因控制台模型可见性扩大授权。个人模型不复用平台公开性能统计。同名模型在不同渠道、不同用户之间各自独立。
+
+## 多接口组合
+
+BYOAPI 与平台流程图的上游连接均可配置 `interfaces`。这是同一连接内的有序接口路由，不增加渠道类型。每条规则声明 `incoming` 入口协议、目标 `protocol`，可用 `models` 按映射后的上游模型精确匹配或使用 `*` 通配。配置接口组合后使用第一条匹配规则，没有匹配项时明确拒绝；没有配置组合的连接继续按其默认接口转换请求。
+
+支持 Chat Completions、Responses、Messages 和 Gemini 任意组合。`path` / `streamPath` / `modelsPath` 相对于当前连接的 Base URL，`{model}` 会编码为路径参数；Gemini 普通和流式路径分别处理。每条规则可配置认证方式、请求头和服务商扩展参数。`{key}` 仅引用此连接的密钥，不读取客户端认证；模型、输出预算与用量采集不能被扩展参数覆盖，仍由模型映射与渠道流程决定。订阅账号不允许通过这些设置向任意 API 地址发送 OAuth 凭据。
+
+模型发现按各规则的协议、目录路径和认证查询，并按规则匹配模型，合并重复模型的接口声明。部分接口发现失败仍返回其他接口的结果与对应错误；Chat / Responses 共享相同目录配置时合并查询。模型发现通过各物理适配器的 `ai.upstream-models.<protocol>@1` 能力读取其已授权密钥引用，路由器不直接读取服务商密钥。
+
+个人接口路由始终继承本人渠道的凭据与公网边界，不接受其他渠道连接或凭据覆盖。修改接口组合不合并平台/其他个人渠道的模型映射，也不改变 API Key 的渠道授权。
 
 ## 公网连接边界
 
@@ -50,3 +60,5 @@ New API 预设可读取公开 `/api/ratio_config`，把上游基础 Token 价格
 - https://github.com/looplj/axonhub/blob/unstable/docs/en/guides/channel-management.md
 - https://github.com/looplj/axonhub/blob/unstable/docs/en/guides/api-key-profiles.md
 - https://docs.newapi.pro/zh/docs/guide/console/settings/rate-settings
+
+高级自定义接口组合参考：https://github.com/QuantumNous/new-api/blob/main/relaykit/dto/channel_settings.go（独立实现，未复制源码）。
