@@ -139,7 +139,7 @@ it("keeps personal channels out of public listings even with an authenticated ow
     const keyResponse = await f.request(
       "/api/plugins/official.auth/keys",
       "POST",
-      { name: "Bound", channelId: channel.id },
+      { name: "Bound", channelIds: [channel.id] },
       admin,
     );
     expect(keyResponse.status).toBe(201);

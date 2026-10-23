@@ -83,7 +83,7 @@ jobs:
           pnpm test
           node scripts/check-boundaries.mjs
           pnpm pack:all
-          node scripts/verify-routing-packages.mjs
+          bun scripts/verify-routing-packages.ts
           node scripts/verify-identity-packages.mjs
           pnpm bench
       - name: Deployable image and persistence

@@ -173,9 +173,9 @@ it("enforces administrator channel blocks independently of user settings, creden
     ).json();
     expect(channel.id).toMatch(/^personal:/);
     const binding = await f.request(
-      auth + "/keys/binding",
+      auth + "/keys",
       "PUT",
-      { id: alice.key.id, channelId: channel.id },
+      { id: alice.key.id, name: "Admin-bound key", channelIds: [channel.id] },
       alice.cookie,
     );
     expect(binding.status).toBe(200);
@@ -265,7 +265,7 @@ it("enforces administrator channel blocks independently of user settings, creden
     expect(released.status).toBe(200);
     await released.text();
     expect(
-      await f.kernel.invoke("ai.routing@1", {
+      await f.kernel.invoke("ai.routing@2", {
         model: "demo",
         channelId: channel.id,
         principalId: alice.id,

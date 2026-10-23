@@ -116,7 +116,7 @@ try {
   );
   kernel = await createKernel(config);
   await kernel.start();
-  const plan = await kernel.invoke("ai.routing@1", {
+  const plan = await kernel.invoke("ai.routing@2", {
     model: "auto",
     features: ["text"],
     request: {
@@ -129,7 +129,7 @@ try {
   assert.equal(plan.model, "m");
   assert.equal(plan.logicalUpstreamId, "smart");
   assert.equal(plan.reasoning.effort, "low");
-  const composed = await kernel.invoke("ai.routing@1", {
+  const composed = await kernel.invoke("ai.routing@2", {
     model: "composed",
     features: ["text"],
     request: {

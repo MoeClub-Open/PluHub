@@ -276,8 +276,8 @@ it("enforces API key model scopes, expiry and request limits without allowing cr
       "expires_at",
       "requests_per_minute",
       "last_used_at",
-      "channel_id",
-      "credential_id",
+      "secret",
+      "channel_ids_json",
     ])
       legacy.exec("ALTER TABLE api_keys DROP COLUMN " + field);
     // Reconstruct the complete historical schema, including pre-MFA sessions.

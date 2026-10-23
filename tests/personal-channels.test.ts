@@ -263,7 +263,7 @@ it("applies personal channel protocol gates to bound API keys and validates prev
       ],
     };
     const channel = await f.channel(f.alice, { flow });
-    const key = await f.key(f.alice, { channelId: channel.id });
+    const key = await f.key(f.alice, { channelIds: [channel.id] });
     const denied = await f.request(
       "/v1/responses",
       "POST",
@@ -347,7 +347,7 @@ it("creates isolated preset/custom channels and binds keys for actual JSON/SSE c
     ).not.toContain("alice-upstream-secret");
     db.close();
     const key = await f.key(f.alice, {
-      channelId: channel.id,
+      channelIds: [channel.id],
       models: ["demo"],
     });
     for (const stream of [false, true]) {
@@ -403,9 +403,14 @@ it("creates isolated preset/custom channels and binds keys for actual JSON/SSE c
       key: "custom-secret",
     });
     const changed = await f.request(
-      auth + "/keys/binding",
+      auth + "/keys",
       "PUT",
-      { id: key.id, channelId: custom.id },
+      {
+        id: key.id,
+        name: "Personal key",
+        models: ["demo"],
+        channelIds: [custom.id],
+      },
       f.alice.cookie,
     );
     expect(changed.status).toBe(200);
@@ -421,11 +426,15 @@ it("rejects cross-user binding, header overrides, revoked credentials, disabled/
   const f = await setup();
   try {
     const channel = await f.channel(),
-      key = await f.key(f.alice, { channelId: channel.id });
+      key = await f.key(f.alice, { channelIds: [channel.id] });
     const bobKey = await f.key(f.bob);
     for (const [path, method, body] of [
-      [auth + "/keys", "POST", { name: "stolen", channelId: channel.id }],
-      [auth + "/keys/binding", "PUT", { id: bobKey.id, channelId: channel.id }],
+      [auth + "/keys", "POST", { name: "stolen", channelIds: [channel.id] }],
+      [
+        auth + "/keys",
+        "PUT",
+        { id: bobKey.id, name: "stolen", channelIds: [channel.id] },
+      ],
       [api + "/personal-channels", "PUT", { ...channel, name: "steal" }],
       [
         api + "/personal-channels?id=" + encodeURIComponent(channel.id),
@@ -504,7 +513,7 @@ it("previews new-api prices/models, preserves unknown/free prices, updates crede
   const f = await setup();
   try {
     const channel = await f.channel(),
-      key = await f.key(f.alice, { channelId: channel.id });
+      key = await f.key(f.alice, { channelIds: [channel.id] });
     const synced = await (
       await f.request(
         api + "/personal-channels/sync",
@@ -571,8 +580,7 @@ it("previews new-api prices/models, preserves unknown/free prices, updates crede
       await f.request(auth + "/keys", "GET", undefined, f.alice.cookie)
     ).json();
     expect(list[0]).toMatchObject({
-      channel_id: channel.id,
-      credential_id: channel.id,
+      channelIds: [channel.id],
     });
   } finally {
     await f.close();
@@ -592,7 +600,7 @@ it("runs personal channel graphs, enforces platform bindings and cancels an upst
       ],
     };
     const channel = await f.channel(f.alice, { flow }),
-      key = await f.key(f.alice, { channelId: channel.id });
+      key = await f.key(f.alice, { channelIds: [channel.id] });
     const response = await f.invoke(key.token);
     expect(response.status).toBe(200);
     await response.text();
@@ -603,7 +611,7 @@ it("runs personal channel graphs, enforces platform bindings and cancels an upst
         { role: "user", content: "hello" },
       ],
     });
-    const platformKey = await f.key(f.alice, { channelId: "preset" });
+    const platformKey = await f.key(f.alice, { channelIds: ["preset"] });
     const forbidden = await f.invoke(platformKey.token, false, {}, "second");
     expect(forbidden.status).toBe(403);
     await forbidden.text();
@@ -645,7 +653,7 @@ it("calculates input/output consumption from original prices, keeps catalog orig
       inputMultiplier: 0.25,
       outputMultiplier: 0.2,
     });
-    const key = await f.key(f.alice, { channelId: channel.id });
+    const key = await f.key(f.alice, { channelIds: [channel.id] });
     const catalog = await (
       await f.request(
         "/api/plugins/official.model-catalog/models?channel=" +
@@ -663,7 +671,7 @@ it("calculates input/output consumption from original prices, keeps catalog orig
       tools: [],
     };
     expect(
-      await f.kernel.invoke("ai.routing@1", {
+      await f.kernel.invoke("ai.routing@2", {
         channelId: channel.id,
         principalId: f.alice.id,
         model: "demo",
@@ -689,7 +697,7 @@ it("calculates input/output consumption from original prices, keeps catalog orig
       outputMultiplier: 0.3,
     });
     expect(
-      await f.kernel.invoke("ai.routing@1", {
+      await f.kernel.invoke("ai.routing@2", {
         channelId: channel.id,
         principalId: f.alice.id,
         model: "demo",
@@ -728,7 +736,7 @@ it("uses each personal provider protocol through the common client ingress and b
       "gemini",
     ]) {
       const channel = await f.channel(f.alice, { protocol, preset: "custom" }),
-        key = await f.key(f.alice, { channelId: channel.id });
+        key = await f.key(f.alice, { channelIds: [channel.id] });
       const response = await f.invoke(key.token);
       expect(response.status).toBe(200);
       expect((await response.json()).choices[0].message.content).toBe(

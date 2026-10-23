@@ -26,7 +26,7 @@ it("does not advertise readiness before the startup graph is published", async (
           host: ">=0.1.0-alpha.1",
           runtime: { kind: "native", entry: "index.mjs" },
           provides: [],
-          requires: ["listener.address@1", "auth.admit@1", "ai.routing@1"],
+          requires: ["listener.address@1", "auth.admit@1", "ai.routing@2"],
           permissions: [],
         }),
       );
