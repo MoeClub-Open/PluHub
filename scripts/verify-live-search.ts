@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 
-/** Explicit opt-in; two billable requests, with at most one hosted search requested. */
+/** Explicit opt-in; two billable requests, asking for one hosted search. */
 export async function verifyLiveSearch(options: {
   url: string;
   token: string;
   model: string;
   channel?: string;
+  maxToolCalls?: number;
 }) {
   const headers = {
     authorization: "Bearer " + options.token,
@@ -30,7 +31,9 @@ export async function verifyLiveSearch(options: {
           ? {
               tools: [{ type: "web_search" }],
               tool_choice: { type: "web_search" },
-              max_tool_calls: 1,
+              ...(options.maxToolCalls === undefined
+                ? {}
+                : { max_tool_calls: options.maxToolCalls }),
             }
           : {}),
       }),

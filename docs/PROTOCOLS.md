@@ -54,7 +54,7 @@ Chat 入口接受 `web_search_options`，也可接收上述搜索工具声明并
 
 搜索活动是服务端工具事件，不转成待客户端执行的函数调用。普通响应保留 `web_search_call` 和 URL 引用；SSE 保留搜索状态、完成快照与引用事件。增量、结束项和最终完整快照按调用 ID / 引用去重；多个文本部分的引用偏移映射到客户端聚合正文。Responses 多轮输入可包含搜索调用项及带 URL 引用的 assistant 消息。Chat 返回标准 `annotations`，搜索活动放在 `extra_content.web_search_calls`，可重新作为对话历史接入 Responses。Playground 将 URL 引用渲染为可点击链接。
 
-工具分支将搜索视为有工具请求，自动路由排除不支持相应控制或接口的候选。调用元数据只记录搜索次数，不记录查询词和检索正文。模型价格可配置 `pricing.webSearch`（USD / 次）；按已完成的搜索调用 ID 去重结算，计入价格、用量及账单快照，并应用渠道倍率。未配置时不追加搜索费。Responses 的 `max_tool_calls` 原样传递；预留使用该上限，未指定时按 3 次估算。原生 Chat 无法报告工具次数，配置独立搜索费时要求改用 Responses 上游。
+工具分支将搜索视为有工具请求，自动路由排除不支持相应控制或接口的候选。调用元数据只记录搜索次数，不记录查询词和检索正文。模型价格可配置 `pricing.webSearch`（USD / 次）；按已完成的搜索调用 ID 去重结算，计入价格、用量及账单快照，并应用渠道倍率。未配置时不追加搜索费。Responses API 的 `max_tool_calls` 原样传递；Codex CLI 当前不接受该参数，网关在资金预留及上游调用前明确拒绝，需省略该参数或选择 Responses API 上游；预留使用该上限，未指定时按 3 次估算。原生 Chat 无法报告工具次数，配置独立搜索费时要求改用 Responses 上游。
 
 参考：[OpenAI Web search](https://developers.openai.com/api/docs/guides/tools-web-search)、[Responses streaming events](https://developers.openai.com/api/reference/resources/responses/streaming-events)。
 

@@ -2,6 +2,79 @@ import { it, expect } from "vitest";
 import { createServer } from "node:http";
 import { fixture } from "./helpers.js";
 
+it("rejects unsupported Codex CLI tool-call bounds before reserving funds or contacting the provider", async () => {
+  const f = await fixture(
+    [
+      "users",
+      "auth",
+      "billing",
+      "ai-router",
+      "http-transport",
+      "upstream-codex",
+      "ingress-openai-responses",
+    ],
+    {
+      billing: { enabled: true },
+      "ai-router": {
+        upstreams: {
+          "1": {
+            protocol: "codex",
+            authMode: "cli",
+            baseUrl: "https://provider.invalid",
+            keyRef: "env:PLUHUB_TEST_UPSTREAM_KEY",
+          },
+        },
+        models: {
+          search: {
+            upstream: "1",
+            model: "gpt-6-luna",
+            inputPrice: 0.1,
+            outputPrice: 0.5,
+          },
+        },
+      },
+    },
+  );
+  try {
+    const admin = await f.admin();
+    const response = await f.request(
+      "/v1/responses",
+      "POST",
+      {
+        model: "search",
+        input: "search",
+        tools: [{ type: "web_search" }],
+        max_tool_calls: 1,
+      },
+      admin,
+    );
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe("web_search_unsupported");
+    expect(
+      await (
+        await f.request(
+          "/api/plugins/official.billing/review",
+          "GET",
+          undefined,
+          admin,
+        )
+      ).json(),
+    ).toEqual([]);
+    expect(
+      await (
+        await f.request(
+          "/api/plugins/official.billing/wallet",
+          "GET",
+          undefined,
+          admin,
+        )
+      ).json(),
+    ).toMatchObject({ balance: 0, held: 0 });
+  } finally {
+    await f.close();
+  }
+});
+
 it("settles native search once for JSON and split SSE, preserving references and scoped credentials", async () => {
   const prior = process.env.PLUHUB_TEST_UPSTREAM_KEY;
   process.env.PLUHUB_TEST_UPSTREAM_KEY = "search-upstream-fixture";
