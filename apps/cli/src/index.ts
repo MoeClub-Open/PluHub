@@ -13,7 +13,7 @@ import {
   attachManagement,
   installWithDependencies,
   planInstall,
-  removeInstalledPackage,
+  uninstallPlugin,
   applyPendingPluginUpdate,
   recoverInterruptedPluginUpdate,
 } from "@pluhub/control";
@@ -94,7 +94,7 @@ async function main() {
   }
   if (command === "help") {
     console.log(
-      "pluhub create-plugin <directory> | init | validate | verify-data | start | set-public-origin <http(s)://host> | bootstrap-admin --username admin | call <capability> <json> | plugin install <directory> --grant <permissions>\nOptions: --config <path>. Bootstrap password: PLUHUB_ADMIN_PASSWORD.",
+      "pluhub create-plugin <directory> | init | validate | verify-data | start | set-public-origin <http(s)://host> | bootstrap-admin --username admin | call <capability> <json> | plugin install <directory> --grant <permissions> | plugin enable <id> | plugin disable <id> | plugin remove <id> [--purge-data]\nOptions: --config <path>. Bootstrap password: PLUHUB_ADMIN_PASSWORD.",
     );
     return;
   }
@@ -153,20 +153,26 @@ async function main() {
     await requireOffline();
     const item = manifests.find((p) => p.manifest.id === args[2]);
     if (!item) throw new Error("Unknown plugin");
+    const current = await createKernel(config);
+    if (args[1] !== "enable") current.assertRemovable(item.manifest.id);
+    if (args[1] === "remove") {
+      const result = await uninstallPlugin(
+        current,
+        file,
+        config,
+        item.manifest.id,
+        args.includes("--purge-data"),
+        (next) => writeConfig(file, next),
+      );
+      console.log(JSON.stringify(result));
+      return;
+    }
     const next = structuredClone(config);
     const index = config.plugins.indexOf(item.entry);
-    if (args[1] === "remove") next.plugins.splice(index, 1);
-    else next.plugins[index]!.enabled = args[1] === "enable";
+    next.plugins[index]!.enabled = args[1] === "enable";
     const checked = await createKernel(next);
     checked.validate();
     await writeConfig(file, next);
-    if (args[1] === "remove") {
-      await removeInstalledPackage(
-        item.entry.path,
-        resolve(dirname(file), ".pluhub/plugins"),
-        item.manifest.id,
-      );
-    }
     console.log("Plugin configuration updated");
     return;
   }

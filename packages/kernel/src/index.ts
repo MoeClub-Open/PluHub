@@ -287,9 +287,61 @@ export class Kernel {
   remove(id: string) {
     const r = this.records.get(id);
     if (!r) return;
+    this.assertRemovable(id);
     if (!["Stopped", "Installed", "Failed"].includes(r.state))
       throw new HostError("plugin_active", "Stop plugin before removing", 409);
     this.records.delete(id);
+    this.bindings = Object.fromEntries(
+      Object.entries(this.bindings).filter(([, owner]) => owner !== id),
+    );
+    this.publish();
+  }
+  lifecycle(id: string) {
+    const r = this.records.get(id);
+    if (!r) throw new HostError("unknown_plugin", "Unknown plugin", 404);
+    const protectedPlugin =
+      r.manifest.category === "core" ||
+      r.manifest.permissions.includes("identity.provide");
+    const dependents = [...this.records.values()]
+      .filter(
+        (other) =>
+          other !== r &&
+          other.settings.enabled !== false &&
+          (Object.hasOwn(other.manifest.dependencies ?? {}, id) ||
+            other.manifest.requires.some(
+              (capability) =>
+                r.manifest.provides.includes(capability) &&
+                (!this.bindings[capability] ||
+                  this.bindings[capability] === id),
+            )),
+      )
+      .map((other) => ({
+        id: other.manifest.id,
+        name: other.manifest.name ?? other.manifest.id,
+      }));
+    return { protected: protectedPlugin, dependents };
+  }
+  assertRemovable(id: string) {
+    const policy = this.lifecycle(id);
+    if (policy.protected)
+      throw new HostError(
+        "protected_plugin",
+        "Infrastructure plugins cannot be disabled or uninstalled",
+        409,
+      );
+    if (policy.dependents.length)
+      throw new HostError(
+        "plugin_required",
+        "Required by enabled plugins: " +
+          policy.dependents.map((p) => p.name).join(", "),
+        409,
+      );
+    if ([...this.retiring.keys()].some((record) => record.manifest.id === id))
+      throw new HostError(
+        "update_draining",
+        "Previous plugin version is still draining",
+        409,
+      );
   }
   validate() {
     this.ordered();
@@ -307,10 +359,8 @@ export class Kernel {
       version: r.manifest.version,
       path: r.path,
       state: r.state,
-      managementProtected:
-        r.manifest.permissions.includes("identity.provide") ||
-        r.manifest.provides.includes("listener.address@1") ||
-        r.manifest.ui?.path === "/console",
+      enabled: r.settings.enabled !== false,
+      lifecycle: this.lifecycle(r.manifest.id),
       manifest: r.manifest,
       config: r.settings.config ?? {},
     }));
@@ -769,27 +819,22 @@ export class Kernel {
     r.state = "Stopped";
     if (wasRunning) this.log(r.manifest.id, "info", "Plugin stopped");
   }
-  async stop(id: string) {
+  async stop(id: string, persist: () => Promise<void> = async () => {}) {
     const r = this.records.get(id);
     if (!r) throw new HostError("unknown_plugin", "Unknown plugin");
-    for (const other of this.records.values())
-      if (
-        other !== r &&
-        other.state === "Active" &&
-        (Object.hasOwn(other.manifest.dependencies ?? {}, id) ||
-          other.manifest.requires.some(
-            (c) => this.resolveCapability(c, this.current.records) === r,
-          ))
-      )
-        throw new HostError(
-          "plugin_required",
-          "Plugin is required by " + other.manifest.id,
-        );
+    this.assertRemovable(id);
+    const previous = r.state;
     r.state = "Draining";
     try {
+      this.makeSnapshot(
+        [...this.records.values()].filter(
+          (record) => record.state === "Active",
+        ),
+      );
+      await persist();
       this.publish();
     } catch (error) {
-      r.state = "Active";
+      r.state = previous;
       throw error;
     }
     await this.drain(
@@ -799,16 +844,25 @@ export class Kernel {
     await this.dispose(r);
     r.settings.enabled = false;
   }
-  async enable(id: string) {
+  async enable(id: string, persist: () => Promise<void> = async () => {}) {
     const r = this.records.get(id);
     if (!r) throw new HostError("unknown_plugin", "Unknown plugin");
-    if (r.state === "Active") return;
+    if (r.state === "Active") {
+      await persist();
+      return;
+    }
     if (r.state === "Failed") await this.dispose(r);
     const previous = r.settings.enabled;
     r.settings.enabled = true;
     try {
       this.ordered();
       await this.startRecord(r);
+      this.makeSnapshot(
+        [...this.records.values()].filter(
+          (record) => record.state === "Active",
+        ),
+      );
+      await persist();
       this.publish();
     } catch (error) {
       await this.dispose(r).catch(() => {});

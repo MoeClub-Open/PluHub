@@ -26,7 +26,8 @@ export async function removeInstalledPackage(
     !(parts.length === 1 && parts[0] === id) &&
     !(
       parts.length === 2 &&
-      /^set-[a-zA-Z0-9_-]+$/.test(parts[0]!) &&
+      (/^set-[a-zA-Z0-9_-]+$/.test(parts[0]!) ||
+        parts[0]!.startsWith(id + "-")) &&
       parts[1] === id
     )
   )

@@ -35,6 +35,8 @@ import {
   restorePluginData,
 } from "./plugin-jobs.js";
 import { fingerprint, registrySources } from "./registry.js";
+import { uninstallPlugin } from "./uninstall.js";
+export { uninstallPlugin } from "./uninstall.js";
 export { recoverInterruptedPluginUpdate } from "./plugin-jobs.js";
 export function validateConfig(value: unknown): asserts value is HostConfig {
   const valid = new Ajv.default().compile(hostSchema);
@@ -207,6 +209,40 @@ export function attachManagement(
     run(async () => {
       const path = new URL(request.url).pathname;
       if (
+        ["/api/host/plugin-state", "/api/host/plugin-uninstall"].includes(
+          path,
+        ) &&
+        request.method === "POST"
+      ) {
+        if (
+          !context.principal?.session ||
+          !context.principal.permissions.includes("*")
+        )
+          throw new HostError(
+            "forbidden",
+            "Administrator session required",
+            403,
+          );
+        if (
+          kernel
+            .list()
+            .some(
+              (plugin) =>
+                plugin.state === "Active" &&
+                plugin.manifest.provides.includes("auth.admin@1"),
+            )
+        ) {
+          const token = /(?:^|;\s*)pluhub_session=([a-zA-Z0-9_-]+)/.exec(
+            request.headers.get("cookie") ?? "",
+          )?.[1];
+          await kernel.invoke(
+            "auth.admin@1",
+            { userId: context.principal.id, token },
+            context.signal,
+          );
+        }
+      }
+      if (
         path.startsWith("/api/host/registry") ||
         path.startsWith("/api/host/plugin-update")
       )
@@ -284,12 +320,7 @@ export function attachManagement(
         const plugin = kernel.list().find((p) => p.id === body.id);
         if (!plugin)
           throw new HostError("unknown_plugin", "Unknown plugin", 404);
-        if (!body.enabled && plugin.managementProtected)
-          throw new HostError(
-            "protected_plugin",
-            "该插件提供管理入口，请通过本地维护流程停用，避免失去控制台访问",
-            409,
-          );
+        if (!body.enabled) kernel.assertRemovable(plugin.id);
         let found = -1;
         for (let i = 0; i < config.plugins.length; i++) {
           const m = validateManifest(
@@ -311,20 +342,35 @@ export function attachManagement(
             "Plugin is not in the persisted configuration",
             404,
           );
-        const next = structuredClone(config),
-          wasActive = plugin.state === "Active";
+        const next = structuredClone(config);
         next.plugins[found]!.enabled = body.enabled;
-        if (body.enabled) await kernel.enable(body.id);
-        else await kernel.stop(body.id);
-        try {
+        const persist = async () => {
           await writeConfig(file, next);
-        } catch (error) {
-          if (wasActive) await kernel.enable(body.id);
-          else await kernel.stop(body.id);
-          throw error;
-        }
-        config = next;
+          config = next;
+        };
+        if (body.enabled) await kernel.enable(body.id, persist);
+        else await kernel.stop(body.id, persist);
         return json({ ok: true });
+      }
+      if (path === "/api/host/plugin-uninstall" && request.method === "POST") {
+        const body = await readObject(request),
+          id = requiredString(body.id, "id");
+        if (typeof body.purgeData !== "boolean")
+          throw new HostError("invalid_request", "purgeData must be a boolean");
+        context.state.set("admin.resourceId", id);
+        return json(
+          await uninstallPlugin(
+            kernel,
+            file,
+            config,
+            id,
+            body.purgeData,
+            async (next) => {
+              await writeConfig(file, next);
+              config = next;
+            },
+          ),
+        );
       }
       if (path === "/api/host/update" && request.method === "POST") {
         const body = await readObject(request),
