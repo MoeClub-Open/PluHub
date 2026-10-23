@@ -231,7 +231,13 @@ export async function loadProcess(
         ? AbortSignal.any([signal, context.signal])
         : signal;
       if (method === "host.call")
-        return host.call(params.capability, params.input, activeSignal);
+        return host.call(
+          params.capability,
+          params.input,
+          activeSignal,
+          params.providerId,
+        );
+      if (method === "host.providers") return host.providers(params.capability);
       if (method === "host.secret") return host.secret(params.reference);
       if (method === "host.log") {
         if (

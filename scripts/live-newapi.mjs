@@ -57,7 +57,6 @@ try {
     "auth",
     "ai-router",
     "observability",
-    "protocol-converter",
     "ingress-openai-chat",
     "ingress-openai-responses",
     "upstream-openai-chat",

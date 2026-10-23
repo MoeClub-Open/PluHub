@@ -173,6 +173,7 @@ export function attachManagement(
   const logs = runtimeLogStore(kernel.dataDir);
   kernel.setLogHandler(logs.write, logs.close, logs.start);
   let config = initial;
+  let configRevision = randomUUID();
   let queue = Promise.resolve();
   const run = <T>(job: () => Promise<T>): Promise<T> => {
     const result = queue.then(job);
@@ -192,6 +193,7 @@ export function attachManagement(
       throw error;
     }
     config = next;
+    configRevision = randomUUID();
   };
   const setup = setupHandler(kernel, () => config, commit);
   const registry = registryManagement(
@@ -202,6 +204,7 @@ export function attachManagement(
       validateConfig(next);
       await writeConfig(file, next);
       config = next;
+      configRevision = randomUUID();
     },
     options.restart,
   );
@@ -306,11 +309,24 @@ export function attachManagement(
         });
       }
       if (path === "/api/host/config" && request.method === "GET")
-        return json(config);
+        return Response.json(config, {
+          headers: { etag: configRevision, "cache-control": "no-store" },
+        });
       if (path === "/api/host/config" && request.method === "PUT") {
+        const expected = request.headers.get("if-match");
+        if (expected && expected !== configRevision)
+          throw new HostError(
+            "config_conflict",
+            "配置已更新，请刷新后重试",
+            409,
+          );
         const next = await readObject<HostConfig>(request);
         await commit(next);
-        return json({ ok: true, graphVersion: kernel.graphVersion });
+        return json({
+          ok: true,
+          graphVersion: kernel.graphVersion,
+          revision: configRevision,
+        });
       }
       if (path === "/api/host/plugin-state" && request.method === "POST") {
         const body = await readObject(request);
@@ -347,6 +363,7 @@ export function attachManagement(
         const persist = async () => {
           await writeConfig(file, next);
           config = next;
+          configRevision = randomUUID();
         };
         if (body.enabled) await kernel.enable(body.id, persist);
         else await kernel.stop(body.id, persist);
@@ -368,6 +385,7 @@ export function attachManagement(
             async (next) => {
               await writeConfig(file, next);
               config = next;
+              configRevision = randomUUID();
             },
           ),
         );
@@ -445,6 +463,7 @@ export function attachManagement(
             },
           );
           config = next;
+          configRevision = randomUUID();
           return json({ ok: true, ...result });
         } catch (error) {
           if (persisted) {
@@ -480,6 +499,7 @@ export function attachManagement(
           async (next) => {
             await writeConfig(file, next);
             config = next;
+            configRevision = randomUUID();
           },
           kernel,
         );
@@ -495,6 +515,7 @@ export function attachManagement(
         const next = await readConfig(file);
         await applyConfig(kernel, config, next);
         config = next;
+        configRevision = randomUUID();
       }),
   };
 }

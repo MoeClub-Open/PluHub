@@ -1,10 +1,8 @@
+import { migrateLegacyChannels } from "../deploy/migrations/channel-graphs.ts";
 import { it, expect } from "vitest";
 import { createServer } from "node:http";
 import { fixture } from "./helpers.js";
-import {
-  migrateLegacyChannels,
-  defaultChannelFlow,
-} from "../../PluHub-Plugins/lib/ai/channel-config.js";
+import { defaultChannelFlow } from "../../PluHub-Plugins/lib/ai/channel-config.js";
 import { readConfig, createKernel } from "../packages/control/dist/index.js";
 
 async function setup() {
@@ -105,10 +103,8 @@ async function setup() {
       },
     },
   };
-  f.kernel.configure({
-    "official.ai-router": router,
-    "official.workflow": workflow,
-  });
+  router.upstreams.composed = { flow: workflow.flows.standard };
+  f.kernel.configure({ "official.ai-router": router });
   const admin = await f.admin();
   return {
     ...f,
@@ -458,7 +454,7 @@ it("composes channel functions before billing and preserves key scope and final-
         f.admin,
       )
     ).json();
-    expect(JSON.stringify(logs)).toContain("standard");
+    expect(JSON.stringify(logs)).toContain("composed");
     expect(JSON.stringify(logs)).not.toContain("policy: concise");
   } finally {
     await f.cleanup();
@@ -482,7 +478,15 @@ it("rejects channel recursion and invalid graph updates while preserving the pre
     const invalid = structuredClone(f.workflow);
     invalid.flows.standard.nodes[0].next = "absent";
     expect(() =>
-      f.kernel.configure({ "official.workflow": invalid }),
+      f.kernel.configure({
+        "official.ai-router": {
+          ...f.router,
+          upstreams: {
+            ...f.router.upstreams,
+            composed: { flow: invalid.flows.standard },
+          },
+        },
+      }),
     ).toThrow();
     const request = {
       model: "flow",
@@ -501,7 +505,15 @@ it("rejects channel recursion and invalid graph updates while preserving the pre
     ).toBe("vendor-model");
     const recursive = structuredClone(f.workflow);
     recursive.flows.standard.nodes.at(-1).target = "flow";
-    f.kernel.configure({ "official.workflow": recursive });
+    f.kernel.configure({
+      "official.ai-router": {
+        ...f.router,
+        upstreams: {
+          ...f.router.upstreams,
+          composed: { flow: recursive.flows.standard },
+        },
+      },
+    });
     await expect(
       f.kernel.invoke("ai.routing@2", {
         model: "flow",
@@ -511,9 +523,9 @@ it("rejects channel recursion and invalid graph updates while preserving the pre
     ).rejects.toMatchObject({ code: "routing_cycle" });
     expect(f.sent).toHaveLength(0);
     const forbidden = await f.request(
-      "/api/plugins/official.workflow/preview",
+      "/api/plugins/official.ai-router/graph/preview",
       "POST",
-      { profile: "standard", request },
+      { upstream: "composed", request },
     );
     expect(forbidden.status).toBe(401);
     await forbidden.text();
@@ -531,8 +543,13 @@ it("composes an automatic-router channel and keeps previously prepared workflow 
     const workflow = structuredClone(f.workflow);
     workflow.flows.standard.nodes.at(-1).target = "smart";
     f.kernel.configure({
-      "official.ai-router": router,
-      "official.workflow": workflow,
+      "official.ai-router": {
+        ...router,
+        upstreams: {
+          ...router.upstreams,
+          composed: { flow: workflow.flows.standard },
+        },
+      },
       "official.auto-router": {
         profiles: {
           p: {
@@ -564,9 +581,17 @@ it("composes an automatic-router channel and keeps previously prepared workflow 
     });
     expect(old.targetModelId).toBe("actual");
     expect(old.responseModel).toBe("smart");
-    expect(old.workflows[0].profile).toBe("standard");
+    expect(old.workflows[0].profile).toBe("composed");
     workflow.flows.standard.nodes[1].text = "new policy";
-    f.kernel.configure({ "official.workflow": workflow });
+    f.kernel.configure({
+      "official.ai-router": {
+        ...router,
+        upstreams: {
+          ...router.upstreams,
+          composed: { flow: workflow.flows.standard },
+        },
+      },
+    });
     const next = await f.kernel.invoke<any>("ai.routing@2", {
       model: "flow",
       request,

@@ -29,7 +29,6 @@ async function setup() {
       "observability",
       "ai-router",
       "byok",
-      "protocol-converter",
       ...["openai-chat", "openai-responses", "anthropic", "gemini"].flatMap(
         (p) => ["ingress-" + p, "upstream-" + p],
       ),

@@ -1,33 +1,32 @@
 # 计费、支付、订阅与自带凭证
 
-当前共有 34 个官方插件，新站默认安装 32 个。以下为主要商业插件；预付计费、Stripe、易支付默认关闭。已有配置必须显式安装和授权，普通启动不会自动扩大权限。部署范围为单节点。
+当前共有 35 个官方插件。以下为主要商业插件；预付计费、Stripe、易支付默认关闭。渠道管理声明 `http.dispatch` 授权；升级迁移为现有渠道配置补齐该权限。部署范围为单节点。
 
 | 插件                         | 能力 / 页面                                                 | 行为                                                                                   |
 | ---------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | billing                      | `billing.credit@1`、`billing.balance@1`；用量与账单         | USD 整数微单位钱包、唯一来源账本、请求预留、结算、待核对、管理员审计调整               |
 | commerce                     | `commerce.payment@1`、`commerce.entitlements@1`；充值与订阅 | 商品价格快照、订单、单次支付、周期额度、权益到期、取消续订、持久 outbox                |
-| payments-stripe              | `payments.stripe@1`；Stripe 支付配置                        | Checkout 单次支付和持续订阅、原始字节 Webhook 验签、异步支付、周期发放                 |
-| payments-epay                | `payments.epay@1`；易支付配置                               | 多支付方式与商户、V1/V2 与 MD5/RSA 独立配置、V2 响应验签、支付回调、预付周期与手动续费 |
+| payments-stripe              | `payments.provider@1`；Stripe 支付配置                      | Checkout 单次支付和持续订阅、原始字节 Webhook 验签、异步支付、周期发放                 |
+| payments-epay                | `payments.provider@1`；易支付配置                           | 多支付方式与商户、V1/V2 与 MD5/RSA 独立配置、V2 响应验签、支付回调、预付周期与手动续费 |
 | byok                         | `credentials.select@1`、`credentials.resolve@1`；自带凭证   | 按用户和渠道隔离的加密 API Key / OAuth 授权、过期刷新、撤销                            |
 | rate-limit                   | 流量策略                                                    | 按用户、Key、渠道聚合 RPM/TPM/并发，以及 HTTP/SSE 输出字节限速                         |
-| protocol-converter           | `ai.converter@1`；协议转换                                  | 四协议请求/响应与流式编解码能力；入口、标准上游通过此能力调用；本地转换预览            |
 | upstream-codex               | `ai.upstream.codex@1`                                       | 官方 SIWC Responses 模式及 CLI 兼容模式                                                |
 | upstream-claude-subscription | `ai.upstream.claude-subscription@1`                         | Claude OAuth Bearer 认证、Messages JSON/SSE                                            |
 | upstream-antigravity         | `ai.upstream.antigravity@1`                                 | Project 请求包装、Gemini JSON/SSE、外层 response 解包                                  |
 
 ## 计费规则
 
-1 USD = 1,000,000 微美元。Token 价格以 USD / 百万 Token 配置，支持普通输入、输出、缓存读、缓存写、1 小时缓存写、上下文阶梯及按次计价。价格填写原价，渠道、用户组和用户的消耗倍率参与最终计算。用有理数汇总后只在最终微美元边界向上取整；SQLite 事务内记录资金变动和唯一来源。非整数、负信用充值或超出 JavaScript 安全整数范围的金额会被拒绝。
+1 USD = 1,000,000 微美元。Token 价格以 USD / 百万 Token 配置，支持普通输入、输出、缓存读、缓存写、1 小时缓存写、上下文阶梯及按次计价。价格填写原价，仅渠道消耗倍率参与最终计算。用有理数汇总后只在最终微美元边界向上取整；SQLite 事务内记录资金变动和唯一来源。非整数、负信用充值或超出 JavaScript 安全整数范围的金额会被拒绝。
 
-Admission 按流程变换后的消息、工具和输出预算预留，采用当次价格快照及输入 UTF-8 字节估计。没有显式输出预算时使用 `reserveOutputTokens`，默认 4096；这只是预留估计。实际费用超过预留时完整入账，可能形成负余额，后续请求被拒绝。BYOK 请求跳过平台模型费用。
+Admission 按流程变换后的消息、工具和输出预算预留，使用当次冻结的价格快照。输出预算由计费策略和提供商限制共同确定；实际使用量结算后释放差额。BYOAPI/BYOSUB 请求跳过平台钱包扣费，上游使用量与费用估算保留在调用记录中。
 
 Finalize 仅在请求完成且实际用量有效时结算。从未进入上游执行的失败释放预留；调用已开始但缺用量、取消时只有部分用量、异常退出遗留的预留进入待核对。管理员根据服务商事实填写实际费用和原因；填 0 释放预留，不自动将未知用量记作免费。
 
-输入总量包含 Anthropic 缓存读写 Token；Gemini 输出总量包含 thoughts Token。缓存细项从输入总量中拆分计价，思考 Token 已包含在输出总量内，不重复收费。观测页面保存费用估算快照，实际扣款以资金账本为准。钱包资金历史由服务端筛选和分页，支持本人 CSV 导出。
+输入总量包含 Anthropic 缓存读写 Token；Gemini 输出总量包含 thoughts Token。缓存细项从输入总量中拆分计价，思考 Token 已包含在输出总量内，不重复收费。观测插件保存费用估算快照，通过 `billing.request-charges@1` 查询实际扣费、预留和核账状态；账本查询失败显示不可用，不能将未知金额当作零。钱包资金历史由服务端筛选和分页，支持本人 CSV 导出。
 
 ## 商品和支付
 
-管理员在「支付与商业 → 商品与订阅」设置商品、实际支付币种、支付金额、到账 USD 额度和单次/周期模式。新商品使用持久化的数字自增编号，界面不再要求手工填写；历史商品继续保留原 ID。支付适配器统一在「支付方式」配置；余额、权限组和个体倍率在用户管理中调整。用户购买位于「充值与订阅」，资金明细位于「用量与账单」。CNY 商品购买 USD 额度是明确的商品定价，没有隐式换汇。已有订单和订阅使用原价格快照。Checkout 支持 `Idempotency-Key`，并发或超时重试复用原订单；付款通知先到时，不会被迟到的失败响应覆盖。
+管理员在「支付与商业 → 商品与订阅」设置商品、实际支付币种、支付金额、到账 USD 额度和单次/周期模式。新商品使用持久化的数字自增编号，界面不再要求手工填写；历史商品继续保留原 ID。支付适配器统一在「支付方式」配置；余额和管理员身份在用户管理中调整。用户购买位于「充值与订阅」，资金明细位于「用量与账单」。CNY 商品购买 USD 额度是明确的商品定价，没有隐式换汇。已有订单和订阅使用原价格快照。Checkout 支持 `Idempotency-Key`，并发或超时重试复用原订单；付款通知先到时，不会被迟到的失败响应覆盖。
 
 支付插件只负责支付平台协议。验签后，Commerce 核对订单、商户、金额和币种，在本库事务内写支付事实和 outbox；随后调用 `billing.payment-state@1`，在同一钱包事务内提交原始额度、累计冲减与支付冻结。投递失败定时重试，也可由管理员调用 `POST /api/plugins/official.commerce/retry`。账本先提交而 outbox 尚未标记时，重启重投不会双入账；并发更新的较新版本不会被旧任务标为已投递。单个钱包失败不会阻塞其他用户入账。普通 Event 不承担财务交付。
 
@@ -137,7 +136,7 @@ https://你的域名/api/plugins/official.payments-epay/notify?pluhub_method=<�
 
 带宽单位为字节/秒，作用于 HTTP/SSE 响应体，使用 pull 背压并可取消等待，不是 Token/秒限速。宿主 Streaming Hook 可以通过公开 `RequestContext.response` 包装标准 Web Response。客户端关闭响应会中断请求信号，Finalize 后释放资源。
 
-协议转换器可以独立启停。`ai.converter@1` 支持 decode/encode/decodeResult/encodeResult/decodeStream/encodeStream；流式对象使用 Native TS 调用。存在时入口与标准上游通过声明的能力调用；不安装时兼容已有内建转换路径。订阅服务的包装由各自适配器处理。协议预览不调用模型。文本、工具、用量及流式范围延续 [支持矩阵](PROTOCOLS.md)。
+协议编解码由入口与上游共享同一实现，转换范围由渠道协议节点控制。订阅服务的包装由各自适配器处理。文本、工具、用量及流式范围见 [支持矩阵](PROTOCOLS.md)。
 
 控制台按账单、订阅、支付方式和个人渠道组织业务入口。协议准入、限流、输出 TPS、自动路由和请求变换统一在渠道流程图编辑。保留可读字号、焦点样式、明暗主题及手机布局。
 
@@ -151,3 +150,13 @@ https://你的域名/api/plugins/official.payments-epay/notify?pluhub_method=<�
 - [OpenAI SIWC](https://developers.openai.com/siwc/quickstart)、[Codex app-server token sharing](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server)
 
 本地支付测试不发起真实付款。真实 New API 联调结果在 `output/live-newapi.json`：两次 DeepSeek 请求 HTTP 200，但 16 Token 预算内无正文；Qwen 渠道返回上游错误。累计 3 次模型查询、3 次推理请求，未进一步扩大调用。报告和源码均不包含用户密钥。
+
+## 插件边界与配置迁移
+
+渠道插件管理模型映射、原价、渠道倍率和执行图，编辑器通过 `/api/plugins/official.ai-router/configuration` 读写自己的配置及必要的策略名称。后端按插件 Manifest 识别上游并同步密钥引用，使用配置修订号拒绝过期保存。发现的模型默认停用，完成定价及映射后启用。个人渠道保存同一份模型元数据契约，数据按拥有者隔离。
+
+入口和上游各自调用共享协议编解码库；协议准入仍是渠道流程节点。独立 `official.protocol-converter` 和旧 `official.workflow` 已退役，旧工作流在停机升级时迁移到渠道图。Docker 启动迁移先保存完整配置副本，再移除退役插件和能力绑定，不删除插件历史数据。非 Docker 部署在停机后运行 `bun scripts/migrate-plugin-boundaries.ts CONFIG --write`。
+
+支付适配器通过 `payments.provider@1` 声明支付方式、币种、支付模式、续订及门户能力。Commerce 按公开提供商 ID 分派调用，不按品牌名选择业务分支。订单保存续订方式；已有 Stripe 订单通过数据库迁移补齐自动续订，其余已有订单为手动续费。
+
+Finalize 的各 Hook 独立执行，单个结算或观测错误不会阻止后续资源释放，错误由宿主统一报告。停用和启用插件先校验活动依赖和配置，再持久化并发布执行图。

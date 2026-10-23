@@ -826,13 +826,14 @@ export class Kernel {
     const previous = r.state;
     r.state = "Draining";
     try {
+      this.checkConfigs();
       this.makeSnapshot(
         [...this.records.values()].filter(
           (record) => record.state === "Active",
         ),
       );
       await persist();
-      this.publish();
+      this.publish(false);
     } catch (error) {
       r.state = previous;
       throw error;
@@ -857,13 +858,14 @@ export class Kernel {
     try {
       this.ordered();
       await this.startRecord(r);
+      this.checkConfigs();
       this.makeSnapshot(
         [...this.records.values()].filter(
           (record) => record.state === "Active",
         ),
       );
       await persist();
-      this.publish();
+      this.publish(false);
     } catch (error) {
       await this.dispose(r).catch(() => {});
       r.settings.enabled = previous;
@@ -983,7 +985,9 @@ export class Kernel {
           r.settings.config ??
           {}) as T,
       dispatch: (request) => {
-        this.require(r, "http.listen");
+        if (!r.manifest.permissions.includes("http.dispatch"))
+          this.require(r, "http.listen");
+        else this.require(r, "http.dispatch");
         ensure();
         return this.fetch(request);
       },
@@ -1036,7 +1040,41 @@ export class Kernel {
           );
         r.provided.set(name, handler);
       },
-      call: async <T>(name: string, input?: unknown, signal?: AbortSignal) => {
+      providers: (name) => {
+        ensure();
+        if (
+          ![
+            ...r.manifest.requires,
+            ...(r.manifest.optionalRequires ?? []),
+            ...r.manifest.provides,
+          ].includes(name)
+        )
+          throw new HostError(
+            "permission_denied",
+            "Undeclared capability dependency",
+            403,
+          );
+        const records =
+          this.storage.getStore()?.snapshot.records ??
+          [...this.records.values()].filter(
+            (record) => record.state === "Active",
+          );
+        return records
+          .filter(
+            (record) => record.state !== "Failed" && record.provided.has(name),
+          )
+          .map(({ manifest }) => ({
+            id: manifest.id,
+            name: manifest.name ?? manifest.id,
+            version: manifest.version,
+          }));
+      },
+      call: async <T>(
+        name: string,
+        input?: unknown,
+        signal?: AbortSignal,
+        providerId?: string,
+      ) => {
         ensure();
         if (
           !r.manifest.requires.includes(name) &&
@@ -1048,7 +1086,7 @@ export class Kernel {
             "Undeclared capability dependency",
             403,
           );
-        return this.invoke<T>(name, input, signal);
+        return this.invoke<T>(name, input, signal, providerId);
       },
       api: (route) => {
         this.require(r, "api.register");
@@ -1161,15 +1199,28 @@ export class Kernel {
     name: string,
     input?: unknown,
     signal?: AbortSignal,
+    providerId?: string,
   ): Promise<T> {
     const records =
       this.storage.getStore()?.snapshot.records ??
       [...this.records.values()].filter((r) => r.state === "Active");
-    const provider = this.resolveCapability(
-      name,
-      records,
-      this.storage.getStore()?.snapshot.bindings ?? this.bindings,
-    );
+    const provider = providerId
+      ? records.find(
+          (record) =>
+            record.manifest.id === providerId &&
+            record.manifest.provides.includes(name),
+        )
+      : this.resolveCapability(
+          name,
+          records,
+          this.storage.getStore()?.snapshot.bindings ?? this.bindings,
+        );
+    if (!provider)
+      throw new HostError(
+        "missing_capability",
+        "Selected capability provider is unavailable",
+        503,
+      );
     if (provider.state === "Failed")
       throw new HostError(
         "plugin_unavailable",
@@ -1244,7 +1295,13 @@ export class Kernel {
           );
         } catch (error) {
           this.storage.run({ snapshot, context }, () =>
-            this.log("host", "error", "Finalize hook failed"),
+            this.log(
+              "host",
+              "error",
+              error instanceof AggregateError
+                ? error.message
+                : "Finalize hook failed",
+            ),
           );
         } finally {
           if (abort) {

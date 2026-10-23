@@ -1,4 +1,5 @@
 import { mkdir, readdir, cp, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { digest } from "../../packages/control/dist/index.js";
 import type { ImagePluginCatalog } from "./sync-bundled-plugins.ts";
@@ -15,6 +16,7 @@ for (const pkg of release.packages)
 for (const name of await readdir("../PluHub-Plugins/plugins")) {
   if (name === "subscription-accounts") continue;
   const source = "../PluHub-Plugins/plugins/" + name;
+  if (!existsSync(source + "/manifest.json")) continue;
   const target = out + "/plugins/" + name;
   await mkdir(target, { recursive: true });
   for (const file of ["manifest.json", "package.json", "dist"])
@@ -34,9 +36,10 @@ await writeFile(
   JSON.stringify(catalog) + "\n",
 );
 await mkdir(out + "/scripts", { recursive: true });
+await cp("deploy/migrations", out + "/deploy/migrations", { recursive: true });
 await cp(
-  "scripts/migrate-channel-graphs.mjs",
-  out + "/scripts/migrate-channel-graphs.mjs",
+  "scripts/migrate-plugin-boundaries.ts",
+  out + "/scripts/migrate-plugin-boundaries.ts",
 );
 await cp("LICENSE", out + "/LICENSE");
 await writeFile(

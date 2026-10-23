@@ -127,7 +127,9 @@ it("rejects unavailable payment methods and incompatible currencies before recor
     const catalog = await (
       await f.request(api + "/catalog", "GET", undefined, admin)
     ).json();
-    expect(catalog.providers).toEqual(["epay"]);
+    expect(
+      catalog.paymentMethods.map((method: any) => method.provider),
+    ).toContain("epay");
     for (const [provider, status] of [
       ["stripe", 409],
       ["epay", 400],

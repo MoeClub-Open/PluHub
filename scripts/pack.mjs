@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import {
   readFile,
   mkdir,
@@ -89,6 +90,7 @@ for (const path of packages) {
 for (const name of await readdir("../PluHub-Plugins/plugins")) {
   if (name === "subscription-accounts") continue;
   const path = resolve("../PluHub-Plugins/plugins", name);
+  if (!existsSync(join(path, "manifest.json"))) continue;
   const manifest = JSON.parse(
     await readFile(join(path, "manifest.json"), "utf8"),
   );

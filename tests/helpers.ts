@@ -9,8 +9,7 @@ import {
 } from "../packages/control/dist/index.js";
 export const pluginsRoot = resolve("../PluHub-Plugins/plugins");
 export async function fixture(
-  // Include optional legacy adapters in regression coverage, not in new sites.
-  names = [...defaultPluginNames, "protocol-converter", "workflow"],
+  names = defaultPluginNames,
   configs: Record<string, Record<string, unknown>> = {},
   prepare?: (kernel: Kernel, directory: string) => Promise<void>,
 ) {

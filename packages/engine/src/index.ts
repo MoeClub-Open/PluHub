@@ -51,10 +51,23 @@ export function compileGraph(version: number, input: Hook[]): CompiledGraph {
     version,
     hooks: groups,
     async run(phase: string, context: RequestContext) {
+      const failures: unknown[] = [];
       for (const hook of groups.get(phase) ?? []) {
         if (phase !== "Finalize") context.signal.throwIfAborted();
-        await hook.handle(context);
+        try {
+          await hook.handle(context);
+        } catch (error) {
+          if (phase !== "Finalize") throw error;
+          failures.push(
+            new Error("Finalize hook " + hook.id + " failed", { cause: error }),
+          );
+        }
       }
+      if (failures.length)
+        throw new AggregateError(
+          failures,
+          failures.map((error) => (error as Error).message).join("; "),
+        );
     },
   });
 }

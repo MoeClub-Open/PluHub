@@ -2,7 +2,6 @@
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { pathToFileURL } from "node:url";
 import { join, resolve, relative, isAbsolute } from "node:path";
 import { install, createKernel } from "../packages/control/dist/index.js";
 import { releasePackage } from "./release-package.mjs";
@@ -17,7 +16,6 @@ try {
     "ai-router",
     "auto-router",
     "token-speed",
-    "workflow",
   ]) {
     const entry = await install(
       await releasePackage("official." + name),
@@ -40,7 +38,26 @@ try {
                   keyRef: "env:PLUHUB_PACKAGE_KEY",
                 },
                 smart: { protocol: "auto-router" },
-                composed: { protocol: "workflow" },
+                composed: {
+                  flow: {
+                    entry: "start",
+                    nodes: [
+                      { id: "start", type: "start", next: "prompt" },
+                      {
+                        id: "prompt",
+                        type: "prompt",
+                        text: "package workflow",
+                        next: "call",
+                      },
+                      {
+                        id: "call",
+                        type: "upstream",
+                        target: "auto",
+                        mode: "explicit",
+                      },
+                    ],
+                  },
+                },
               },
               models: {
                 physical: { upstream: "p", model: "m" },
@@ -66,32 +83,9 @@ try {
                   },
                 },
               }
-            : name === "workflow"
-              ? {
-                  flows: {
-                    standard: {
-                      entry: "start",
-                      nodes: [
-                        { id: "start", type: "start", next: "prompt" },
-                        {
-                          id: "prompt",
-                          type: "prompt",
-                          text: "package workflow",
-                          next: "call",
-                        },
-                        {
-                          id: "call",
-                          type: "upstream",
-                          target: "auto",
-                          mode: "explicit",
-                        },
-                      ],
-                    },
-                  },
-                }
-              : name === "token-speed"
-                ? { default: { tps: 1000, tokenizer: "o200k_base" } }
-                : {},
+            : name === "token-speed"
+              ? { default: { tps: 1000, tokenizer: "o200k_base" } }
+              : {},
     });
   }
   const config = {
@@ -99,21 +93,6 @@ try {
     dataDir: join(directory, "data"),
     plugins,
   };
-  const routerEntry = plugins.find((p) =>
-    p.path.replaceAll("\\", "/").endsWith("/official.ai-router"),
-  );
-  const { migrateLegacyChannels } = await import(
-    pathToFileURL(join(routerEntry.path, "dist/index.js")).href
-  );
-  assert.equal(migrateLegacyChannels(config), true);
-  assert.ok(
-    Object.values(routerEntry.config.upstreams).every(
-      (channel) => !channel.protocol && channel.flow,
-    ),
-  );
-  config.plugins = config.plugins.filter(
-    (p) => !p.path.replaceAll("\\", "/").endsWith("/official.workflow"),
-  );
   kernel = await createKernel(config);
   await kernel.start();
   const plan = await kernel.invoke("ai.routing@2", {

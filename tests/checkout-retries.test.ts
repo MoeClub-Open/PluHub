@@ -18,7 +18,16 @@ async function setup() {
   });
   const calls: any[] = [];
   (globalThis as any).__auditCheckout = async (input: any) => {
-    if (input.action === "status") return { enabled: true };
+    if (input.action === "status")
+      return {
+        id: "stripe",
+        name: "Stripe",
+        enabled: true,
+        methods: [{ name: "Stripe" }],
+        currencies: "*",
+        modes: ["payment", "subscription"],
+        renewal: "automatic",
+      };
     calls.push(input);
     return execute(input);
   };
@@ -41,14 +50,14 @@ async function setup() {
           version: "1.0.0",
           host: ">=0.1.0-alpha.1",
           runtime: { kind: "native", entry: "index.mjs" },
-          provides: ["payments.stripe@1"],
+          provides: ["payments.provider@1"],
           requires: [],
           permissions: [],
         }),
       );
       await writeFile(
         join(path, "index.mjs"),
-        'export default {setup(h){h.provide("payments.stripe@1",i=>globalThis.__auditCheckout(i));}};',
+        'export default {setup(h){h.provide("payments.provider@1",i=>globalThis.__auditCheckout(i));}};',
       );
       await kernel.add(path);
     },

@@ -10,7 +10,7 @@ import {
   applyPendingPluginUpdate,
   writeConfig,
 } from "../packages/control/dist/index.js";
-import { migrateLegacyChannels } from "../../PluHub-Plugins/plugins/ai-router/dist/index.js";
+import { migrateLegacyChannels } from "../deploy/migrations/channel-graphs.ts";
 import { defaultPluginNames } from "../apps/cli/dist/presets.js";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const directory = resolve(

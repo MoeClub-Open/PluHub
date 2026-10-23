@@ -422,7 +422,7 @@ it("supports all Epay version/signature combinations with signed V2 responses an
             admin,
           )
         ).json();
-        expect(subs[0].id).toMatch(/^epay-prepaid:/);
+        expect(subs[0].id).toMatch(/^prepaid:/);
         expect(subs[0].period_end).toBeGreaterThan(Date.now());
       } finally {
         await f.close();
@@ -456,7 +456,6 @@ it("reserves and settles usage, enforces limits and keeps unknown usage for revi
       "billing",
       "byok",
       "rate-limit",
-      "protocol-converter",
       "ingress-openai-chat",
       "upstream-openai-chat",
     ],
@@ -653,7 +652,6 @@ it("releases concurrency on early stream cancellation and holds partial usage fo
       "ai-router",
       "billing",
       "rate-limit",
-      "protocol-converter",
       "ingress-openai-chat",
       "upstream-openai-chat",
     ],

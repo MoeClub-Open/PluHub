@@ -53,6 +53,11 @@ export interface Hook {
   after?: string[];
   handle: (context: RequestContext) => void | Promise<void>;
 }
+export interface CapabilityProvider {
+  id: string;
+  name: string;
+  version: string;
+}
 export interface Host {
   readonly id: string;
   readonly dataDir: string;
@@ -78,10 +83,12 @@ export interface Host {
     name: string,
     handler: (input: any, signal: AbortSignal) => any,
   ): void;
+  providers(name: string): CapabilityProvider[];
   call<T = unknown>(
     name: string,
     input?: unknown,
     signal?: AbortSignal,
+    providerId?: string,
   ): Promise<T>;
   api(route: ApiRoute): void;
   route(route: ApiRoute): void;

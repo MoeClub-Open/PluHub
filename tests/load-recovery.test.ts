@@ -47,7 +47,6 @@ it("releases request slots after repeated HTTP stream cancellation and serves co
       "ai-router",
       "observability",
       "rate-limit",
-      "protocol-converter",
       "ingress-openai-chat",
       "upstream-openai-chat",
     ],

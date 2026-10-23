@@ -1,3 +1,4 @@
+import { encodeRequest } from "../../PluHub-Plugins/lib/ai/protocols.ts";
 // Opt-in paid integration. Never writes credentials, prompts or completions to the report.
 import { readFile, mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -128,7 +129,6 @@ try {
     "users",
     "auth",
     "ai-router",
-    "protocol-converter",
     ...["openai-chat", "openai-responses", "anthropic", "gemini"].map(
       (p) => "ingress-" + p,
     ),
@@ -196,10 +196,12 @@ try {
     if (report.calls >= calls) return;
     configure(upstream);
     report.calls++;
-    const body = await kernel.invoke("ai.converter@1", {
-      action: "encode",
-      protocol: entry,
-      input: { model: "live", tools: [], maxTokens, ...request, stream },
+    const body = encodeRequest(entry, {
+      model: "live",
+      tools: [],
+      maxTokens,
+      ...request,
+      stream,
     });
     const started = performance.now();
     const check = {

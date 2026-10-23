@@ -98,7 +98,12 @@ if (!existsSync(file)) {
   });
   renameSync(file + ".init", file);
 }
-if (args[0] === "start") await syncBundledPlugins(file);
+if (args[0] === "start") {
+  const { migratePluginBoundaries } =
+    await import("../migrations/plugin-boundaries.ts");
+  await migratePluginBoundaries(file);
+  await syncBundledPlugins(file);
+}
 // The shell entrypoint holds an exclusive flock across container PID namespaces.
 // A stale PID from a crashed container cannot identify a process in this namespace.
 try {

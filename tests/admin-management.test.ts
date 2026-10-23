@@ -499,7 +499,7 @@ it("keeps plugin state consistent on persistence failure, protects management pr
     const invalid = await f.request(
       "/api/host/plugin-state",
       "POST",
-      { id: "official.protocol-converter", enabled: "false" },
+      { id: "official.playground", enabled: "false" },
       admin,
     );
     expect(invalid.status).toBe(400);
@@ -527,14 +527,13 @@ it("keeps plugin state consistent on persistence failure, protects management pr
     const failed = await f.request(
       "/api/host/plugin-state",
       "POST",
-      { id: "official.protocol-converter", enabled: false },
+      { id: "official.playground", enabled: false },
       admin,
     );
     expect(failed.status).toBe(500);
     await failed.text();
     expect(
-      f.kernel.list().find((p) => p.id === "official.protocol-converter")!
-        .state,
+      f.kernel.list().find((p) => p.id === "official.playground")!.state,
     ).toBe("Active");
     await rmdir(f.file);
     await rename(f.file + ".saved", f.file);
