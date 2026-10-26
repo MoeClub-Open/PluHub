@@ -121,6 +121,90 @@ async function setup() {
   };
 }
 
+it("uses the same requested/mapped model conditions for preview, execution and quotes", async () => {
+  const f = await setup();
+  try {
+    f.router.models.actual.publicModel = "assistant";
+    f.router.upstreams.p.flow = {
+      entry: "s",
+      nodes: [
+        { id: "s", type: "start", next: "requested" },
+        {
+          id: "requested",
+          type: "condition",
+          test: "model",
+          models: ["assistant"],
+          yes: "mapped",
+          no: "other",
+        },
+        {
+          id: "mapped",
+          type: "condition",
+          test: "model",
+          modelSource: "mapped",
+          models: ["vendor-*"],
+          yes: "match",
+          no: "other",
+        },
+        { id: "match", type: "provider", model: "vendor-selected" },
+        { id: "other", type: "provider", model: "vendor-other" },
+      ],
+    };
+    const configuration = await f.request(
+      "/api/plugins/official.ai-router/configuration",
+      "GET",
+      undefined,
+      f.admin,
+    );
+    const { revision } = (await configuration.json()) as any;
+    const saved = await f.request(
+      "/api/plugins/official.ai-router/configuration",
+      "PUT",
+      { config: f.router, revision },
+      f.admin,
+    );
+    expect(saved.status).toBe(200);
+    await saved.text();
+    const request = {
+      model: "assistant",
+      messages: [{ role: "user", text: "hello" }],
+      tools: [],
+      stream: false,
+    };
+    const preview = await f.request(
+      "/api/plugins/official.ai-router/graph/preview",
+      "POST",
+      { upstream: "p", mappingId: "actual", request },
+      f.admin,
+    );
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toMatchObject({
+      providerId: "match",
+      trace: { nodes: ["s", "requested", "mapped", "match"] },
+    });
+    const quoted = await f.kernel.invoke<any>("ai.routing@2", {
+      model: "assistant",
+      purpose: "quote",
+      ingressProtocol: "openai-chat",
+      features: ["text", "usage"],
+    });
+    expect(quoted.model).toBe("vendor-selected");
+    expect(f.sent).toHaveLength(0);
+    const response = await f.request(
+      "/v1/chat/completions",
+      "POST",
+      { model: "assistant", messages: [{ role: "user", content: "hello" }] },
+      f.admin,
+    );
+    expect(response.status).toBe(200);
+    await response.text();
+    expect(f.sent).toHaveLength(1);
+    expect(f.sent[0].model).toBe("vendor-selected");
+  } finally {
+    await f.cleanup();
+  }
+});
+
 it("enforces trusted protocol admission before the upstream and keeps JSON/SSE cross-protocol conversion", async () => {
   const f = await setup();
   try {
