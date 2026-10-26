@@ -57,6 +57,7 @@ try {
     "auth",
     "ai-router",
     "observability",
+    "rate-limit",
     "ingress-openai-chat",
     "ingress-openai-responses",
     "upstream-openai-chat",

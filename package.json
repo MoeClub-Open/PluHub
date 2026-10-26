@@ -1,7 +1,7 @@
 {
   "name": "pluhub-workspace",
   "private": true,
-  "version": "0.1.0-alpha.17",
+  "version": "0.1.0-alpha.18",
   "type": "module",
   "packageManager": "pnpm@10.20.0",
   "engines": {
@@ -27,6 +27,9 @@
     "format:check": "prettier --check packages apps tests scripts deploy vitest.config.ts compose.yaml"
   },
   "devDependencies": {
+    "@pluhub/contracts": "link:../PluHub-Spec",
+    "@pluhub/control": "workspace:*",
+    "@pluhub/sdk": "workspace:*",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

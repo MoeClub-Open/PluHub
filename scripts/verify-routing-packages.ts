@@ -126,7 +126,7 @@ try {
     yield { type: "text", text: "hello" };
     yield { type: "finish", reason: "stop" };
   }
-  const paced = await kernel.invoke("ai.output-pace@1", {
+  const paced = await kernel.invoke("ai.output-pace@2", {
     events: events(),
     plan,
   });

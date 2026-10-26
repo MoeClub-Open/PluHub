@@ -132,7 +132,7 @@ https://你的域名/api/plugins/official.payments-epay/notify?pluhub_method=<�
 
 ## 限流、转换和界面
 
-流量策略可同时设置每用户、每 Key 和各渠道的 RPM/TPM/并发。使用一分钟固定窗口；Token 先预留、完成后按真实用量修正；未知或中断保留预算，下一窗口恢复。状态存在内存，重启重置，当前不提供分布式限流。Auth 的 Key RPM 仍独立生效。
+流量策略可同时设置每用户、每 Key 和各渠道的 RPM/TPM/并发。使用一分钟固定窗口；Token 先预留、完成后按真实用量修正；未知或中断保留预算，下一窗口恢复。状态存在内存，重启重置，当前不提供分布式限流。密钥上限由 Rate Limit 与全局密钥上限合并执行，取较小值；Auth 只负责授权，不再保存独立计数。
 
 带宽单位为字节/秒，作用于 HTTP/SSE 响应体，使用 pull 背压并可取消等待，不是 Token/秒限速。宿主 Streaming Hook 可以通过公开 `RequestContext.response` 包装标准 Web Response。客户端关闭响应会中断请求信号，Finalize 后释放资源。
 
@@ -149,7 +149,7 @@ https://你的域名/api/plugins/official.payments-epay/notify?pluhub_method=<�
 - [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)、[Sub2API](https://github.com/Wei-Shaw/sub2api)
 - [OpenAI SIWC](https://developers.openai.com/siwc/quickstart)、[Codex app-server token sharing](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server)
 
-本地支付测试不发起真实付款。真实 New API 联调结果在 `output/live-newapi.json`：两次 DeepSeek 请求 HTTP 200，但 16 Token 预算内无正文；Qwen 渠道返回上游错误。累计 3 次模型查询、3 次推理请求，未进一步扩大调用。报告和源码均不包含用户密钥。
+模拟支付验证不发起真实付款。真实支付、邮件和模型调用需在有效环境中单独验收，方法及预算见 [联调说明](LIVE_TESTING.md)。现场结果保存在仓库外，不将单次联调结果作为长期兼容承诺。
 
 ## 插件边界与配置迁移
 
@@ -165,9 +165,9 @@ Finalize 的各 Hook 独立执行，单个结算或观测错误不会阻止后�
 
 渠道管理中的「使用分组」配置名称、可用平台渠道、倍率、启停及用户权限。默认分组未配置渠道列表时覆盖全部平台渠道；其他分组显式指定渠道。分组只使用不可变 ID 绑定密钥，改名不影响绑定；停用或无权访问时拒绝调用，不自动换组。指定用户名单留空时没有用户可用。
 
-新平台密钥绑定一个分组；个人密钥绑定自己的个人渠道。分组限制同时用于模型目录、费用试算、实际路由和自动路由候选，流程内重定向也不能越出分组渠道。平台价格为模型价 × 渠道倍率 × 分组倍率，最终价格快照保存总倍率和当时的分组名称、倍率；历史账单不随配置变化。个人渠道只记录上游消耗估算，不扣平台余额。
+新平台密钥绑定一个分组；个人密钥绑定自己的个人渠道。分组限制同时用于模型目录、费用试算、实际路由和自动路由候选，流程内重定向也不能越出分组渠道。平台价格为最终模型价 × 入口渠道倍率 × 分组倍率，最终价格快照保存总倍率和当时的分组名称、倍率；历史账单不随配置变化。个人渠道只记录上游消耗估算，不扣平台余额。
 
-升级时，旧未绑定渠道的密钥进入默认分组；旧显式绑定的密钥保留授权和渠道倍率，编辑其他字段不会改变价格。用户主动选择新分组后才改用分组规则。现有 `RequestPricing.multiplier` 仍是唯一参与金额运算的倍率，分组快照只作说明，不重复乘算。
+升级时，旧未绑定渠道的密钥进入默认分组；旧平台渠道绑定迁入相同渠道范围、仅原用户可用且倍率为 1 的分组。相同范围合并，不扩大权限；混合平台和个人绑定须先拆成两把密钥，详见 [运维迁移](OPERATIONS.md)。现有 `RequestPricing.multiplier` 仍是唯一参与金额运算的倍率，分组快照只作说明，不重复乘算。
 
 ```mermaid
 flowchart TD

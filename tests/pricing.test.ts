@@ -79,6 +79,7 @@ async function setup(enabled = true) {
       "ai-router",
       "observability",
       "model-catalog",
+      "rate-limit",
       "ingress-openai-chat",
       "upstream-openai-chat",
       "upstream-openai-responses",
@@ -111,6 +112,102 @@ async function setup(enabled = true) {
     f.kernel.invoke<any>("billing.balance@1", { userId: me.id });
   return { ...f, admin, me, invoke, balance };
 }
+it("resolves quotes and execution through the same conditional route and entry/group multipliers", async () => {
+  const f = await setup();
+  let calls = 0;
+  respond = () => {
+    calls++;
+    return Response.json({
+      choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+      usage,
+    });
+  };
+  try {
+    f.kernel.configure({
+      "official.ai-router": {
+        ...router,
+        groups: { default: { name: "Default", multiplier: 2 } },
+        upstreams: {
+          primary: { ...router.upstreams.primary, consumptionMultiplier: 9 },
+          entry: {
+            consumptionMultiplier: 0.5,
+            flow: {
+              entry: "s",
+              nodes: [
+                { id: "s", type: "start", next: "branch" },
+                {
+                  id: "branch",
+                  type: "condition",
+                  test: "textLengthAbove",
+                  value: 0,
+                  yes: "fixed",
+                  no: "token",
+                },
+                {
+                  id: "fixed",
+                  type: "upstream",
+                  target: "fixed",
+                  mode: "implicit",
+                },
+                {
+                  id: "token",
+                  type: "upstream",
+                  target: "demo",
+                  mode: "implicit",
+                },
+              ],
+            },
+          },
+        },
+        models: {
+          ...router.models,
+          entry: {
+            upstream: "entry",
+            model: "unused",
+            inputPrice: 999,
+            outputPrice: 999,
+          },
+        },
+      },
+    });
+    const quote = (request?: unknown) =>
+      f.request(
+        "/api/plugins/official.billing/quote",
+        "POST",
+        {
+          model: "entry",
+          usage: { input: 1000, output: 100, cacheRead: 600 },
+          request,
+        },
+        f.admin,
+      );
+    const missing = await quote();
+    expect(missing.status).toBe(409);
+    expect(await missing.json()).toMatchObject({
+      error: { code: "quote_request_required" },
+    });
+    const quoted = await quote({
+      messages: [{ role: "user", content: "hello" }],
+    });
+    expect(quoted.status).toBe(200);
+    expect((await quoted.json()).amount).toBe(2000);
+    expect(calls).toBe(0);
+    const candidate = await f.kernel.invoke<any>("ai.targets@1", {
+      target: "fixed",
+      consumptionMultiplier: 0.5,
+      request: { model: "fixed", messages: [], tools: [], stream: false },
+    });
+    expect(candidate.plan.pricing.multiplier).toBe(1);
+    const result = await f.invoke("entry");
+    expect(result.status).toBe(200);
+    await result.json();
+    expect(calls).toBe(1);
+    expect(await f.balance()).toMatchObject({ balance: 998000, held: 0 });
+  } finally {
+    await f.close();
+  }
+});
+
 it("charges cache-aware usage with the channel multiplier and exposes an immutable own receipt", async () => {
   const f = await setup();
   try {

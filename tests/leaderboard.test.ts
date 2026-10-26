@@ -369,7 +369,7 @@ it("records real non-streaming and streaming calls once, while excluding failure
     );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const f = await fixture([...names, "ingress-openai-chat"]);
+  const f = await fixture([...names, "rate-limit", "ingress-openai-chat"]);
   try {
     process.env.PLUHUB_TEST_UPSTREAM_KEY = "local-leaderboard-test-secret";
     f.kernel.configure({

@@ -8,6 +8,15 @@ importers:
 
   .:
     devDependencies:
+      '@pluhub/contracts':
+        specifier: link:../PluHub-Spec
+        version: link:../PluHub-Spec
+      '@pluhub/control':
+        specifier: workspace:*
+        version: link:packages/control
+      '@pluhub/sdk':
+        specifier: workspace:*
+        version: link:packages/sdk
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2

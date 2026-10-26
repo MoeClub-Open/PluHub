@@ -94,6 +94,7 @@ it("routes media JSON, multipart and binary through auth, channel bindings, logs
       "http-transport",
       "upstream-openai-chat",
       "upstream-openai-media",
+      "rate-limit",
       "ingress-openai-media",
     ],
     {

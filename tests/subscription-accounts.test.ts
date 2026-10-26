@@ -971,6 +971,7 @@ it("retries one 401 on the same subscription account, holds the stream lease and
       "billing",
       "observability",
       "ai-router",
+      "rate-limit",
       "ingress-openai-chat",
       "upstream-codex",
     ],

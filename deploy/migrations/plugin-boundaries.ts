@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { writeConfig } from "@pluhub/control";
 import type { HostConfig } from "@pluhub/sdk";
 import { migrateLegacyChannels } from "./channel-graphs.ts";
+import { prepareKeyScopes } from "./key-scopes.ts";
 
 const retired = new Set(["official.workflow", "official.protocol-converter"]);
 export async function migratePluginBoundaries(file: string, write = true) {
@@ -60,6 +61,29 @@ export async function migratePluginBoundaries(file: string, write = true) {
     (plugin) => identities.get(plugin.path) === "official.ai-router",
   );
   if (
+    config.plugins.some(
+      (plugin) =>
+        plugin.enabled !== false &&
+        identities.get(plugin.path)?.startsWith("official.ingress-"),
+    )
+  ) {
+    const limiter = config.plugins.find(
+      (plugin) => identities.get(plugin.path) === "official.rate-limit",
+    );
+    if (!limiter)
+      throw new Error(
+        "标准 AI 入口需要安装 official.rate-limit，请先安装后再升级。",
+      );
+    limiter.enabled = true;
+  }
+  const bindings = config.bindings ?? {};
+  if (bindings["ai.output-pace@1"]) {
+    bindings["ai.output-pace@2"] ??= bindings["ai.output-pace@1"];
+    delete bindings["ai.output-pace@1"];
+  }
+  delete bindings["ai.upstream.auto-router@1"];
+  const keyScopes = prepareKeyScopes(file, config, router?.config);
+  if (
     !applied &&
     router &&
     !router.grants.includes("*") &&
@@ -76,6 +100,11 @@ export async function migratePluginBoundaries(file: string, write = true) {
     );
     await writeConfig(file, config);
   }
+  if (write) keyScopes.apply();
   if (write && !applied) await writeConfig(marker, { version: 1 });
-  return { changed, written: changed && write };
+  return {
+    changed: changed || keyScopes.count > 0,
+    written: write && (changed || keyScopes.count > 0),
+    migratedKeys: keyScopes.count,
+  };
 }

@@ -38,6 +38,7 @@ try {
     "billing",
     "ai-router",
     "byok",
+    "rate-limit",
     "ingress-openai-chat",
     "upstream-openai-chat",
   ]) {

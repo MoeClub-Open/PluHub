@@ -18,6 +18,7 @@ async function gateway() {
       "token-speed",
       "billing",
       "observability",
+      "rate-limit",
       "ingress-openai-chat",
       "upstream-openai-chat",
     ],
@@ -211,6 +212,17 @@ it("routes a virtual provider before billing, records final model and checks key
       )
     ).json();
     f.kernel.configure({ "official.billing": { enabled: true } });
+    const quote = await f.request(
+      "/api/plugins/official.billing/quote",
+      "POST",
+      { model: "auto", usage: { input: 3, output: 2 } },
+      f.admin,
+    );
+    expect(quote.status).toBe(409);
+    expect(await quote.json()).toMatchObject({
+      error: { code: "quote_route_required" },
+    });
+    expect(f.decisions()).toBe(0);
     await f.kernel.invoke("billing.credit@1", {
       userId: me.id,
       amount: 1000000,
@@ -398,7 +410,7 @@ it("loads an administrator-provided Hugging Face tokenizer with no automatic dow
     }
     const start = performance.now();
     const paced = await f.kernel.invoke<AsyncIterable<any>>(
-      "ai.output-pace@1",
+      "ai.output-pace@2",
       { events: events(), plan: { upstreamId: "p", model: "m" } },
     );
     const output = [];

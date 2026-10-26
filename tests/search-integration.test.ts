@@ -11,6 +11,7 @@ it("rejects unsupported Codex CLI tool-call bounds before reserving funds or con
       "ai-router",
       "http-transport",
       "upstream-codex",
+      "rate-limit",
       "ingress-openai-responses",
     ],
     {
@@ -169,6 +170,7 @@ it("settles native search once for JSON and split SSE, preserving references and
       "observability",
       "http-transport",
       "upstream-openai-responses",
+      "rate-limit",
       "ingress-openai-responses",
     ],
     {

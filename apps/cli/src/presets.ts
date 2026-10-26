@@ -1,5 +1,5 @@
 /** Bundled plugins shared by init, demo and integration fixtures.
- * Optional features are installed disabled; compatibility adapters stay opt-in. */
+ * Optional features are installed disabled. */
 export const defaultPluginNames = [
   "listener",
   "http-transport",
@@ -40,6 +40,7 @@ export const defaultEnabledPluginNames = [
   "console",
   "users",
   "auth",
+  "rate-limit",
   "ai-router",
   "model-catalog",
   "observability",

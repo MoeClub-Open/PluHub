@@ -295,6 +295,7 @@ it("records encoder failure after upstream finish and holds settlement for revie
       "billing",
       "observability",
       "ai-router",
+      "rate-limit",
       "ingress-openai-chat",
     ],
     {

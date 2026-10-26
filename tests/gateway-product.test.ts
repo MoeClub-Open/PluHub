@@ -57,6 +57,7 @@ async function gateway() {
     "observability",
     "model-catalog",
     "playground",
+    "rate-limit",
     "ingress-openai-chat",
     "upstream-openai-chat",
   ]);

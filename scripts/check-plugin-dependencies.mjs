@@ -1,4 +1,5 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -8,7 +9,10 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const directory = resolve(root, "../PluHub-Plugins/plugins");
 const report = [];
 for (const entry of (await readdir(directory, { withFileTypes: true }))
-  .filter((e) => e.isDirectory() && e.name !== "subscription-accounts")
+  .filter(
+    (e) =>
+      e.isDirectory() && existsSync(join(directory, e.name, "manifest.json")),
+  )
   .sort((a, b) => a.name.localeCompare(b.name))) {
   const path = join(directory, entry.name);
   const manifest = validateManifest(
