@@ -90,7 +90,7 @@ it("previews and migrates key scopes without widening channels, then remains ide
     const groups = Object.values(config.plugins[0].config.groups);
     expect(groups).toEqual([
       {
-        name: "原渠道授权 · platform",
+        name: "platform · 指定用户",
         multiplier: 1,
         channelIds: ["platform"],
         userIds: ["u1", "u2"],

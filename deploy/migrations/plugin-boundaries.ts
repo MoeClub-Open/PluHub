@@ -8,9 +8,12 @@ import { prepareKeyScopes } from "./key-scopes.ts";
 const retired = new Set(["official.workflow", "official.protocol-converter"]);
 export async function migratePluginBoundaries(file: string, write = true) {
   const marker = file + ".plugin-boundaries.json";
-  let applied = false;
+  let applied = false,
+    compositionApplied = false;
   try {
-    applied = JSON.parse(await readFile(marker, "utf8")).version === 1;
+    const version = JSON.parse(await readFile(marker, "utf8")).version;
+    applied = version >= 1;
+    compositionApplied = version >= 2;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
@@ -82,7 +85,32 @@ export async function migratePluginBoundaries(file: string, write = true) {
     delete bindings["ai.output-pace@1"];
   }
   delete bindings["ai.upstream.auto-router@1"];
+  const byok = config.plugins.find(
+    (plugin) => identities.get(plugin.path) === "official.byok",
+  );
+  if (
+    !compositionApplied &&
+    byok &&
+    !byok.grants.includes("*") &&
+    !byok.grants.includes("http.dispatch")
+  )
+    byok.grants.push("http.dispatch");
   const keyScopes = prepareKeyScopes(file, config, router?.config);
+  for (const [id, group] of Object.entries(
+    (router?.config?.groups ?? {}) as Record<string, any>,
+  ))
+    if (
+      id.startsWith("migrated-key-scope-") &&
+      group.name.startsWith("原渠道授权 · ")
+    )
+      group.name =
+        group.channelIds
+          .map(
+            (channel: string) =>
+              router!.config!.upstreams[channel]?.name ?? channel,
+          )
+          .join(" / ") + " · 指定用户";
+
   if (
     !applied &&
     router &&
@@ -101,7 +129,7 @@ export async function migratePluginBoundaries(file: string, write = true) {
     await writeConfig(file, config);
   }
   if (write) keyScopes.apply();
-  if (write && !applied) await writeConfig(marker, { version: 1 });
+  if (write && !compositionApplied) await writeConfig(marker, { version: 2 });
   return {
     changed: changed || keyScopes.count > 0,
     written: write && (changed || keyScopes.count > 0),
