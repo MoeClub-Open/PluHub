@@ -85,6 +85,7 @@ async function setup(enabled = true) {
       "upstream-openai-responses",
       "upstream-anthropic",
       "upstream-gemini",
+      "upstream-openai-media",
     ],
     {
       billing: { enabled },
@@ -161,6 +162,13 @@ it("resolves quotes and execution through the same conditional route and entry/g
         },
         models: {
           ...router.models,
+          embeddings: {
+            upstream: "primary",
+            model: "embed-vendor",
+            operations: ["embeddings"],
+            inputPrice: 1,
+            outputPrice: 0,
+          },
           entry: {
             upstream: "entry",
             model: "unused",
@@ -191,6 +199,15 @@ it("resolves quotes and execution through the same conditional route and entry/g
     });
     expect(quoted.status).toBe(200);
     expect((await quoted.json()).amount).toBe(2000);
+    expect(calls).toBe(0);
+    const mediaQuote = await f.request(
+      "/api/plugins/official.billing/quote",
+      "POST",
+      { model: "embeddings", usage: { input: 1000, output: 0 } },
+      f.admin,
+    );
+    expect(mediaQuote.status).toBe(200);
+    expect((await mediaQuote.json()).amount).toBe(18000);
     expect(calls).toBe(0);
     const candidate = await f.kernel.invoke<any>("ai.targets@1", {
       target: "fixed",

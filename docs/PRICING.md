@@ -20,7 +20,7 @@
 
 `POST /api/plugins/official.billing/quote` 接收公开 `model`、可选 `channelId` / `groupId` 和归一化 `usage`。登录会话可选择有权访问的分组，API 密钥不能借参数切换分组或越过自身模型范围。同名模型存在多个路由时必须选渠道，避免展示不确定价格。
 
-试算调用 `ai.routing@2` 的 `purpose: "quote"`，与真实调用共用重定向、渠道图、分组及协议检查。可选 `request` 按 OpenAI Chat 格式提供消息、工具及流式标志；条件图缺少请求时返回 `quote_request_required`，当前目录界面没有填写完整请求的入口，因此此类渠道会显示明确错误。自动路由返回 `quote_route_required`，不请求远程决策器、不猜测最终模型。
+试算调用 `ai.routing@2` 的 `purpose: "quote"`，与真实调用共用重定向、渠道图、分组及协议检查。可选 `operation` 选择模型支持的端点，省略时使用模型首个端点。可选 `request` 在对话端点按 OpenAI Chat 格式提供消息、工具及流式标志，媒体端点使用对应的 JSON 请求体；条件图缺少请求时返回 `quote_request_required`，当前目录界面没有填写完整请求的入口，因此此类渠道会显示明确错误。自动路由返回 `quote_route_required`，不请求远程决策器、不猜测最终模型。
 
 `context.params`、`context.headers`、`context.at` 用于表达式试算；真实调用仍冻结真实请求的参数、请求头及开始时间。试算不占凭证或并发租约，不预留余额或限流额度，也不证明上游在线或实际 Token 数准确。
 
