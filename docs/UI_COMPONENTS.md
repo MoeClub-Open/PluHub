@@ -14,6 +14,8 @@
 
 紧凑密度、品牌配色与明暗主题仍使用 Console 的 CSS 变量。避免在不同页面并行引入多套具有冲突全局样式的 UI 框架。依赖固定版本并提交 lockfile；公共 UI SDK 不暴露组件库内部对象或要求第三方插件导入官方插件私有源码。
 
+页面标题、标签和操作各保留一处。标签已说明当前内容时，嵌入列表不再重复显示同名大标题；订阅账号列表仅在独立管理页显示提供商标题。搜索、筛选、刷新和添加统一放入 `list-toolbar`，操作按钮放在右侧的 `actions` 中；表格复用 `table-wrap`，不额外套带内边距的卡片。
+
 本地浏览器验收应覆盖表单值、空选项、分组禁用、重置、动态选项、弹窗内选择、嵌套确认、忙碌时关闭限制、Escape、焦点恢复及手机/深色模式。只读线上验收不执行付款、调账或其他业务写操作。
 
 参考：[Radix UI Primitives](https://www.radix-ui.com/primitives/docs/overview/introduction)、[Lucide](https://lucide.dev/guide/packages/lucide-react)。
