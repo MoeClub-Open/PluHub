@@ -8,9 +8,11 @@
 
 用户登录地址为 `#/login`，注册地址为 `#/register`。全新站点先经 OOBE 保存站点设置并创建管理员；在此之前公开注册不可用。门户和登录页提供注册链接；注册页支持邮箱验证码、用户名、密码确认、重发倒计时及错误重试，成功后以普通用户身份进入控制台。未开放注册或邮件服务不可用时显示相应状态。公开页面不显示管理员初始化命令；CLI 创建和恢复方法保留在部署文档中。
 
+凭据在配置页直接填写并加密保存；示例中的 `secret:` 编号须替换为真实保存的编号，详见 [凭据与参数](SECRETS.md)。
+
 ## 配置
 
-以下为各插件的 `config`，不是整个宿主配置文件。主配置中相应插件需要安装并启用。环境变量在启动宿主之前设置；`secretRefs` 授权插件读取引用，浏览器只看到引用名称。
+以下为各插件的 `config`，不是整个宿主配置文件。主配置中相应插件需要安装并启用。凭据在管理页面填写，保存后 `secretRefs` 授权插件读取相应的加密凭据，浏览器只看到已配置状态。
 
 `official.mailer`：
 
@@ -22,8 +24,8 @@
   "secure": false,
   "from": "no-reply@example.com",
   "user": "smtp-user",
-  "passwordRef": "env:SMTP_PASSWORD",
-  "secretRefs": ["env:SMTP_PASSWORD"]
+  "passwordRef": "secret:SMTP_PASSWORD",
+  "secretRefs": ["secret:SMTP_PASSWORD"]
 }
 ```
 
@@ -38,8 +40,8 @@
   "enabled": true,
   "provider": "turnstile",
   "siteKey": "YOUR_PUBLIC_SITE_KEY",
-  "secretRef": "env:TURNSTILE_SECRET",
-  "secretRefs": ["env:TURNSTILE_SECRET"],
+  "secretRef": "secret:TURNSTILE_SECRET",
+  "secretRefs": ["secret:TURNSTILE_SECRET"],
   "hostnames": ["hub.example.com"]
 }
 ```

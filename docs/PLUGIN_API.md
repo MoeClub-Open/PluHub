@@ -24,7 +24,7 @@ Manifest 可填写 `name`（最多 80 字符）和 `description`（最多 400 �
 | host.hook(hook) | 注册具名阶段 Hook，需要 hooks.register 权限 |
 | host.config() | 请求中读取对应图版本的配置快照 |
 | host.validateConfig(check) | 在启动和配置切换前检查跨字段约束 |
-| host.secret(reference) | 读取 secrets.read 授权且列入 secretRefs 的环境变量引用 |
+| host.secret(reference) | 读取 secrets.read 授权且列入 secretRefs 的托管凭据 |
 | host.cleanup(callback) | 停止时逆序释放资源 |
 | host.publish / subscribe | 诊断通知；不用于资金事实交付 |
 
@@ -91,3 +91,5 @@ Finalize Hook 可从请求 `state` 读取通用观测信息：`http.status`、`h
 Go SDK 使用 JSON-RPC 2.0 标准输入/输出，支持请求级能力、Host 反向调用、超时与取消。单消息最大 1 MiB，不传输流式正文。SSE / WS 在原生数据面执行，Sidecar 整流通道不在首版范围。
 
 Native 和 Process 都是安装者授权的本机代码；Host API 权限检查不构成操作系统沙箱。
+
+通用凭据通过 `Host.secret("secret:编号")` 读取，仍要求 `secrets.read` 和配置 `secretRefs` 的共同授权。宿主管理配置保存时先加密直接填写的凭据，再验证并持久化配置。业务参数通过能力参数、请求体或插件配置传递。迁移、存储及恢复说明见 [凭据与参数](SECRETS.md)。

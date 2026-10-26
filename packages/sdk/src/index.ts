@@ -94,6 +94,7 @@ export interface Host {
   route(route: ApiRoute): void;
   hook(hook: Hook): void;
   identity(resolve: (request: Request) => Promise<Principal | undefined>): void;
+  /** Resolve a host-managed credential subject to this plugin's secretRefs grant. */
   secret(reference: string): string;
   log(level: "info" | "warn" | "error", message: string): void;
   cleanup(fn: () => void | Promise<void>): void;

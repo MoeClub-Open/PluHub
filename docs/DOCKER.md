@@ -21,9 +21,9 @@ docker compose ps
 
 启动时先在数据卷排他锁内执行离线配置及密钥迁移。切换镜像后的首次启动，再按镜像自带目录同步所有内置插件的版本和安装记录，保留原配置、授权及启停状态。共享代码重建也包含在内，不能只更新本次直接修改的插件。普通重启不重复同步；在线安装到数据卷的插件继续使用各自的安装记录。启动失败时查看 `docker compose logs gateway`，不能只凭 Compose 返回“Started”判断上线成功。
 
-无人值守安装或账号恢复仍可在停机时通过本地 `bootstrap-admin --username admin` 操作；使用 `PLUHUB_ADMIN_PASSWORD` 或挂载的 `PLUHUB_ADMIN_PASSWORD_FILE` 提供密码。通过本地 CLI 预建管理员会跳过网页 OOBE，站点信息可在后台设置。
+无人值守安装或账号恢复可在停机时通过本地 `bootstrap-admin --username admin --password-file /path/to/password` 操作；密码从受保护的文件直接读取，不经过环境变量或命令行明文传递。容器使用挂载文件的容器内路径。通过本地 CLI 预建管理员会跳过网页 OOBE，站点信息可在后台设置。
 
-默认只映射 `127.0.0.1:8080`，访问 `http://localhost:8080`。修改映射端口时同步设置 `.env` 中的 `PLUHUB_PUBLIC_ORIGIN`；公网部署应由 HTTPS 反向代理转发。上游密钥放入 `.env` 的运行时变量，再在控制台使用 `env:变量名` 引用，不写入镜像或路由 JSON。
+默认只映射 `127.0.0.1:8080`，访问 `http://localhost:8080`。修改映射端口时同步设置 `.env` 中的 `PLUHUB_PUBLIC_ORIGIN`；公网部署应由 HTTPS 反向代理转发。上游密钥在控制台直接填写并加密保存，普通路由配置只保留凭据编号；不通过 `.env` 或容器环境变量传递，详见 [凭据与参数](SECRETS.md)。
 
 首次启动自动创建 `/data/pluhub.json` 与 `/data/state/`。`PLUHUB_PUBLIC_ORIGIN` 只在首次创建配置时应用；HTTPS Origin 会同时启用 Auth 的 Secure Cookie。已有配置保留原值，改变域名、端口或 Cookie 策略后需修改持久化配置并重启。
 

@@ -22,6 +22,8 @@ import {
 import { loadNative, loadProcess, type LoadedRuntime } from "@pluhub/runtime";
 import { compileGraph, type CompiledGraph } from "@pluhub/engine";
 import { createLogSanitizer, newLog, type RuntimeLog } from "./logging.js";
+import { SecretVault } from "./secrets.js";
+export { SecretVault } from "./secrets.js";
 export type { RuntimeLog, LogLevel } from "./logging.js";
 export { createLogSanitizer } from "./logging.js";
 import {
@@ -160,11 +162,15 @@ export class Kernel {
   private loggedRequests = new WeakSet<RequestContext>();
   private retiring = new Map<RecordData, Promise<void>>();
   private replacing = false;
+  readonly secrets: SecretVault;
   constructor(
     readonly dataDir: string,
     readonly drainTimeoutMs = 30000,
     bindings: Record<string, string> = {},
   ) {
+    this.secrets = new SecretVault(dataDir, (value) =>
+      this.sanitizer.register(value),
+    );
     this.bindings = { ...bindings };
     this.current = this.makeSnapshot([]);
   }
@@ -1134,10 +1140,11 @@ export class Kernel {
       secret: (reference) => {
         this.require(r, "secrets.read");
         if (
-          !reference.startsWith("env:") ||
-          !/^env:[A-Z][A-Z0-9_]*$/.test(reference)
+          !/^(?:env:[A-Z][A-Z0-9_]*|secret:[a-zA-Z0-9][a-zA-Z0-9_.-]*)$/.test(
+            reference,
+          )
         )
-          throw new HostError("invalid_secret", "Expected env:NAME reference");
+          throw new HostError("invalid_secret", "Invalid secret reference");
         const allowed = ((
           this.storage.getStore()?.snapshot.configs.get(r.manifest.id) ??
           r.settings.config
@@ -1148,7 +1155,9 @@ export class Kernel {
             "Secret reference not granted",
             403,
           );
-        const value = process.env[reference.slice(4)];
+        const value = reference.startsWith("secret:")
+          ? this.secrets.get(reference)
+          : process.env[reference.slice(4)];
         if (!value)
           throw new HostError(
             "secret_missing",

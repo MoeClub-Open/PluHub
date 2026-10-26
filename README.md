@@ -44,7 +44,7 @@ init --port 9000 可指定端口，--config /path/pluhub.json 可指定配置文
 
 ## 配置 AI 调用
 
-在启动进程前设置上游密钥环境变量。进入控制台“模型与上游”，保存以下结构；界面同时更新对应上游插件的密钥引用授权。
+在控制台的渠道上游节点直接填写 API Key，保存后加密存储并授权相应适配器。下方为保存后的结构，`secret:` 编号应使用实际保存的凭据编号；详见 [凭据与参数](docs/SECRETS.md)。
 
 ```json
 {
@@ -60,7 +60,7 @@ init --port 9000 可指定端口，--config /path/pluhub.json 可指定配置文
             "upstream": {
               "protocol": "openai-chat",
               "baseUrl": "https://api.openai.com/v1",
-              "keyRef": "env:OPENAI_API_KEY"
+              "keyRef": "secret:OPENAI_API_KEY"
             }
           }
         ]

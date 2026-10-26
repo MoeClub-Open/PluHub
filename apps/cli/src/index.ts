@@ -94,7 +94,7 @@ async function main() {
   }
   if (command === "help") {
     console.log(
-      "pluhub create-plugin <directory> | init | validate | verify-data | start | set-public-origin <http(s)://host> | bootstrap-admin --username admin | call <capability> <json> | plugin install <directory> --grant <permissions> | plugin enable <id> | plugin disable <id> | plugin remove <id> [--purge-data]\nOptions: --config <path>. Bootstrap password: PLUHUB_ADMIN_PASSWORD.",
+      "pluhub create-plugin <directory> | init | validate | verify-data | start | set-public-origin <http(s)://host> | bootstrap-admin --username admin | call <capability> <json> | plugin install <directory> --grant <permissions> | plugin enable <id> | plugin disable <id> | plugin remove <id> [--purge-data]\nOptions: --config <path>. Bootstrap password: --password-file PATH.",
     );
     return;
   }
@@ -275,11 +275,15 @@ async function main() {
         command === "bootstrap-admin"
           ? {
               username: option("username", "admin"),
-              password: process.env.PLUHUB_ADMIN_PASSWORD,
+              password: option("password-file")
+                ? (
+                    await readFile(resolve(option("password-file")!), "utf8")
+                  ).replace(/\r?\n$/, "")
+                : undefined,
             }
           : JSON.parse(args[2] ?? "null");
       if (command === "bootstrap-admin" && !input.password)
-        throw new Error("Set PLUHUB_ADMIN_PASSWORD");
+        throw new Error("Provide --password-file PATH");
       console.log(JSON.stringify(await kernel.invoke(capability, input)));
     } finally {
       await kernel.shutdown();

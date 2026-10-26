@@ -32,14 +32,7 @@ Finalize 仅在请求完成且实际用量有效时结算。从未进入上游�
 
 ### Stripe
 
-环境变量示例：
-
-```text
-STRIPE_SECRET_KEY=<商户测试模式密钥>
-STRIPE_WEBHOOK_SECRET=<Webhook endpoint 签名密钥>
-```
-
-在 Stripe 支付页面填写 `env:STRIPE_SECRET_KEY`、`env:STRIPE_WEBHOOK_SECRET` 并选择测试/正式模式。配置中的 `secretRefs` 会由表单按选择的引用生成；不在控制台填写明文密钥。Webhook 地址：
+在 Stripe 支付页面直接填写商户密钥与 Webhook 签名密钥，并选择测试/正式模式；保存到支付插件的加密存储。留空保留已保存凭据。Webhook 地址：
 
 ```text
 https://你的域名/api/plugins/official.payments-stripe/webhook
@@ -71,7 +64,7 @@ Commerce 持久保存每笔退款或争议及去重事件。通知早于支付�
 
 在易支付页添加支付方式，可同时启用支付宝、微信支付及 QQ 钱包，也可配置多个平台或商户。每条配置拥有持久化数字自增编号、名称、独立启停、V1/V2 与 MD5/RSA 设置；可复制商户参数后切换支付类型，新增方式默认停用。用户购买时按实际方式选择，订单保存所选配置及名称，幂等键不能跨方式复用。商品、渠道和支付方式等内部配置 ID 自动生成；模型名等外部协议标识仍由管理员指定。
 
-停用方式或关闭易支付只阻止新订单，已存在且保留配置的订单仍可接收回调。删除配置后该方式的待付款订单不能验签，建议先停用并等待订单完成。旧单配置及无方式 ID 的历史订单回调继续兼容，原环境变量引用保留。
+停用方式或关闭易支付只阻止新订单，已存在且保留配置的订单仍可接收回调。删除配置后该方式的待付款订单不能验签，建议先停用并等待订单完成。旧单配置及无方式 ID 的历史订单回调继续兼容，旧环境变量引用随升级导入加密存储。
 
 配置 V1/V2 与 MD5/RSA。文档标准组合是 **V1 + MD5、V2 + RSA**；另外两种为兼容模式，须确认具体商户平台支持。
 
@@ -79,7 +72,7 @@ V1 生成 `/submit.php` 跳转；V2 POST `/api/pay/create`，携带 `method=jump
 
 控制台可直接填写 MD5 商户密钥，或 RSA 商户私钥及平台公钥。插件使用 AES-256-GCM 加密存入自己的 `secrets.sqlite`，主密钥保存在同目录的 `vault.key`（权限 0600）。配置仅保存不可变的 `local:` 引用，查询配置和再次编辑均不返回密钥原文；留空保留已有值，复制支付方式复用原引用。备份必须同时保留插件数据和主密钥，修改凭证须管理员会话及近期身份确认。
 
-仍兼容 `keyRef`、`privateKeyRef`、`platformPublicKeyRef` 的环境变量引用，只有 `env:` 引用需要出现在 `secretRefs` 授权列表。回调：
+`keyRef`、`privateKeyRef`、`platformPublicKeyRef` 保存加密凭据编号，页面直接填写实际密钥。宿主托管的 `secret:` 引用需要出现在 `secretRefs` 授权列表。回调：
 
 ```text
 https://你的域名/api/plugins/official.payments-epay/notify?pluhub_method=<支付方式ID>
@@ -89,9 +82,11 @@ https://你的域名/api/plugins/official.payments-epay/notify?pluhub_method=<�
 
 ## BYOK 和订阅授权
 
+通用凭据、旧引用升级及备份要求见 [凭据与参数](SECRETS.md)。以下静态连接示例中的 `secret:` 编号须替换为实际保存的编号；订阅渠道优先在账号管理页授权。
+
 用户在「个人渠道」保存自己的上游地址、API Key 和模型映射；订阅授权在「自带订阅」中由各提供商插件管理。API Key 可绑定个人渠道，请求也可用 `x-pluhub-channel` 选择个人渠道。平台渠道使用管理员配置的上游授权，不提供用户覆盖平台凭证的接口。
 
-个人密钥采用 AES-256-GCM 加密，AAD 绑定 ID、用户、渠道和类型。主密钥可用 `masterKeyRef` 引用 32 字节 Base64 环境变量，或首次启动生成权限 0600 的 `vault.key`。备份时保留数据库和主密钥；更换主密钥不会自动重加密旧数据。
+个人密钥采用 AES-256-GCM 加密，AAD 绑定 ID、用户、渠道和类型。主密钥默认在首次启动生成权限 0600 的 `vault.key`；显式 `masterKeyRef` 使用宿主托管凭据，值为 32 字节 Base64。备份时保留数据库和主密钥；更换主密钥不会自动重加密旧数据。
 
 各订阅提供商插件负责 OAuth 授权、刷新和账号占用，见 [订阅上游插件](SUBSCRIPTION_UPSTREAMS.md)。
 
@@ -103,24 +98,24 @@ https://你的域名/api/plugins/official.payments-epay/notify?pluhub_method=<�
     "protocol": "codex",
     "authMode": "siwc",
     "baseUrl": "https://api.openai.com/v1",
-    "keyRef": "env:CODEX_ACCESS_TOKEN"
+    "keyRef": "secret:CODEX_ACCESS_TOKEN"
   },
   "codex-cli": {
     "protocol": "codex",
     "authMode": "cli",
     "baseUrl": "https://chatgpt.com/backend-api/codex",
-    "keyRef": "env:CODEX_ACCESS_TOKEN",
+    "keyRef": "secret:CODEX_ACCESS_TOKEN",
     "accountId": "你的账号ID"
   },
   "claude-plan": {
     "protocol": "claude-subscription",
     "baseUrl": "https://api.anthropic.com",
-    "keyRef": "env:CLAUDE_ACCESS_TOKEN"
+    "keyRef": "secret:CLAUDE_ACCESS_TOKEN"
   },
   "google-plan": {
     "protocol": "antigravity",
     "baseUrl": "https://cloudcode-pa.googleapis.com",
-    "keyRef": "env:GOOGLE_ACCESS_TOKEN",
+    "keyRef": "secret:GOOGLE_ACCESS_TOKEN",
     "projectId": "你的项目ID"
   }
 }

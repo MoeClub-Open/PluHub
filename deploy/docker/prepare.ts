@@ -37,10 +37,11 @@ await writeFile(
 );
 await mkdir(out + "/scripts", { recursive: true });
 await cp("deploy/migrations", out + "/deploy/migrations", { recursive: true });
-await cp(
-  "scripts/migrate-plugin-boundaries.ts",
-  out + "/scripts/migrate-plugin-boundaries.ts",
-);
+for (const name of [
+  "migrate-plugin-boundaries.ts",
+  "migrate-managed-secrets.ts",
+])
+  await cp("scripts/" + name, out + "/scripts/" + name);
 await cp("LICENSE", out + "/LICENSE");
 await writeFile(
   out + "/package.json",

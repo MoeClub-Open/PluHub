@@ -99,6 +99,9 @@ if (!existsSync(file)) {
   renameSync(file + ".init", file);
 }
 if (args[0] === "start") {
+  const { migrateManagedSecrets } =
+    await import("../migrations/managed-secrets.ts");
+  migrateManagedSecrets(file);
   const { migratePluginBoundaries } =
     await import("../migrations/plugin-boundaries.ts");
   await migratePluginBoundaries(file);
@@ -111,11 +114,8 @@ try {
 } catch (error) {
   if (error.code !== "ENOENT") throw error;
 }
-if (process.env.PLUHUB_ADMIN_PASSWORD_FILE)
-  process.env.PLUHUB_ADMIN_PASSWORD = readFileSync(
-    process.env.PLUHUB_ADMIN_PASSWORD_FILE,
-    "utf8",
-  ).replace(/\r?\n$/, "");
+delete process.env.PLUHUB_ADMIN_PASSWORD;
+delete process.env.PLUHUB_ADMIN_PASSWORD_FILE;
 const child = spawn(process.execPath, [cli, ...args, "--config", file], {
   stdio: "inherit",
 });

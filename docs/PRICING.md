@@ -105,7 +105,7 @@ AI Router 中的模型和渠道：
             "upstream": {
               "protocol": "openai-chat",
               "baseUrl": "https://provider.example",
-              "keyRef": "env:UPSTREAM_KEY"
+              "keyRef": "secret:UPSTREAM_KEY"
             }
           }
         ]

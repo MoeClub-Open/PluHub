@@ -23,13 +23,13 @@
 
 ## 完整组合示例
 
-下面是三个插件的 `config` 字段示例。实际密钥通过宿主环境变量提供，并向对应上游插件授权 `env:PROVIDER_KEY`。`fast-vendor`、`strong-vendor` 是占位模型 ID，需要改成服务商真实模型和支持档位。
+下面是三个插件的 `config` 字段示例。API Key 在配置页填写并加密保存，下方 `secret:PROVIDER_KEY` 应替换为实际保存的凭据编号。`fast-vendor`、`strong-vendor` 是占位模型 ID，需要改成服务商真实模型和支持档位。
 
 ```json
 {
   "ai-router": {
     "upstreams": {
-      "primary": { "protocol": "openai-chat", "baseUrl": "https://provider.example/v1", "keyRef": "env:PROVIDER_KEY" },
+      "primary": { "protocol": "openai-chat", "baseUrl": "https://provider.example/v1", "keyRef": "secret:PROVIDER_KEY" },
       "smart-provider": { "protocol": "auto-router", "name": "智能提供商" }
     },
     "models": {
@@ -72,10 +72,10 @@
 例如把策略 `decision` 改为：
 
 ```json
-{ "kind": "luna", "baseUrl": "https://api.openai.com/v1", "model": "gpt-6-luna", "keyRef": "env:DECISION_KEY", "timeoutMs": 3000, "maxInputChars": 16000 }
+{ "kind": "luna", "baseUrl": "https://api.openai.com/v1", "model": "gpt-6-luna", "keyRef": "secret:DECISION_KEY", "timeoutMs": 3000, "maxInputChars": 16000 }
 ```
 
-同时设置自动路由插件 `secretRefs: ["env:DECISION_KEY"]`。Clef 使用部署的 SystemOne 服务地址与模型 ID；JEV 使用运行 `serve_decide.py` 的服务地址。这些接口仍需部署或开通对应服务；代码不会下载权重、读取本机登录文件或借用回答模型的凭证。
+配置页会自动维护自动路由插件 `secretRefs: ["secret:DECISION_KEY"]`。Clef 使用部署的 SystemOne 服务地址与模型 ID；JEV 使用运行 `serve_decide.py` 的服务地址。这些接口仍需部署或开通对应服务；代码不会下载权重、读取本机登录文件或借用回答模型的凭证。
 
 概率分布、选项和 confidence 会严格检查。超时、无效响应、输入超出决策长度或低置信度，按 `onFailure` 使用保底候选或拒绝；请求取消直接退出。保底模型仍须通过上下文、协议和 BYOK 过滤。远程决策有独立的每用户自然分钟配额 `decisionRpm`（默认 60）与全局并发 `decisionConcurrency`（默认 8），超限返回 429。远程决策会向配置的服务发送任务正文；日志只存选择元数据，决策费用目前属于平台开销，不计入回答模型账单。
 

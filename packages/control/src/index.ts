@@ -36,6 +36,7 @@ import {
 } from "./plugin-jobs.js";
 import { fingerprint, registrySources } from "./registry.js";
 import { uninstallPlugin } from "./uninstall.js";
+import { sealConfigSecrets } from "./secrets.js";
 export { uninstallPlugin } from "./uninstall.js";
 export { recoverInterruptedPluginUpdate } from "./plugin-jobs.js";
 export function validateConfig(value: unknown): asserts value is HostConfig {
@@ -159,6 +160,7 @@ export async function applyConfig(
   kernel.configure(configs, next.bindings ?? {}, validateOnly);
 }
 export { Kernel };
+export { SecretVault } from "@pluhub/kernel";
 
 export function attachManagement(
   kernel: Kernel,
@@ -184,6 +186,7 @@ export function attachManagement(
     return result;
   };
   const commit = async (next: HostConfig) => {
+    next = sealConfigSecrets(next, kernel.secrets);
     await applyConfig(kernel, config, next, true);
     await writeConfig(file, next);
     try {
