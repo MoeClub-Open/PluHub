@@ -58,20 +58,21 @@ Chat 入口接受 `web_search_options`，也可接收上述搜索工具声明并
 
 参考：[OpenAI Web search](https://developers.openai.com/api/docs/guides/tools-web-search)、[Responses streaming events](https://developers.openai.com/api/reference/resources/responses/streaming-events)。
 
-## 图片、向量与音频
+## 图片、视频、向量与音频
 
-`official.ingress-openai-media` 和 `official.upstream-openai-media` 独立安装与启停；新站点预装但默认停用。媒体上游复用 OpenAI Chat / Responses 连接的凭证、认证及公网上游策略，不能指向 Codex、Claude 或 Antigravity 的文本订阅接口。
+`official.ingress-openai-media` 和 `official.upstream-openai-media` 独立安装与启停；新站点预装但默认停用。媒体上游复用 OpenAI Chat / Responses 连接的凭证、认证及公网上游策略。Codex 图片通过其订阅插件声明的 `ai.media.codex@1` 调用；Claude 与 Antigravity 当前不提供媒体生成端点。
 
 | 入口                            | 请求                                 | 响应                                  |
 | ------------------------------- | ------------------------------------ | ------------------------------------- |
 | `POST /v1/embeddings`           | 文本、文本批次、Token 数组           | JSON 向量 / base64、输入 Token 用量   |
 | `POST /v1/images/generations`   | JSON                                 | JSON 图片或图片 SSE                   |
 | `POST /v1/images/edits`         | JSON 图片引用或 multipart 文件、遮罩 | JSON 图片或图片 SSE                   |
+| `POST /v1/videos/generations`   | JSON 或 multipart 提示词、可选参考图片 | 完成后的视频二进制或含结果 URL 的 JSON |
 | `POST /v1/audio/speech`         | JSON 文本与音色                      | 音频二进制流或 `stream_format: "sse"` |
 | `POST /v1/audio/transcriptions` | multipart 音频文件                   | JSON、文本、字幕或转写 SSE            |
 | `POST /v1/audio/translations`   | multipart 音频文件                   | JSON、文本或字幕                      |
 
-模型配置 `operations` 选择允许的端点，例如 `["images/generations", "images/edits"]`。省略时只允许 `chat`（四类会话协议）；图片、音频和向量模型不会出现在 Playground 对话选择器中。公开及个人目录保留各自模型端点和渠道价格，媒体模型的接入示例使用对应接口。个人模型仍按所属用户隔离，API Key 的渠道及模型限制同样生效。
+模型配置 `operations` 选择允许的端点，例如 `["images/generations", "images/edits"]` 或 `["videos/generations"]`。省略时只允许 `chat`（四类会话协议）。Playground 按模式分别显示对话、图片和视频模型；音频和向量仍通过对应 API 调用。公开及个人目录保留各自模型端点和渠道价格，媒体模型的接入示例使用对应接口。个人模型仍按所属用户隔离，API Key 的渠道及模型限制同样生效。
 
 渠道流程继续提供渠道/模型选择、重定向、请求限流与 OpenAI 协议准入。媒体请求不能执行文本提示词、思考强度、输出 Token 上限、TPS 或任务分类节点，防止配置静默失效。高级接口组合的 `mediaPaths` 按操作名配置相对路径，例如 `{ "embeddings": "/v1/vector" }`，不会误用会话的 `path`。
 
@@ -79,6 +80,18 @@ Chat 入口接受 `web_search_options`，也可接收上述搜索工具声明并
 
 Embeddings 以提供商输入 Token 计费。图片和音频首期使用明确的按次价格或固定金额表达式，不把媒体 Token 当作普通文本 Token，也不根据文件体积猜测音频时长；上游提供的 Token 总量仍可记录。计费未启用或个人渠道不扣平台钱包；平台计费启用时，媒体未配置固定价格会在调用前拒绝。
 
-图片变体、视频、Realtime、Files 和 Responses 的 `image_generation` 工具尚未接入。媒体端点支持 OpenAI 兼容服务的原生接口，不提供 Gemini / Anthropic 媒体协议转换；提供商自身是否支持模型、格式和参数，以其接口响应为准。
+### Codex 图片
 
-参考：[Images](https://developers.openai.com/api/reference/resources/images)、[Embeddings](https://developers.openai.com/api/reference/resources/embeddings/methods/create)、[Speech](https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create)、[Transcriptions](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)。
+Codex 模型映射可声明 `images/generations`、`images/edits`；目标模型使用实际图片模型，例如 `gpt-image-2.5-sunburst`。订阅适配器复用现有账号租约、刷新和冷却，将图片请求转换为 Responses 的 `image_generation` 工具。顶层调用默认使用 `gpt-6.1-sol`，可用请求参数 `response_model` 指定账号支持的主模型；如果路由目标本身是文本模型，则以该模型为主模型，并可用 `image_model` 指定图片模型。每次生成一张图片，常用尺寸、画质、背景与输出格式传给工具。
+
+只有收到完整的 `response.completed` 和图片数据才完成结算；同一图片在增量与最终快照中去重。工具开始后不自动重放，取消或截断保留待核对。该适配不代表所有 Codex 订阅账号均获得官方图片工具权限，实际开放情况以上游响应为准；平台图片模型应配置明确的按次价格或固定金额表达式，不沿用文本 Token 价格。
+
+### 视频完成式调用
+
+`POST /v1/videos/generations` 是网关的完成式接口，和异步 `POST /v1/videos` 的返回语义不同。上游默认调用 `/v1/videos`；高级接口的 `mediaPaths["videos/generations"]` 可覆盖该路径。兼容上游可直接返回视频或结果 URL，也可返回 `id` 与 `queued` / `in_progress` 等状态；适配器查询同一路径下的 `/{id}`，直到 `completed`，再获取 `/{id}/content`。查询和下载使用同一上游与凭证，不接受任意远端查询地址。
+
+任务创建、状态查询和下载属于同一次网关执行，只预留和结算一次。任务已接受后的失败、取消或查询异常不会按「尚未生成」自动退款。连接保持至完成，不提供跨刷新恢复任务的接口；反向代理的等待超时应满足提供商的生成耗时。原生 Sora API 已于 2026-09-24 退役，因此不内置可用 Sora 预设，也不将 Codex 订阅视为视频授权；需要管理员配置仍在服务的兼容视频上游。
+
+图片变体、Realtime、Files 和通用 Responses `image_generation` 工具透传尚未接入。媒体端点不提供 Gemini / Anthropic 媒体协议转换；提供商自身是否支持模型、格式和参数，以其接口响应为准。
+
+参考：[Images](https://developers.openai.com/api/reference/resources/images)、[Image generation tool](https://developers.openai.com/api/docs/guides/tools-image-generation)、[Video API 与退役说明](https://developers.openai.com/api/docs/deprecations)、[Embeddings](https://developers.openai.com/api/reference/resources/embeddings/methods/create)、[Speech](https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create)、[Transcriptions](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)。
