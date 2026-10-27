@@ -39,6 +39,7 @@ async function setup(extra: string[] = [], configs: any = {}) {
       ...new Set([
         "users",
         "auth",
+        "ai-router",
         ...["codex", "claude-subscription", "antigravity"].map(
           (p) => "upstream-" + p,
         ),
