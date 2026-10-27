@@ -1,0 +1,4571 @@
+{
+  "schemaVersion": 1,
+  "plugins": [
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.ai-router",
+        "category": "routing",
+        "name": "渠道管理",
+        "description": "管理渠道、模型映射和可视化功能组合。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.49",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.routing@2",
+          "ai.execution@1",
+          "ai.catalog@2",
+          "ai.channels@1",
+          "ai.targets@1",
+          "ai.groups@1",
+          "ai.upstream.systemone@1",
+          "ai.upstream.luna@1",
+          "ai.upstream.jev@1",
+          "ai.workflow-decision@1",
+          "ai.workflow-execution@1"
+        ],
+        "requires": [],
+        "permissions": [
+          "api.register",
+          "http.route",
+          "http.dispatch",
+          "http.dispatch.child",
+          "secrets.read",
+          "hooks.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nextChannelId": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "upstreams": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "protocol": {
+                    "enum": [
+                      "openai-chat",
+                      "openai-responses",
+                      "anthropic",
+                      "gemini",
+                      "systemone",
+                      "luna",
+                      "jev",
+                      "codex",
+                      "claude-subscription",
+                      "antigravity",
+                      "auto-router",
+                      "grok"
+                    ]
+                  },
+                  "baseUrl": {
+                    "type": "string",
+                    "pattern": "^https?://"
+                  },
+                  "keyRef": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+                        }
+                      }
+                    ]
+                  },
+                  "name": {
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "accountId": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
+                  "projectId": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
+                  "authMode": {
+                    "enum": [
+                      "siwc",
+                      "cli"
+                    ]
+                  },
+                  "flow": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "entry",
+                      "nodes"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "entry": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "layout": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                              "minimum": -1000000,
+                              "maximum": 1000000
+                            },
+                            "y": {
+                              "type": "number",
+                              "minimum": -1000000,
+                              "maximum": 1000000
+                            }
+                          }
+                        }
+                      },
+                      "nodes": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 128,
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "text"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "format"
+                                },
+                                "value": {}
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "values"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "template"
+                                },
+                                "template": {
+                                  "type": "string"
+                                },
+                                "values": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+                                    "not": {
+                                      "enum": [
+                                        "__proto__",
+                                        "prototype",
+                                        "constructor"
+                                      ]
+                                    }
+                                  },
+                                  "additionalProperties": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "replace"
+                                },
+                                "text": {
+                                  "type": "string"
+                                },
+                                "find": {
+                                  "type": "string"
+                                },
+                                "replacement": {
+                                  "type": "string"
+                                },
+                                "all": {
+                                  "type": "boolean"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "promptMode"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "llm"
+                                },
+                                "model": {
+                                  "type": "string"
+                                },
+                                "channelId": {
+                                  "type": "string"
+                                },
+                                "allowedModels": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "protocol": {
+                                  "enum": [
+                                    "openai-chat",
+                                    "openai-responses",
+                                    "anthropic"
+                                  ]
+                                },
+                                "messages": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object"
+                                  }
+                                },
+                                "prompt": {
+                                  "type": "string"
+                                },
+                                "system": {
+                                  "type": "string"
+                                },
+                                "maxTokens": {
+                                  "type": "integer"
+                                },
+                                "promptMode": {
+                                  "enum": [
+                                    "append",
+                                    "replace"
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "jev"
+                                },
+                                "model": {
+                                  "type": "string"
+                                },
+                                "channelId": {
+                                  "type": "string"
+                                },
+                                "state": {},
+                                "questions": {
+                                  "type": "object"
+                                },
+                                "assets": {
+                                  "type": "object"
+                                },
+                                "answerKey": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "response"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "valueType"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "value"
+                                },
+                                "valueType": {
+                                  "enum": [
+                                    "string",
+                                    "number",
+                                    "integer",
+                                    "boolean",
+                                    "string[]",
+                                    "object",
+                                    "json",
+                                    "secret"
+                                  ]
+                                },
+                                "value": {},
+                                "secretRef": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^secret:[A-Za-z0-9][A-Za-z0-9_.-]*$"
+                                    },
+                                    {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "pattern": "^secret:[A-Za-z0-9][A-Za-z0-9_.-]*$"
+                                      }
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "next"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "start"
+                                },
+                                "next": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "yes",
+                                "no"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "condition"
+                                },
+                                "test": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "integer"
+                                },
+                                "models": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "modelSource": {
+                                  "type": "string"
+                                },
+                                "yes": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "no": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "protocol": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "condition",
+                                "yes",
+                                "no"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "branch"
+                                },
+                                "condition": {
+                                  "type": "boolean"
+                                },
+                                "yes": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "no": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "test"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "predicate"
+                                },
+                                "test": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "integer"
+                                },
+                                "models": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "modelSource": {
+                                  "type": "string"
+                                },
+                                "protocol": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "valueType",
+                                "operator",
+                                "left",
+                                "right"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "compare"
+                                },
+                                "valueType": {
+                                  "enum": [
+                                    "string",
+                                    "number",
+                                    "boolean"
+                                  ]
+                                },
+                                "operator": {
+                                  "enum": [
+                                    "eq",
+                                    "ne",
+                                    "gt",
+                                    "gte",
+                                    "lt",
+                                    "lte",
+                                    "matches"
+                                  ]
+                                },
+                                "left": {},
+                                "right": {}
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "operator",
+                                "left"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "logic"
+                                },
+                                "operator": {
+                                  "enum": [
+                                    "and",
+                                    "or",
+                                    "not"
+                                  ]
+                                },
+                                "left": {
+                                  "type": "boolean"
+                                },
+                                "right": {
+                                  "type": "boolean"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "next"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "prompt"
+                                },
+                                "next": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "next"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "reasoning"
+                                },
+                                "next": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "effort": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "next"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "maxTokens"
+                                },
+                                "next": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "limit": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "next"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "tps"
+                                },
+                                "next": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "rate": {
+                                  "type": "number"
+                                },
+                                "tokenizer": {
+                                  "type": "string"
+                                },
+                                "aggregateRate": {
+                                  "type": "number"
+                                },
+                                "model": {
+                                  "type": "string"
+                                },
+                                "inheritDefault": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "rate"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "aggregateRate"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "upstream"
+                                },
+                                "target": {
+                                  "type": "string"
+                                },
+                                "allowedTargets": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "mode": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "provider"
+                                },
+                                "recordResponseModel": {
+                                  "type": "boolean"
+                                },
+                                "upstream": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "protocol": {
+                                      "type": "string"
+                                    },
+                                    "baseUrl": {
+                                      "type": "string"
+                                    },
+                                    "keyRef": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "pattern": "^(?:$|env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+                                        },
+                                        {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "accountId": {
+                                      "type": "string"
+                                    },
+                                    "projectId": {
+                                      "type": "string"
+                                    },
+                                    "authMode": {
+                                      "type": "string"
+                                    },
+                                    "subscriptionAccountIds": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "interfaces": {
+                                      "type": "array",
+                                      "minItems": 1,
+                                      "items": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "path": {
+                                            "type": "string"
+                                          },
+                                          "streamPath": {
+                                            "type": "string"
+                                          },
+                                          "modelsPath": {
+                                            "type": "string"
+                                          },
+                                          "headers": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "params": {
+                                            "type": "object"
+                                          },
+                                          "auth": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "type": {
+                                                "type": "string"
+                                              },
+                                              "name": {
+                                                "type": "string"
+                                              }
+                                            }
+                                          },
+                                          "incoming": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "protocol": {
+                                            "type": "string"
+                                          },
+                                          "models": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "mediaPaths": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "embeddings": {
+                                                "type": "string"
+                                              },
+                                              "images/generations": {
+                                                "type": "string"
+                                              },
+                                              "images/edits": {
+                                                "type": "string"
+                                              },
+                                              "audio/speech": {
+                                                "type": "string"
+                                              },
+                                              "audio/transcriptions": {
+                                                "type": "string"
+                                              },
+                                              "audio/translations": {
+                                                "type": "string"
+                                              },
+                                              "videos/generations": {
+                                                "type": "string"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "model": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "routing"
+                                },
+                                "profile": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "next"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "protocol"
+                                },
+                                "next": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "allow": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "conversion": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "type",
+                                "next"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "type": {
+                                  "const": "rateLimit"
+                                },
+                                "next": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "rule": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "rpm": {
+                                      "type": "integer"
+                                    },
+                                    "tpm": {
+                                      "type": "integer"
+                                    },
+                                    "concurrency": {
+                                      "type": "integer"
+                                    },
+                                    "bytesPerSecond": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "bindings": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "source",
+                            "output",
+                            "target",
+                            "input"
+                          ],
+                          "properties": {
+                            "source": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "output": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "target": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "input": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "consumptionMultiplier": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "subscriptionAccountIds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    }
+                  },
+                  "interfaces": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "incoming",
+                        "protocol"
+                      ],
+                      "properties": {
+                        "path": {
+                          "type": "string",
+                          "pattern": "^/(?!/)"
+                        },
+                        "streamPath": {
+                          "type": "string",
+                          "pattern": "^/(?!/)"
+                        },
+                        "modelsPath": {
+                          "type": "string",
+                          "pattern": "^/(?!/)"
+                        },
+                        "headers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "params": {
+                          "type": "object"
+                        },
+                        "auth": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "type"
+                          ],
+                          "properties": {
+                            "type": {
+                              "enum": [
+                                "default",
+                                "none",
+                                "bearer",
+                                "header",
+                                "query"
+                              ]
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "incoming": {
+                          "type": "array",
+                          "minItems": 1,
+                          "uniqueItems": true,
+                          "items": {
+                            "enum": [
+                              "openai-chat",
+                              "openai-responses",
+                              "anthropic",
+                              "gemini"
+                            ]
+                          }
+                        },
+                        "protocol": {
+                          "enum": [
+                            "openai-chat",
+                            "openai-responses",
+                            "anthropic",
+                            "gemini"
+                          ]
+                        },
+                        "models": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "mediaPaths": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "embeddings": {
+                              "type": "string",
+                              "pattern": "^/(?!/)"
+                            },
+                            "images/generations": {
+                              "type": "string",
+                              "pattern": "^/(?!/)"
+                            },
+                            "images/edits": {
+                              "type": "string",
+                              "pattern": "^/(?!/)"
+                            },
+                            "audio/speech": {
+                              "type": "string",
+                              "pattern": "^/(?!/)"
+                            },
+                            "audio/transcriptions": {
+                              "type": "string",
+                              "pattern": "^/(?!/)"
+                            },
+                            "audio/translations": {
+                              "type": "string",
+                              "pattern": "^/(?!/)"
+                            },
+                            "videos/generations": {
+                              "type": "string",
+                              "pattern": "^/(?!/)"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "minimum": -1000000,
+                    "maximum": 1000000
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "protocol": {
+                          "enum": [
+                            "openai-chat",
+                            "openai-responses",
+                            "anthropic",
+                            "gemini",
+                            "codex",
+                            "claude-subscription",
+                            "antigravity",
+                            "grok",
+                            "systemone",
+                            "luna",
+                            "jev"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "protocol"
+                      ]
+                    },
+                    "then": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "baseUrl",
+                            "keyRef"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "baseUrl"
+                          ],
+                          "properties": {
+                            "protocol": {
+                              "enum": [
+                                "systemone",
+                                "luna",
+                                "jev"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "required": [
+                            "subscriptionAccountIds"
+                          ]
+                        }
+                      ]
+                    },
+                    "else": {
+                      "not": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "baseUrl"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "keyRef"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "not": {
+                        "required": [
+                          "protocol"
+                        ]
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "flow"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            "models": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "upstream",
+                  "model"
+                ],
+                "properties": {
+                  "upstream": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "name": {
+                    "maxLength": 1024,
+                    "type": "string"
+                  },
+                  "provider": {
+                    "maxLength": 1024,
+                    "type": "string"
+                  },
+                  "description": {
+                    "maxLength": 1024,
+                    "type": "string"
+                  },
+                  "contextWindow": {
+                    "minimum": 1,
+                    "maximum": 100000000,
+                    "type": "integer"
+                  },
+                  "inputPrice": {
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "type": "number"
+                  },
+                  "outputPrice": {
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "type": "number"
+                  },
+                  "reasoningEfforts": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "none",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    }
+                  },
+                  "pricing": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "mode": {
+                        "enum": [
+                          "tokens",
+                          "request",
+                          "expression"
+                        ]
+                      },
+                      "request": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000000
+                      },
+                      "cacheRead": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000000
+                      },
+                      "cacheWrite": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000000
+                      },
+                      "cacheWrite1h": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000000
+                      },
+                      "tiers": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "above",
+                            "input",
+                            "output"
+                          ],
+                          "properties": {
+                            "above": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100000000
+                            },
+                            "input": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000
+                            },
+                            "output": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000
+                            },
+                            "cacheRead": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000
+                            },
+                            "cacheWrite": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000
+                            },
+                            "cacheWrite1h": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000
+                            }
+                          }
+                        }
+                      },
+                      "expression": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 16384
+                      },
+                      "webSearch": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000000
+                      }
+                    }
+                  },
+                  "operations": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "chat",
+                        "embeddings",
+                        "images/generations",
+                        "images/edits",
+                        "videos/generations",
+                        "audio/speech",
+                        "audio/transcriptions",
+                        "audio/translations"
+                      ]
+                    }
+                  },
+                  "publicModel": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              }
+            },
+            "redirects": {
+              "type": "object",
+              "maxProperties": 1024,
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "mode"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "mode": {
+                    "enum": [
+                      "implicit",
+                      "explicit"
+                    ]
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "groups": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[A-Za-z0-9_-]{1,128}$"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "channelIds": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "multiplier": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "userIds": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            },
+            "secretRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              }
+            }
+          }
+        },
+        "ui": {
+          "entry": "dist/ui.js",
+          "title": "渠道",
+          "path": "/channels",
+          "public": false,
+          "group": "routing",
+          "order": 10,
+          "pages": [
+            {
+              "title": "使用分组",
+              "path": "/settings/service-groups",
+              "public": false,
+              "group": "routing",
+              "order": 20
+            }
+          ]
+        },
+        "optionalRequires": [
+          "http.transport@1",
+          "ai.upstream.openai-chat@1",
+          "ai.upstream.openai-responses@1",
+          "ai.upstream.anthropic@1",
+          "ai.upstream.gemini@1",
+          "credentials.resolve@1",
+          "auth.admit@1",
+          "ai.decision-profile@1",
+          "billing.admit@1",
+          "credentials.select@1",
+          "ai.upstream.codex@1",
+          "ai.upstream.claude-subscription@1",
+          "ai.upstream.antigravity@1",
+          "ai.auto-routing@1",
+          "ai.user-channels@1",
+          "ai.subscription.codex@1",
+          "ai.subscription.claude-subscription@1",
+          "ai.subscription.antigravity@1",
+          "ai.request-limits@1",
+          "ai.output-pace@2",
+          "ai.upstream-models.openai-chat@1",
+          "ai.upstream-models.openai-responses@1",
+          "ai.upstream-models.anthropic@1",
+          "ai.upstream-models.gemini@1",
+          "ai.media.openai-chat@1",
+          "ai.media.openai-responses@1",
+          "ai.upstream.grok@1",
+          "ai.subscription.grok@1",
+          "auth.admin@1",
+          "ai.media.codex@1"
+        ]
+      },
+      "archive": "official.ai-router-0.1.0-alpha.49-3a0383e60531d0adb2e7aff9cb7deba5d1855ed86938c6ae7b0e1527cde52519.tgz",
+      "sha256": "3a0383e60531d0adb2e7aff9cb7deba5d1855ed86938c6ae7b0e1527cde52519"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.auth",
+        "category": "identity",
+        "name": "账号认证",
+        "description": "管理密码、会话、API Key 和多因素验证。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.30",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "auth.bootstrap@1",
+          "auth.setup@1",
+          "auth.admit@1",
+          "auth.reset-factors@1",
+          "auth.admin@1",
+          "auth.security-history@1",
+          "auth.key-names@1"
+        ],
+        "requires": [
+          "users.lookup@1",
+          "users.manage@1"
+        ],
+        "permissions": [
+          "api.register",
+          "identity.provide",
+          "hooks.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "securityHistoryRetentionDays": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650
+            },
+            "securityHistoryMaxRows": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 1000000
+            },
+            "secureCookie": {
+              "type": "boolean"
+            },
+            "issuer": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "registrationEnabled": {
+              "type": "boolean"
+            },
+            "emailLoginEnabled": {
+              "type": "boolean"
+            },
+            "passwordResetEnabled": {
+              "type": "boolean"
+            },
+            "captcha": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "login": {
+                  "type": "boolean"
+                },
+                "register": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "webauthn": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "rpID": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253,
+                  "pattern": "^[a-z0-9.-]+$"
+                },
+                "rpName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "origins": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 2048
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ui": {
+          "entry": "dist/ui.js",
+          "title": "API 密钥",
+          "path": "/auth",
+          "public": true,
+          "pages": [
+            {
+              "title": "账号设置",
+              "path": "/account",
+              "public": true
+            },
+            {
+              "title": "登录与注册",
+              "path": "/settings/auth",
+              "group": "verification-services",
+              "order": 10,
+              "public": false
+            },
+            {
+              "title": "访问密钥管理",
+              "path": "/settings/access-keys",
+              "public": false,
+              "group": "security",
+              "order": 30
+            }
+          ]
+        },
+        "optionalRequires": [
+          "site.branding@1",
+          "mail.send@1",
+          "mail.options@1",
+          "captcha.verify@1",
+          "captcha.options@1",
+          "ai.channels@1",
+          "ai.groups@1"
+        ]
+      },
+      "archive": "official.auth-0.1.0-alpha.30-86be99f52d719f20d977f74b0aba5f6b2e7939fd1ccb84cd6b06a69cd9662682.tgz",
+      "sha256": "86be99f52d719f20d977f74b0aba5f6b2e7939fd1ccb84cd6b06a69cd9662682"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.auto-router",
+        "category": "routing",
+        "name": "智能路由",
+        "description": "根据任务选择模型和思考强度。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.25",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.auto-routing@1",
+          "ai.decision-profile@1"
+        ],
+        "requires": [
+          "ai.targets@1",
+          "http.transport@1"
+        ],
+        "optionalRequires": [
+          "ai.workflow-decision@1",
+          "ai.upstream.openai-chat@1",
+          "ai.upstream.openai-responses@1",
+          "ai.upstream.anthropic@1",
+          "ai.upstream.gemini@1",
+          "ai.upstream.codex@1",
+          "ai.upstream.claude-subscription@1",
+          "ai.upstream.antigravity@1",
+          "ai.upstream.grok@1"
+        ],
+        "permissions": [
+          "api.register",
+          "secrets.read"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "profiles": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode",
+                  "candidates",
+                  "decision"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "mode": {
+                    "enum": [
+                      "model",
+                      "effort",
+                      "both",
+                      "manual"
+                    ]
+                  },
+                  "candidates": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 64,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "target",
+                        "strength"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "target": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "strength": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "reasoningEfforts": {
+                          "type": "array",
+                          "uniqueItems": true,
+                          "items": {
+                            "enum": [
+                              "none",
+                              "minimal",
+                              "low",
+                              "medium",
+                              "high",
+                              "xhigh",
+                              "max"
+                            ]
+                          }
+                        },
+                        "defaultEffort": {
+                          "enum": [
+                            "none",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "fixedCandidate": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "fixedEffort": {
+                    "enum": [
+                      "none",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  },
+                  "preserveClientEffort": {
+                    "type": "boolean"
+                  },
+                  "decision": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "rules",
+                          "luna",
+                          "systemone",
+                          "jev"
+                        ]
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "baseUrl": {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      "channelId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "keyRef": {
+                        "type": "string",
+                        "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+                      },
+                      "timeoutMs": {
+                        "type": "integer",
+                        "minimum": 50,
+                        "maximum": 30000
+                      },
+                      "maxInputChars": {
+                        "type": "integer",
+                        "minimum": 128,
+                        "maximum": 1000000
+                      }
+                    }
+                  },
+                  "minConfidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "onFailure": {
+                    "enum": [
+                      "fallback",
+                      "reject"
+                    ]
+                  },
+                  "fallbackCandidate": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "fallbackEffort": {
+                    "enum": [
+                      "none",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  },
+                  "difficultyStrength": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "easy": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "standard": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "hard": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "expert": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      }
+                    }
+                  },
+                  "effortByDifficulty": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "easy": {
+                        "enum": [
+                          "none",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      },
+                      "standard": {
+                        "enum": [
+                          "none",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      },
+                      "hard": {
+                        "enum": [
+                          "none",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      },
+                      "expert": {
+                        "enum": [
+                          "none",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      }
+                    }
+                  },
+                  "strategy": {
+                    "enum": [
+                      "balanced",
+                      "cost",
+                      "quality"
+                    ]
+                  }
+                }
+              }
+            },
+            "secretRefs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              },
+              "uniqueItems": true
+            },
+            "decisionRpm": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "decisionConcurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            }
+          }
+        },
+        "ui": {
+          "entry": "dist/ui.js",
+          "title": "路由策略",
+          "path": "/auto-router",
+          "public": false,
+          "group": "channel-settings",
+          "order": 20
+        }
+      },
+      "archive": "official.auto-router-0.1.0-alpha.25-c0eebafbbb07db31418514e6a22c41009824ad3dc388459fd810563014c6a295.tgz",
+      "sha256": "c0eebafbbb07db31418514e6a22c41009824ad3dc388459fd810563014c6a295"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.billing",
+        "category": "commerce",
+        "name": "计费与余额",
+        "description": "管理余额预留、结算和资金账本。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.32",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "billing.payment-state@1",
+          "billing.credit@1",
+          "billing.balance@1",
+          "billing.request-charges@1",
+          "billing.request-totals@1",
+          "billing.admit@1"
+        ],
+        "requires": [],
+        "optionalRequires": [
+          "auth.admin@1",
+          "users.lookup@1",
+          "ai.catalog@2",
+          "ai.routing@2"
+        ],
+        "permissions": [
+          "api.register",
+          "hooks.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "reserveOutputTokens": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000000
+            },
+            "outputBudgetMode": {
+              "type": "string",
+              "enum": [
+                "automatic",
+                "bounded",
+                "estimate"
+              ]
+            }
+          }
+        },
+        "ui": {
+          "title": "用量与账单",
+          "entry": "dist/ui.js",
+          "path": "/billing",
+          "public": true,
+          "pages": [
+            {
+              "title": "计费设置",
+              "path": "/settings/billing",
+              "group": "payments",
+              "order": 40,
+              "public": false
+            }
+          ]
+        }
+      },
+      "archive": "official.billing-0.1.0-alpha.32-191e3a3087806869598b5bf65d9d4d787b3dcbaac850a56a079ad8de13750fb5.tgz",
+      "sha256": "191e3a3087806869598b5bf65d9d4d787b3dcbaac850a56a079ad8de13750fb5"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.byok",
+        "category": "routing",
+        "name": "个人渠道",
+        "description": "管理用户自带密钥、订阅与个人渠道。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.45",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "credentials.select@1",
+          "credentials.resolve@1",
+          "ai.user-channels@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "optionalRequires": [
+          "ai.routing@2",
+          "ai.execution@1",
+          "ai.upstream.openai-chat@1",
+          "ai.upstream.openai-responses@1",
+          "ai.upstream.anthropic@1",
+          "ai.upstream.gemini@1",
+          "ai.upstream.systemone@1",
+          "ai.upstream.luna@1",
+          "ai.upstream.jev@1",
+          "ai.upstream.codex@1",
+          "ai.upstream.claude-subscription@1",
+          "ai.upstream.antigravity@1",
+          "auth.admin@1",
+          "ai.subscription.codex@1",
+          "ai.subscription.claude-subscription@1",
+          "ai.subscription.antigravity@1",
+          "ai.request-limits@1",
+          "ai.output-pace@2",
+          "ai.upstream-models.openai-chat@1",
+          "ai.upstream-models.openai-responses@1",
+          "ai.upstream-models.anthropic@1",
+          "ai.upstream-models.gemini@1",
+          "ai.upstream.grok@1",
+          "ai.subscription.grok@1",
+          "ai.groups@1"
+        ],
+        "permissions": [
+          "api.register",
+          "secrets.read",
+          "http.dispatch"
+        ],
+        "configReload": "restart",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "masterKeyRef": {
+              "type": "string",
+              "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+            },
+            "secretRefs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              },
+              "uniqueItems": true
+            },
+            "allowedPrivateOrigins": {
+              "type": "array",
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^https?://",
+                "maxLength": 2048
+              }
+            }
+          }
+        },
+        "ui": {
+          "title": "个人渠道",
+          "entry": "dist/ui.js",
+          "path": "/byok",
+          "public": true,
+          "pages": [
+            {
+              "title": "用户渠道管理",
+              "path": "/settings/user-channels",
+              "public": false,
+              "group": "routing",
+              "order": 30
+            }
+          ]
+        }
+      },
+      "archive": "official.byok-0.1.0-alpha.45-c5907b5b2ae3df5654fc5cb0bd7bd6977c158e4b2b1410e2ead7fbf3167d989c.tgz",
+      "sha256": "c5907b5b2ae3df5654fc5cb0bd7bd6977c158e4b2b1410e2ead7fbf3167d989c"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.commerce",
+        "category": "commerce",
+        "name": "商品与订阅",
+        "description": "管理商品、订单、订阅和支付入账。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.22",
+        "host": ">=0.1.0-alpha.15 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "commerce.payment-adjustment@1",
+          "commerce.payment@1",
+          "commerce.entitlements@1"
+        ],
+        "requires": [
+          "billing.payment-state@1"
+        ],
+        "optionalRequires": [
+          "auth.admin@1",
+          "payments.provider@1"
+        ],
+        "permissions": [
+          "api.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "publicUrl": {
+              "type": "string"
+            },
+            "nextProductId": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "products": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name",
+                  "paymentMinor",
+                  "currency",
+                  "creditMicros",
+                  "mode"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "paymentMinor": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[a-z]{3}$"
+                  },
+                  "creditMicros": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "mode": {
+                    "enum": [
+                      "payment",
+                      "subscription"
+                    ]
+                  },
+                  "interval": {
+                    "enum": [
+                      "month",
+                      "year"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ui": {
+          "title": "充值与订阅",
+          "entry": "dist/ui.js",
+          "path": "/commerce",
+          "public": true,
+          "pages": [
+            {
+              "title": "商品与订阅",
+              "path": "/settings/commerce",
+              "group": "payments",
+              "order": 30,
+              "public": false
+            }
+          ]
+        }
+      },
+      "archive": "official.commerce-0.1.0-alpha.22-f473346e7bbe4b8f3aba72f5b9357e3ade6df366beb5aac95b0d4b0c19a0b884.tgz",
+      "sha256": "f473346e7bbe4b8f3aba72f5b9357e3ade6df366beb5aac95b0d4b0c19a0b884"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.console",
+        "category": "core",
+        "name": "控制台",
+        "description": "提供站点门户、登录页面及管理界面。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.75",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "site.branding@1"
+        ],
+        "requires": [],
+        "permissions": [
+          "http.route"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "branding": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "defaultLanguage": {
+                  "type": "string",
+                  "enum": [
+                    "zh-CN",
+                    "en-US"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "workspaceName": {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                "logoUrl": {
+                  "type": "string",
+                  "maxLength": 90000
+                },
+                "faviconUrl": {
+                  "type": "string",
+                  "maxLength": 90000
+                },
+                "accentColor": {
+                  "type": "string",
+                  "maxLength": 7
+                },
+                "loginTitle": {
+                  "type": "string",
+                  "maxLength": 160
+                },
+                "loginDescription": {
+                  "type": "string",
+                  "maxLength": 400
+                },
+                "footerText": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "supportEmail": {
+                  "type": "string",
+                  "maxLength": 254
+                },
+                "websiteUrl": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "termsUrl": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "privacyUrl": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "siteTheme": {
+                  "type": "string",
+                  "enum": [
+                    "graphite",
+                    "ocean",
+                    "violet"
+                  ]
+                }
+              }
+            },
+            "portal": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "showEndpoint": {
+                  "type": "boolean"
+                },
+                "eyebrow": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "title": {
+                  "type": "string",
+                  "maxLength": 160
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 600
+                },
+                "announcement": {
+                  "type": "string",
+                  "maxLength": 600
+                },
+                "primaryLabel": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "primaryUrl": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "docsUrl": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "features": {
+                  "type": "array",
+                  "maxItems": 6,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "title",
+                      "description"
+                    ],
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 400
+                      }
+                    }
+                  }
+                },
+                "faqs": {
+                  "type": "array",
+                  "maxItems": 8,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "question",
+                      "answer"
+                    ],
+                    "properties": {
+                      "question": {
+                        "type": "string",
+                        "maxLength": 160
+                      },
+                      "answer": {
+                        "type": "string",
+                        "maxLength": 2000
+                      }
+                    }
+                  }
+                },
+                "pages": {
+                  "type": "array",
+                  "maxItems": 8,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "slug",
+                      "title",
+                      "body"
+                    ],
+                    "properties": {
+                      "slug": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "title": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "body": {
+                        "type": "string",
+                        "maxLength": 20000
+                      }
+                    }
+                  }
+                },
+                "layout": {
+                  "type": "string",
+                  "enum": [
+                    "split",
+                    "centered"
+                  ]
+                },
+                "featuredModels": {
+                  "type": "array",
+                  "maxItems": 8,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  }
+                }
+              }
+            },
+            "onboarding": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "completed": {
+                  "type": "boolean"
+                },
+                "completedAt": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "modelSetupDeferred": {
+                  "type": "boolean"
+                },
+                "siteConfiguredAt": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "draftStep": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2
+                }
+              }
+            }
+          }
+        },
+        "ui": {
+          "entry": "dist/ui.js",
+          "title": "控制台",
+          "path": "/console",
+          "public": true,
+          "pages": [
+            {
+              "title": "品牌与外观",
+              "path": "/settings/branding",
+              "group": "site",
+              "order": 10,
+              "public": false
+            },
+            {
+              "title": "门户与公开内容",
+              "path": "/settings/portal",
+              "group": "site",
+              "order": 20,
+              "public": false
+            }
+          ]
+        }
+      },
+      "archive": "official.console-0.1.0-alpha.75-ec630184096e1bac1668e7efd2e3ba5fe76fb66e967b112224d75cb076d65e62.tgz",
+      "sha256": "ec630184096e1bac1668e7efd2e3ba5fe76fb66e967b112224d75cb076d65e62"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.http-transport",
+        "category": "core",
+        "name": "HTTP 传输",
+        "description": "向上游发送请求并管理响应流。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.4",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "http.transport@1"
+        ],
+        "requires": [],
+        "permissions": [],
+        "configReload": "restart",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      },
+      "archive": "official.http-transport-0.1.0-alpha.4-0d53924c0d987249bbea58db3f5ed57ba767caa32deb2421622f9cea8b08378b.tgz",
+      "sha256": "0d53924c0d987249bbea58db3f5ed57ba767caa32deb2421622f9cea8b08378b"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.ingress-anthropic",
+        "category": "ingress",
+        "name": "Anthropic Messages 入口",
+        "description": "接收并解析 Anthropic Messages 客户端请求。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.25",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.ingress.anthropic@1"
+        ],
+        "requires": [
+          "ai.routing@2",
+          "ai.execution@1",
+          "ai.request-limits@1"
+        ],
+        "permissions": [
+          "http.route"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "optionalRequires": [
+          "auth.admit@1",
+          "billing.admit@1",
+          "ai.workflow-execution@1"
+        ]
+      },
+      "archive": "official.ingress-anthropic-0.1.0-alpha.25-90c0ecb8a48cf55529c61727d260d190a9e5b8c5c363f3e7a2c03c5bb7dd8547.tgz",
+      "sha256": "90c0ecb8a48cf55529c61727d260d190a9e5b8c5c363f3e7a2c03c5bb7dd8547"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.ingress-gemini",
+        "category": "ingress",
+        "name": "Gemini 入口",
+        "description": "接收并解析 Gemini 客户端请求。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.25",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.ingress.gemini@1"
+        ],
+        "requires": [
+          "ai.routing@2",
+          "ai.execution@1",
+          "ai.request-limits@1"
+        ],
+        "permissions": [
+          "http.route"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "optionalRequires": [
+          "auth.admit@1",
+          "billing.admit@1",
+          "ai.workflow-execution@1"
+        ]
+      },
+      "archive": "official.ingress-gemini-0.1.0-alpha.25-025b95a4590ddcf1f62e872af8194e4e46361c28519f6021ebb5d52eb9cb6312.tgz",
+      "sha256": "025b95a4590ddcf1f62e872af8194e4e46361c28519f6021ebb5d52eb9cb6312"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.ingress-openai-chat",
+        "category": "ingress",
+        "name": "OpenAI Chat Completions 入口",
+        "description": "接收并解析 OpenAI Chat Completions 客户端请求。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.25",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.ingress.openai-chat@1"
+        ],
+        "requires": [
+          "ai.routing@2",
+          "ai.execution@1",
+          "ai.request-limits@1"
+        ],
+        "permissions": [
+          "http.route"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "optionalRequires": [
+          "auth.admit@1",
+          "billing.admit@1",
+          "ai.workflow-execution@1"
+        ]
+      },
+      "archive": "official.ingress-openai-chat-0.1.0-alpha.25-74c222fcb83b34e5c1ae070a2b32b077a140693a569f0e912424b997b629eb7a.tgz",
+      "sha256": "74c222fcb83b34e5c1ae070a2b32b077a140693a569f0e912424b997b629eb7a"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.ingress-openai-media",
+        "category": "ingress",
+        "name": "OpenAI 媒体入口",
+        "description": "图片、视频、向量和音频接口。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.11",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.ingress.openai-media@1"
+        ],
+        "requires": [
+          "ai.routing@2",
+          "ai.execution@1",
+          "ai.request-limits@1"
+        ],
+        "permissions": [
+          "http.route"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "optionalRequires": [
+          "auth.admit@1",
+          "billing.admit@1"
+        ]
+      },
+      "archive": "official.ingress-openai-media-0.1.0-alpha.11-cf83aaf02375f0b63bfa84f7b96ad7a39e6ab84ac71cd354af0a5c906d9f28c0.tgz",
+      "sha256": "cf83aaf02375f0b63bfa84f7b96ad7a39e6ab84ac71cd354af0a5c906d9f28c0"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.ingress-openai-responses",
+        "category": "ingress",
+        "name": "OpenAI Responses 入口",
+        "description": "接收并解析 OpenAI Responses 客户端请求。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.25",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.ingress.openai-responses@1"
+        ],
+        "requires": [
+          "ai.routing@2",
+          "ai.execution@1",
+          "ai.request-limits@1"
+        ],
+        "permissions": [
+          "http.route"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "optionalRequires": [
+          "auth.admit@1",
+          "billing.admit@1",
+          "ai.workflow-execution@1"
+        ]
+      },
+      "archive": "official.ingress-openai-responses-0.1.0-alpha.25-25f3ffb248247b9983e199d93c03e9fc164c6e89f641fe7ab7ee9d4568293e47.tgz",
+      "sha256": "25f3ffb248247b9983e199d93c03e9fc164c6e89f641fe7ab7ee9d4568293e47"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.leaderboard",
+        "category": "operations",
+        "name": "整站排行榜",
+        "description": "展示用户用量榜和平台模型热度榜。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.12",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [],
+        "requires": [
+          "observability.rankings@1",
+          "users.directory@1"
+        ],
+        "permissions": [
+          "api.register"
+        ],
+        "configReload": "restart",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "ui": {
+          "title": "排行榜",
+          "entry": "dist/ui.js",
+          "public": true,
+          "path": "/leaderboard",
+          "order": 40
+        },
+        "optionalRequires": [
+          "ai.catalog@2"
+        ]
+      },
+      "archive": "official.leaderboard-0.1.0-alpha.12-6f414dfca41e9cb32a79806814bdafab7e4fc21ce738653d3285473f3807578b.tgz",
+      "sha256": "6f414dfca41e9cb32a79806814bdafab7e4fc21ce738653d3285473f3807578b"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.listener",
+        "category": "core",
+        "name": "网络监听器",
+        "description": "接收 HTTP、SSE 和 WebSocket 连接。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.5",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "listener.address@1"
+        ],
+        "requires": [],
+        "permissions": [
+          "http.listen"
+        ],
+        "configReload": "restart",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "host": {
+              "type": "string",
+              "minLength": 1
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "publicOrigin": {
+              "type": "string",
+              "pattern": "^https?://"
+            },
+            "trustedProxies": {
+              "type": "array",
+              "maxItems": 128,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            }
+          }
+        },
+        "optionalRequires": [
+          "ai.routing@2",
+          "auth.admit@1"
+        ]
+      },
+      "archive": "official.listener-0.1.0-alpha.5-aebb9927dda65e1b5cf493cb3fee21a247a26535087bc2bb0e5e69d1ee8a3030.tgz",
+      "sha256": "aebb9927dda65e1b5cf493cb3fee21a247a26535087bc2bb0e5e69d1ee8a3030"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.mailer",
+        "category": "identity",
+        "name": "邮件服务",
+        "description": "发送注册、登录及安全验证邮件。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.16",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "mail.send@1",
+          "mail.options@1"
+        ],
+        "requires": [],
+        "optionalRequires": [
+          "site.branding@1",
+          "users.lookup@1"
+        ],
+        "permissions": [
+          "api.register",
+          "secrets.read"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "secretRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              }
+            },
+            "host": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "from": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 254
+            },
+            "secure": {
+              "type": "boolean"
+            },
+            "tlsServerName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9.-]*$"
+            },
+            "allowInsecure": {
+              "type": "boolean"
+            },
+            "user": {
+              "type": "string",
+              "maxLength": 320
+            },
+            "passwordRef": {
+              "type": "string",
+              "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+            }
+          }
+        },
+        "ui": {
+          "entry": "dist/ui.js",
+          "title": "邮件发件",
+          "path": "/mailer",
+          "public": false,
+          "group": "verification-services",
+          "order": 20
+        }
+      },
+      "archive": "official.mailer-0.1.0-alpha.16-9074d3b34fd491a5a5d8f67e0f621b3f44d5a10c9f4bd99157c62ca70fe37ce9.tgz",
+      "sha256": "9074d3b34fd491a5a5d8f67e0f621b3f44d5a10c9f4bd99157c62ca70fe37ce9"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.model-catalog",
+        "category": "tools",
+        "name": "模型目录",
+        "description": "展示模型、价格和调用示例。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.27",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "entry": "dist/index.js",
+          "kind": "native"
+        },
+        "provides": [],
+        "requires": [
+          "ai.catalog@2"
+        ],
+        "permissions": [
+          "api.register"
+        ],
+        "configReload": "restart",
+        "configSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "ui": {
+          "title": "模型目录",
+          "entry": "dist/ui.js",
+          "public": true,
+          "path": "/models"
+        },
+        "optionalRequires": [
+          "observability.model-metrics@1"
+        ]
+      },
+      "archive": "official.model-catalog-0.1.0-alpha.27-d717fccf88d94515123af71280c8b55989c47d81b5175ef4acc57824c67d58f9.tgz",
+      "sha256": "d717fccf88d94515123af71280c8b55989c47d81b5175ef4acc57824c67d58f9"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.observability",
+        "category": "operations",
+        "name": "调用观测",
+        "description": "记录调用、用量、延迟和错误。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.29",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "entry": "dist/index.js",
+          "kind": "native"
+        },
+        "provides": [
+          "observability.rankings@1",
+          "observability.model-metrics@1"
+        ],
+        "requires": [],
+        "optionalRequires": [
+          "users.log-scope@1",
+          "auth.key-names@1",
+          "billing.request-charges@1",
+          "billing.request-totals@1"
+        ],
+        "permissions": [
+          "api.register",
+          "hooks.register"
+        ],
+        "configReload": "restart",
+        "configSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "retentionDays": {
+              "minimum": 1,
+              "maximum": 365,
+              "type": "integer"
+            },
+            "maxRows": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 1000000
+            }
+          },
+          "type": "object"
+        },
+        "ui": {
+          "title": "调用记录",
+          "entry": "dist/ui.js",
+          "public": true,
+          "path": "/activity"
+        }
+      },
+      "archive": "official.observability-0.1.0-alpha.29-8fb93ef16eab38ed1f98145078fcfd7272832e7d9e7b15b5859dc246f1896b5d.tgz",
+      "sha256": "8fb93ef16eab38ed1f98145078fcfd7272832e7d9e7b15b5859dc246f1896b5d"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.payments-epay",
+        "category": "commerce",
+        "name": "易支付",
+        "description": "对接易支付 V1/V2、MD5/RSA 签名。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.16",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "payments.provider@1"
+        ],
+        "requires": [
+          "commerce.payment@1",
+          "http.transport@1"
+        ],
+        "optionalRequires": [
+          "auth.admin@1"
+        ],
+        "permissions": [
+          "api.register",
+          "secrets.read"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "nextMethodId": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "version": {
+              "enum": [
+                "v1",
+                "v2"
+              ]
+            },
+            "algorithm": {
+              "enum": [
+                "MD5",
+                "RSA"
+              ]
+            },
+            "pid": {
+              "type": "string"
+            },
+            "baseUrl": {
+              "type": "string"
+            },
+            "publicUrl": {
+              "type": "string"
+            },
+            "paymentType": {
+              "enum": [
+                "alipay",
+                "wxpay",
+                "qqpay"
+              ]
+            },
+            "clientIp": {
+              "type": "string"
+            },
+            "keyRef": {
+              "type": "string",
+              "pattern": "^(?:(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)|local:[a-f0-9-]{36})$"
+            },
+            "privateKeyRef": {
+              "type": "string",
+              "pattern": "^(?:(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)|local:[a-f0-9-]{36})$"
+            },
+            "platformPublicKeyRef": {
+              "type": "string",
+              "pattern": "^(?:(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)|local:[a-f0-9-]{36})$"
+            },
+            "secretRefs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              },
+              "uniqueItems": true
+            },
+            "methods": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "paymentType"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "version": {
+                    "enum": [
+                      "v1",
+                      "v2"
+                    ]
+                  },
+                  "algorithm": {
+                    "enum": [
+                      "MD5",
+                      "RSA"
+                    ]
+                  },
+                  "pid": {
+                    "type": "string"
+                  },
+                  "baseUrl": {
+                    "type": "string"
+                  },
+                  "publicUrl": {
+                    "type": "string"
+                  },
+                  "paymentType": {
+                    "enum": [
+                      "alipay",
+                      "wxpay",
+                      "qqpay"
+                    ]
+                  },
+                  "clientIp": {
+                    "type": "string"
+                  },
+                  "keyRef": {
+                    "type": "string",
+                    "pattern": "^(?:(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)|local:[a-f0-9-]{36})$"
+                  },
+                  "privateKeyRef": {
+                    "type": "string",
+                    "pattern": "^(?:(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)|local:[a-f0-9-]{36})$"
+                  },
+                  "platformPublicKeyRef": {
+                    "type": "string",
+                    "pattern": "^(?:(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)|local:[a-f0-9-]{36})$"
+                  },
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_-]{1,128}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ui": {
+          "title": "易支付",
+          "entry": "dist/ui.js",
+          "path": "/payments-epay",
+          "public": false,
+          "group": "payment-adapters",
+          "order": 20
+        }
+      },
+      "archive": "official.payments-epay-0.1.0-alpha.16-7ede2cd611be51abe4a5e76482cfe85297eb56b47c6dedc860796f8227f82961.tgz",
+      "sha256": "7ede2cd611be51abe4a5e76482cfe85297eb56b47c6dedc860796f8227f82961"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.payments-stripe",
+        "category": "commerce",
+        "name": "Stripe 支付",
+        "description": "对接 Stripe 单次支付、订阅和回调验签。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.14",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "payments.provider@1"
+        ],
+        "requires": [
+          "commerce.payment-adjustment@1",
+          "commerce.payment@1",
+          "http.transport@1"
+        ],
+        "optionalRequires": [
+          "auth.admin@1"
+        ],
+        "permissions": [
+          "api.register",
+          "secrets.read"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "keyRef": {
+              "type": "string",
+              "pattern": "^((?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)|local:[a-f0-9-]{36})$"
+            },
+            "webhookSecretRef": {
+              "type": "string",
+              "pattern": "^((?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)|local:[a-f0-9-]{36})$"
+            },
+            "livemode": {
+              "type": "boolean"
+            },
+            "secretRefs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              },
+              "uniqueItems": true
+            },
+            "previousWebhookSecretRef": {
+              "type": "string",
+              "pattern": "^((?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)|local:[a-f0-9-]{36})$"
+            },
+            "portalEnabled": {
+              "type": "boolean"
+            },
+            "portalConfiguration": {
+              "type": "string",
+              "pattern": "^bpc_[A-Za-z0-9]+$"
+            }
+          }
+        },
+        "ui": {
+          "title": "Stripe 支付",
+          "entry": "dist/ui.js",
+          "path": "/payments-stripe",
+          "public": false,
+          "group": "payment-adapters",
+          "order": 10
+        }
+      },
+      "archive": "official.payments-stripe-0.1.0-alpha.14-a56fcdd3f3b447c1b1d9bae3b19df65ca51bee6542abb4526c1fbd35f7cefa8f.tgz",
+      "sha256": "a56fcdd3f3b447c1b1d9bae3b19df65ca51bee6542abb4526c1fbd35f7cefa8f"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.playground",
+        "category": "tools",
+        "name": "模型试用",
+        "description": "提供多轮对话、图片和视频模型试用。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.25",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "entry": "dist/index.js",
+          "kind": "native"
+        },
+        "provides": [],
+        "requires": [
+          "ai.catalog@2"
+        ],
+        "permissions": [
+          "api.register"
+        ],
+        "configReload": "restart",
+        "configSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "ui": {
+          "title": "模型试用",
+          "entry": "dist/ui.js",
+          "public": true,
+          "path": "/playground"
+        }
+      },
+      "archive": "official.playground-0.1.0-alpha.25-0274b76fc56d78eb00aeba14f37b08ccdb69125270635bf2ef137b80cdd5c672.tgz",
+      "sha256": "0274b76fc56d78eb00aeba14f37b08ccdb69125270635bf2ef137b80cdd5c672"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.rate-limit",
+        "category": "traffic",
+        "name": "请求限流",
+        "description": "按规则限制请求频率和 Token 配额。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.16",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.request-limits@1"
+        ],
+        "requires": [],
+        "optionalRequires": [],
+        "permissions": [
+          "api.register",
+          "hooks.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "user": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "rpm": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                },
+                "tpm": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                },
+                "concurrency": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                }
+              }
+            },
+            "key": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "rpm": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                },
+                "tpm": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                },
+                "concurrency": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                }
+              }
+            },
+            "channels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "rpm": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000000
+                  },
+                  "tpm": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000000
+                  },
+                  "concurrency": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000000
+                  }
+                }
+              }
+            },
+            "bytesPerSecond": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
+            }
+          }
+        },
+        "ui": {
+          "title": "全局请求限制",
+          "entry": "dist/ui.js",
+          "path": "/rate-limit",
+          "public": false,
+          "group": "channel-settings",
+          "order": 10
+        }
+      },
+      "archive": "official.rate-limit-0.1.0-alpha.16-950bf808b2a2f3e7d08a27bd508d2a14da554427984adcf9fb1fc12935c85993.tgz",
+      "sha256": "950bf808b2a2f3e7d08a27bd508d2a14da554427984adcf9fb1fc12935c85993"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.tickets",
+        "category": "operations",
+        "name": "工单与支持",
+        "description": "提供用户工单、客服回复与处理状态管理。",
+        "version": "0.1.0-alpha.14",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "codeReload": "restart",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [],
+        "requires": [
+          "users.lookup@1"
+        ],
+        "optionalRequires": [],
+        "permissions": [
+          "api.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxOpenPerUser": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "dailyCreateLimit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "hourlyMessageLimit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          }
+        },
+        "ui": {
+          "title": "我的工单",
+          "entry": "dist/ui.js",
+          "path": "/tickets",
+          "public": true,
+          "pages": [
+            {
+              "title": "工单管理",
+              "path": "/settings/tickets",
+              "group": "system",
+              "order": 40,
+              "public": false
+            }
+          ]
+        }
+      },
+      "archive": "official.tickets-0.1.0-alpha.14-ee1a7f743a06987171af8b5cd9759cb47852d96101cc85b63b61f8b94ca55382.tgz",
+      "sha256": "ee1a7f743a06987171af8b5cd9759cb47852d96101cc85b63b61f8b94ca55382"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.token-speed",
+        "category": "traffic",
+        "name": "输出速度控制",
+        "description": "限制单个请求的输出 Token 速度。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.13",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.output-pace@2"
+        ],
+        "requires": [],
+        "optionalRequires": [],
+        "permissions": [
+          "api.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "tokenizer"
+              ],
+              "properties": {
+                "tps": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000000
+                },
+                "aggregateTps": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000000
+                },
+                "tokenizer": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                }
+              }
+            },
+            "models": {
+              "type": "array",
+              "maxItems": 512,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "tokenizer",
+                  "channel",
+                  "model"
+                ],
+                "properties": {
+                  "tps": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000000
+                  },
+                  "aggregateTps": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000000
+                  },
+                  "tokenizer": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "channel": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              }
+            },
+            "tokenizers": {
+              "type": "object",
+              "additionalProperties": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "encoding"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "tiktoken"
+                      },
+                      "encoding": {
+                        "enum": [
+                          "cl100k_base",
+                          "o200k_base"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "tokenizerPath",
+                      "configPath"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "huggingface"
+                      },
+                      "tokenizerPath": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "configPath": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "maxTrackedChars": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 1000000
+            },
+            "quantumTokens": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 128
+            }
+          }
+        },
+        "ui": {
+          "entry": "dist/ui.js",
+          "title": "默认输出速度",
+          "path": "/token-speed",
+          "public": false,
+          "group": "channel-settings",
+          "order": 20
+        }
+      },
+      "archive": "official.token-speed-0.1.0-alpha.13-1cfbda0e066d1a9b3892ee401069cf5333fb26c9186cc1c0a9650cc5636e92fe.tgz",
+      "sha256": "1cfbda0e066d1a9b3892ee401069cf5333fb26c9186cc1c0a9650cc5636e92fe"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.turnstile",
+        "category": "identity",
+        "name": "人机验证",
+        "description": "提供 Turnstile、reCAPTCHA、hCaptcha 与极验人机验证。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.17",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "captcha.options@1",
+          "captcha.verify@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "permissions": [
+          "api.register",
+          "secrets.read"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "secretRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              }
+            },
+            "siteKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "secretRef": {
+              "type": "string",
+              "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+            },
+            "hostnames": {
+              "type": "array",
+              "uniqueItems": true,
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253,
+                "pattern": "^[a-zA-Z0-9.-]+$"
+              }
+            },
+            "provider": {
+              "type": "string",
+              "enum": [
+                "turnstile",
+                "recaptcha",
+                "hcaptcha",
+                "geetest"
+              ]
+            },
+            "recaptchaVersion": {
+              "type": "string",
+              "enum": [
+                "v2",
+                "v3"
+              ]
+            },
+            "recaptchaDomain": {
+              "type": "string",
+              "enum": [
+                "www.google.com",
+                "www.recaptcha.net"
+              ]
+            },
+            "minScore": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "ui": {
+          "entry": "dist/ui.js",
+          "title": "人机验证",
+          "path": "/turnstile",
+          "public": false,
+          "group": "verification-services",
+          "order": 30
+        }
+      },
+      "archive": "official.turnstile-0.1.0-alpha.17-b1ebf3df730c721de1b1bd046a14aa4c558bb33fdb94bc9ce3e8eb2587b68208.tgz",
+      "sha256": "b1ebf3df730c721de1b1bd046a14aa4c558bb33fdb94bc9ce3e8eb2587b68208"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.upstream-anthropic",
+        "category": "upstream",
+        "name": "Anthropic Messages 上游",
+        "description": "调用 Anthropic Messages 兼容服务并解析结果。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.20",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.upstream.anthropic@1",
+          "ai.upstream-models.anthropic@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "permissions": [
+          "secrets.read"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secretRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              }
+            }
+          }
+        },
+        "optionalRequires": [
+          "credentials.resolve@1"
+        ]
+      },
+      "archive": "official.upstream-anthropic-0.1.0-alpha.20-9ae85d5b504989e01184503977be6e3d203ad8afb9f8ead6cb0fe3343939b0d8.tgz",
+      "sha256": "9ae85d5b504989e01184503977be6e3d203ad8afb9f8ead6cb0fe3343939b0d8"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.upstream-antigravity",
+        "category": "upstream",
+        "name": "Antigravity 订阅接入",
+        "description": "管理 Antigravity 授权、订阅账号与上游调用。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.36",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.upstream.antigravity@1",
+          "ai.subscription.antigravity@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "optionalRequires": [
+          "credentials.resolve@1"
+        ],
+        "permissions": [
+          "secrets.read",
+          "api.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "masterKeyRef": {
+              "type": "string",
+              "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+            },
+            "secretRefs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              },
+              "uniqueItems": true
+            },
+            "oauth": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "antigravity": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "authorizeUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "tokenUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "clientId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "redirectUri": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "scope": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "clientSecretRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048,
+                      "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ui": {
+          "title": "Antigravity 订阅",
+          "entry": "dist/ui.js",
+          "path": "/settings/subscriptions/antigravity",
+          "public": false,
+          "group": "routing",
+          "order": 25
+        }
+      },
+      "archive": "official.upstream-antigravity-0.1.0-alpha.36-a7ab0df5439ac5370463b1f82851931f8daf26f7e3ecd27f479476248caead1b.tgz",
+      "sha256": "a7ab0df5439ac5370463b1f82851931f8daf26f7e3ecd27f479476248caead1b"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.upstream-claude-subscription",
+        "category": "upstream",
+        "name": "Claude 订阅接入",
+        "description": "管理 Claude 授权、订阅账号与上游调用。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.35",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.upstream.claude-subscription@1",
+          "ai.subscription.claude-subscription@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "optionalRequires": [
+          "credentials.resolve@1"
+        ],
+        "permissions": [
+          "secrets.read",
+          "api.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "masterKeyRef": {
+              "type": "string",
+              "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+            },
+            "secretRefs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              },
+              "uniqueItems": true
+            },
+            "oauth": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "claude-subscription": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "authorizeUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "tokenUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "clientId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "redirectUri": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "scope": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "clientSecretRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048,
+                      "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ui": {
+          "title": "Claude 订阅",
+          "entry": "dist/ui.js",
+          "path": "/settings/subscriptions/claude-subscription",
+          "public": false,
+          "group": "routing",
+          "order": 25
+        }
+      },
+      "archive": "official.upstream-claude-subscription-0.1.0-alpha.35-37965bf05bd338605dc84cad1c9f250369290fc29ffdaac658efb392f8357de1.tgz",
+      "sha256": "37965bf05bd338605dc84cad1c9f250369290fc29ffdaac658efb392f8357de1"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.upstream-codex",
+        "category": "upstream",
+        "name": "Codex 订阅接入",
+        "description": "管理 Codex 授权、订阅账号与上游调用。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.35",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.upstream.codex@1",
+          "ai.subscription.codex@1",
+          "ai.media.codex@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "optionalRequires": [
+          "credentials.resolve@1"
+        ],
+        "permissions": [
+          "secrets.read",
+          "api.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "masterKeyRef": {
+              "type": "string",
+              "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+            },
+            "secretRefs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              },
+              "uniqueItems": true
+            },
+            "oauth": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "codex": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "authorizeUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "tokenUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "clientId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "redirectUri": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "scope": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "clientSecretRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048,
+                      "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ui": {
+          "title": "Codex 订阅",
+          "entry": "dist/ui.js",
+          "path": "/settings/subscriptions/codex",
+          "public": false,
+          "group": "routing",
+          "order": 25
+        }
+      },
+      "archive": "official.upstream-codex-0.1.0-alpha.35-eea9703135d361f82369731670a219d7f2a9ec5a47599f4ccf9f815b6b237046.tgz",
+      "sha256": "eea9703135d361f82369731670a219d7f2a9ec5a47599f4ccf9f815b6b237046"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.upstream-gemini",
+        "category": "upstream",
+        "name": "Gemini 上游",
+        "description": "调用 Gemini 兼容服务并解析结果。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.20",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.upstream.gemini@1",
+          "ai.upstream-models.gemini@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "permissions": [
+          "secrets.read"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secretRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              }
+            }
+          }
+        },
+        "optionalRequires": [
+          "credentials.resolve@1"
+        ]
+      },
+      "archive": "official.upstream-gemini-0.1.0-alpha.20-43dd7f9c235fc1e46f3273d2768cf05dc8d4f2cee62d2dbedf1bdb440e90b3f5.tgz",
+      "sha256": "43dd7f9c235fc1e46f3273d2768cf05dc8d4f2cee62d2dbedf1bdb440e90b3f5"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.upstream-grok",
+        "category": "upstream",
+        "name": "Grok 订阅接入",
+        "description": "Grok 授权、订阅账号与上游调用。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.14",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.upstream.grok@1",
+          "ai.subscription.grok@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "optionalRequires": [
+          "credentials.resolve@1"
+        ],
+        "permissions": [
+          "secrets.read",
+          "api.register"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "masterKeyRef": {
+              "type": "string",
+              "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+            },
+            "secretRefs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "ui": {
+          "title": "Grok 订阅",
+          "entry": "dist/ui.js",
+          "path": "/settings/subscriptions/grok",
+          "public": false,
+          "group": "routing",
+          "order": 28
+        }
+      },
+      "archive": "official.upstream-grok-0.1.0-alpha.14-167007219d5a3d56ecc00c26cdf3d911068313539a97eb77c95ab2861a7822fd.tgz",
+      "sha256": "167007219d5a3d56ecc00c26cdf3d911068313539a97eb77c95ab2861a7822fd"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.upstream-openai-chat",
+        "category": "upstream",
+        "name": "OpenAI Chat Completions 上游",
+        "description": "调用 OpenAI Chat Completions 兼容服务并解析结果。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.20",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.upstream.openai-chat@1",
+          "ai.upstream-models.openai-chat@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "permissions": [
+          "secrets.read"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secretRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              }
+            }
+          }
+        },
+        "optionalRequires": [
+          "credentials.resolve@1"
+        ]
+      },
+      "archive": "official.upstream-openai-chat-0.1.0-alpha.20-853b6654b143393030f91fb7ce0f7abab0e96c1b34e3a7b502059088930155e6.tgz",
+      "sha256": "853b6654b143393030f91fb7ce0f7abab0e96c1b34e3a7b502059088930155e6"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.upstream-openai-media",
+        "category": "upstream",
+        "name": "OpenAI 媒体上游",
+        "description": "图片、视频、向量和音频接口。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.9",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.media.openai-chat@1",
+          "ai.media.openai-responses@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "permissions": [
+          "secrets.read"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secretRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              }
+            }
+          }
+        },
+        "optionalRequires": [
+          "credentials.resolve@1"
+        ]
+      },
+      "archive": "official.upstream-openai-media-0.1.0-alpha.9-948893cff4c5ed00cf160c1b9a539769fd075765ecf1d46c35e9983f368f0a9b.tgz",
+      "sha256": "948893cff4c5ed00cf160c1b9a539769fd075765ecf1d46c35e9983f368f0a9b"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.upstream-openai-responses",
+        "category": "upstream",
+        "name": "OpenAI Responses 上游",
+        "description": "调用 OpenAI Responses 兼容服务并解析结果。",
+        "codeReload": "parallel",
+        "version": "0.1.0-alpha.20",
+        "host": ">=0.1.0-alpha.16 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "ai.upstream.openai-responses@1",
+          "ai.upstream-models.openai-responses@1"
+        ],
+        "requires": [
+          "http.transport@1"
+        ],
+        "permissions": [
+          "secrets.read"
+        ],
+        "configReload": "snapshot",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secretRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^(?:env:[A-Z][A-Z0-9_]*|secret:[A-Za-z0-9][A-Za-z0-9_.-]*)$"
+              }
+            }
+          }
+        },
+        "optionalRequires": [
+          "credentials.resolve@1"
+        ]
+      },
+      "archive": "official.upstream-openai-responses-0.1.0-alpha.20-e729f093c8559cb05cdc46b607b7279139360a6015e8cbd7f2a67c6e9c93c7eb.tgz",
+      "sha256": "e729f093c8559cb05cdc46b607b7279139360a6015e8cbd7f2a67c6e9c93c7eb"
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "official.users",
+        "category": "identity",
+        "name": "用户管理",
+        "description": "维护用户资料、管理员权限和启用状态。",
+        "codeReload": "restart",
+        "version": "0.1.0-alpha.22",
+        "host": ">=0.1.0-alpha.1 <0.2.0-0",
+        "runtime": {
+          "kind": "native",
+          "entry": "dist/index.js"
+        },
+        "provides": [
+          "users.lookup@1",
+          "users.manage@1",
+          "users.directory@1",
+          "users.log-scope@1"
+        ],
+        "requires": [],
+        "permissions": [
+          "api.register"
+        ],
+        "configReload": "restart",
+        "configSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "ui": {
+          "entry": "dist/ui.js",
+          "title": "用户管理",
+          "path": "/users",
+          "public": false
+        },
+        "optionalRequires": [
+          "auth.admin@1"
+        ]
+      },
+      "archive": "official.users-0.1.0-alpha.22-0fe8f220b14ad8dab177c33545592155dd730a1f8fb6f1f3cfc2eeb1ca17a881.tgz",
+      "sha256": "0fe8f220b14ad8dab177c33545592155dd730a1f8fb6f1f3cfc2eeb1ca17a881"
+    }
+  ]
+}
