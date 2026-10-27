@@ -6,6 +6,188 @@ import { fixture } from "./helpers.js";
 
 const api = "/api/plugins/official.byok",
   auth = "/api/plugins/official.auth";
+
+it("enforces personal-channel permissions after resolving typed inputs", async () => {
+  const f = await fixture(
+    [
+      "users",
+      "auth",
+      "ai-router",
+      "byok",
+      "rate-limit",
+      "http-transport",
+      "upstream-openai-chat",
+    ],
+    { "upstream-openai-chat": { secretRefs: [] } },
+  );
+  try {
+    const admin = await f.admin();
+    const flow = {
+      entry: "s",
+      nodes: [
+        { id: "s", type: "start", next: "condition" },
+        {
+          id: "condition",
+          type: "condition",
+          test: "model",
+          models: ["demo"],
+          yes: "limit",
+          no: "limit",
+        },
+        { id: "limit", type: "rateLimit", rule: {}, next: "call" },
+        { id: "call", type: "provider" },
+        { id: "rpm", type: "value", valueType: "integer", value: 60 },
+        {
+          id: "model",
+          type: "value",
+          valueType: "string",
+          value: "provider-model",
+        },
+      ],
+      bindings: [
+        { source: "rpm", output: "value", target: "limit", input: "rule.rpm" },
+        { source: "model", output: "value", target: "call", input: "model" },
+      ],
+    };
+    const created = await f.request(
+      api + "/personal-channels",
+      "POST",
+      {
+        name: "Typed personal",
+        preset: "custom",
+        protocol: "openai-chat",
+        baseUrl: "https://api.example.com/v1",
+        key: "personal-test-key",
+        models: { demo: { model: "provider-model" } },
+        flow,
+      },
+      admin,
+    );
+    expect(created.status, await created.clone().text()).toBe(201);
+    const channel = (await created.json()) as any;
+    const preview = await f.request(
+      api + "/personal-channels/preview",
+      "POST",
+      {
+        id: channel.id,
+        request: {
+          model: "demo",
+          messages: [{ role: "user", text: "hi" }],
+          tools: [],
+          stream: false,
+        },
+      },
+      admin,
+    );
+    expect(preview.status, await preview.clone().text()).toBe(200);
+    expect(await preview.json()).toMatchObject({
+      providerId: "call",
+      requestLimits: [{ node: "limit", rule: { rpm: 60 } }],
+    });
+
+    const invalidModel = structuredClone(channel);
+    invalidModel.flow.nodes.find((node: any) => node.id === "model").value =
+      "unauthorized-model";
+    const deniedModel = await f.request(
+      api + "/personal-channels",
+      "PUT",
+      invalidModel,
+      admin,
+    );
+    expect(deniedModel.status, await deniedModel.clone().text()).toBe(400);
+
+    const invalidGroup = structuredClone(channel);
+    invalidGroup.flow = {
+      entry: "s",
+      nodes: [
+        { id: "s", type: "start", next: "group" },
+        { id: "group", type: "platform", groupId: "default" },
+        {
+          id: "group-value",
+          type: "value",
+          valueType: "string",
+          value: "unavailable-group",
+        },
+      ],
+      bindings: [
+        {
+          source: "group-value",
+          output: "value",
+          target: "group",
+          input: "groupId",
+        },
+      ],
+    };
+    const deniedGroup = await f.request(
+      api + "/personal-channels",
+      "PUT",
+      invalidGroup,
+      admin,
+    );
+    expect(deniedGroup.status, await deniedGroup.clone().text()).toBe(403);
+
+    const invalidInterface = structuredClone(channel);
+    invalidInterface.interfaces = [
+      {
+        incoming: ["openai-chat"],
+        protocol: "openai-chat",
+        path: "/v1/chat/completions",
+      },
+    ];
+    invalidInterface.flow = {
+      entry: "s",
+      nodes: [
+        { id: "s", type: "start", next: "call" },
+        { id: "call", type: "provider" },
+        {
+          id: "path",
+          type: "value",
+          valueType: "string",
+          value: "//invalid.example",
+        },
+      ],
+      bindings: [
+        {
+          source: "path",
+          output: "value",
+          target: "call",
+          input: "interfaces.0.path",
+        },
+      ],
+    };
+    const deniedInterface = await f.request(
+      api + "/personal-channels",
+      "PUT",
+      invalidInterface,
+      admin,
+    );
+    expect(deniedInterface.status, await deniedInterface.clone().text()).toBe(
+      400,
+    );
+
+    const invalidSecret = structuredClone(channel);
+    invalidSecret.flow.nodes.push({
+      id: "secret",
+      type: "value",
+      valueType: "secret",
+      secretRef: "must-not-be-persisted",
+    });
+    const deniedSecret = await f.request(
+      api + "/personal-channels",
+      "PUT",
+      invalidSecret,
+      admin,
+    );
+    expect(deniedSecret.status, await deniedSecret.clone().text()).toBe(400);
+    const after = await (
+      await f.request(api + "/personal-channels", "GET", undefined, admin)
+    ).json();
+    expect(JSON.stringify(after)).not.toContain("must-not-be-persisted");
+  } finally {
+    await f.close();
+  }
+});
+
 async function setup() {
   const sent: any[] = [];
   let disconnected = false;
