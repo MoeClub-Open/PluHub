@@ -24,8 +24,9 @@ it("validates and persists verification services and policies in one transaction
     });
     Object.assign(drafts.turnstile!, {
       enabled: true,
+      provider: "hcaptcha",
       siteKey: "test-only-site-key",
-      secretRef: "env:TEST_VERIFICATION_SECRET",
+      secretRef: "secret:TEST_VERIFICATION_SECRET",
       hostnames: ["localhost"],
     });
     Object.assign(drafts.auth!, {
@@ -41,7 +42,17 @@ it("validates and persists verification services and policies in one transaction
     expect(
       JSON.parse(saved).plugins.find((p: any) => /[\\/]turnstile$/.test(p.path))
         .config.secretRefs,
-    ).toEqual(["env:TEST_VERIFICATION_SECRET"]);
+    ).toEqual(["secret:TEST_VERIFICATION_SECRET"]);
+    const options = (await (
+      await f.request("/api/plugins/official.auth/options")
+    ).json()) as any;
+    expect(options.captchaProvider).toEqual({
+      enabled: true,
+      provider: "hcaptcha",
+      siteKey: "test-only-site-key",
+    });
+    expect(options.turnstile).toBeUndefined();
+    expect(JSON.stringify(options)).not.toContain("TEST_VERIFICATION_SECRET");
     const invalid = structuredClone(config);
     invalid.plugins.find((p: any) => /[\\/]mailer$/.test(p.path)).config.host =
       "remote.example";
