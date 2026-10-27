@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { verifyBackupBundle } from "./verify-backup-bundle.mjs";
+import { defaultEnabledPluginNames } from "../apps/cli/dist/presets.js";
 const docker = process.env.PLUHUB_DOCKER ?? "docker";
 const image = process.env.PLUHUB_DOCKER_IMAGE ?? "pluhub:local";
 const name = "pluhub-verify-" + Date.now();
@@ -140,7 +141,11 @@ try {
   const installed = await (
     await request("/api/host/plugins", { headers: { cookie } })
   ).json();
-  assert.equal(installed.filter((p) => p.state === "Active").length, 17);
+  const activePlugins = installed.filter((p) => p.state === "Active");
+  assert.deepEqual(
+    activePlugins.map((p) => p.id).sort(),
+    defaultEnabledPluginNames.map((id) => "official." + id).sort(),
+  );
   for (const id of [
     "billing",
     "commerce",
@@ -152,17 +157,17 @@ try {
     "mailer",
     "turnstile",
     "auto-router",
-    "rate-limit",
     "token-speed",
     "upstream-codex",
     "upstream-claude-subscription",
     "upstream-antigravity",
+    "upstream-grok",
   ])
     assert.notEqual(
       installed.find((p) => p.id === "official." + id)?.state,
       "Active",
     );
-  report.defaultActivePlugins = 17;
+  report.defaultActivePlugins = activePlugins.length;
   const key = await (
     await request("/api/plugins/official.auth/keys", {
       method: "POST",
