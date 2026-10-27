@@ -120,5 +120,5 @@ jobs:
             PluHub/output/docker-smoke.json
             PluHub/output/backup-manager-smoke.json
             PluHub/output/packages/RELEASE_LOCK.json
-            PluHub/output/registry/v1/index.json
+            PluHub/output/registry/index.json
           if-no-files-found: warn
