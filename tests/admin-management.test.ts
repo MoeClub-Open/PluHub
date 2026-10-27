@@ -175,7 +175,12 @@ it("enforces administrator channel blocks independently of user settings, creden
     const binding = await f.request(
       auth + "/keys",
       "PUT",
-      { id: alice.key.id, name: "Admin-bound key", channelIds: [channel.id] },
+      {
+        id: alice.key.id,
+        name: "Admin-bound key",
+        groupId: null,
+        channelIds: [channel.id],
+      },
       alice.cookie,
     );
     expect(binding.status).toBe(200);
@@ -284,7 +289,7 @@ it("enforces administrator channel blocks independently of user settings, creden
 });
 
 it("exposes safe account facts and supports password, sessions, factors and roles without removing the last administrator", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin(),
       alice = await account(f, admin, "recover-user");
@@ -423,7 +428,7 @@ it("exposes safe account facts and supports password, sessions, factors and role
 });
 
 it("records successful and failed management actions durably without bodies, credentials or duplicate audit rows", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin(),
       alice = await account(f, admin, "audited-user");
@@ -595,6 +600,8 @@ it("queries all financial facts, retries verified credits once and serializes ow
   process.env.PLUHUB_ADMIN_STRIPE_KEY = "mock-stripe-key";
   let cancels = 0;
   (globalThis as any).__pluhubAdminTransport = async (input: any) => {
+    if (input.url.endsWith("/customers"))
+      return Response.json({ id: "cus_admin_test" });
     if (input.url.endsWith("/checkout/sessions"))
       return Response.json({ url: "https://checkout.stripe.com/mock" });
     if (input.url.endsWith("/subscriptions/sub_admin")) {

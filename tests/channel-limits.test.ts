@@ -309,7 +309,7 @@ it("rejects missing limit capabilities and malformed rules before applying confi
       ).toThrow();
     }
     await expect(f.kernel.stop("official.rate-limit")).rejects.toThrow(
-      /请求限流/,
+      /Required by enabled plugins/,
     );
     const response = await f.invoke(true);
     expect(response.status).toBe(200);

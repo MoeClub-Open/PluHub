@@ -3,7 +3,7 @@ import { fixture } from "./helpers.js";
 import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 it("supports sessions, users, own API keys, revocation, disabling and persistent data", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin();
     const malformed = await f.kernel.fetch(

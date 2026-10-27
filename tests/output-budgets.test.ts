@@ -164,6 +164,7 @@ async function budgetFixture(
       "billing",
       "ai-router",
       "observability",
+      "rate-limit",
       "ingress-" + ingress,
       "upstream-" + target,
     ],

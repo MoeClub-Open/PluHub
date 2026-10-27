@@ -24,6 +24,8 @@ async function setup() {
   (globalThis as any).__pluhubFinanceTransport = (input: any) => {
     const url = new URL(input.url);
     requests.push(url.pathname + url.search);
+    if (url.pathname === "/v1/customers")
+      return Response.json({ id: "cus_local_" + ++counter });
     if (url.pathname === "/v1/checkout/sessions")
       return Response.json({ url: "https://checkout.stripe.com/c/pay/local" });
     if (url.pathname === "/v1/invoice_payments") {

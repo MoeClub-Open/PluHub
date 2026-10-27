@@ -244,7 +244,7 @@ it("routes media JSON, multipart and binary through auth, channel bindings, logs
       { model: "model0", prompt: "cat" },
       { authorization },
     );
-    expect(forbidden.status).toBe(404);
+    expect(forbidden.status).toBe(400);
     const unauthenticated = await f.request("/v1/embeddings", "POST", {
       model: "model0",
       input: "hello",

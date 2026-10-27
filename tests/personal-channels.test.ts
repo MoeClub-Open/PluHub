@@ -314,6 +314,13 @@ async function setup() {
     byok: { allowedPrivateOrigins: [origin] },
     billing: { enabled: true },
     "ai-router": {
+      groups: {
+        presetOnly: {
+          name: "Preset only",
+          multiplier: 1,
+          channelIds: ["preset"],
+        },
+      },
       upstreams: {
         preset: {
           protocol: "openai-chat",
@@ -507,8 +514,8 @@ it("creates isolated preset/custom channels and binds keys for actual JSON/SSE c
     );
     const channel = await f.channel();
     expect(channel.models.demo).toMatchObject({
-      inputMultiplier: 1,
-      outputMultiplier: 1,
+      inputPrice: 2.5,
+      outputPrice: 10,
     });
     expect(JSON.stringify(channel)).not.toContain("alice-upstream-secret");
     expect(
@@ -638,7 +645,7 @@ it("rejects cross-user binding, header overrides, revoked credentials, disabled/
     expect(
       (await f.invoke(bobKey.token, false, { "x-pluhub-channel": channel.id }))
         .status,
-    ).toBe(404);
+    ).toBe(403);
     expect(f.sent).toHaveLength(0);
     const disabledResponse = await f.request(
       api + "/personal-channels",
@@ -733,12 +740,14 @@ it("previews new-api prices/models, preserves unknown/free prices, updates crede
     expect(update.status).toBe(200);
     const changed = await update.json();
     expect(changed.models.demo).toMatchObject({
-      inputMultiplier: null,
-      outputMultiplier: null,
+      model: "other-model",
+      pricingSource: "manual",
     });
+    expect(changed.models.demo).not.toHaveProperty("inputPrice");
+    expect(changed.models.demo).not.toHaveProperty("outputPrice");
     expect(changed.models.free).toMatchObject({
-      inputMultiplier: 1,
-      outputMultiplier: 1,
+      inputPrice: 0,
+      outputPrice: 0,
     });
     await f.kernel.shutdown();
     await f.kernel.start();
@@ -793,9 +802,9 @@ it("runs personal channel graphs, enforces platform bindings and cancels an upst
         { role: "user", content: "hello" },
       ],
     });
-    const platformKey = await f.key(f.alice, { channelIds: ["preset"] });
+    const platformKey = await f.key(f.alice, { groupId: "presetOnly" });
     const forbidden = await f.invoke(platformKey.token, false, {}, "second");
-    expect(forbidden.status).toBe(403);
+    expect(forbidden.status).toBe(404);
     await forbidden.text();
     const models = await (
       await f.request("/v1/models", "GET", undefined, {
@@ -832,8 +841,8 @@ it("calculates input/output consumption from original prices, keeps catalog orig
     expect(channel.models.demo).toMatchObject({
       inputPrice: 10,
       outputPrice: 40,
-      inputMultiplier: 0.25,
-      outputMultiplier: 0.2,
+      upstreamInputPrice: 2.5,
+      upstreamOutputPrice: 8,
     });
     const key = await f.key(f.alice, { channelIds: [channel.id] });
     const catalog = await (
@@ -867,7 +876,17 @@ it("calculates input/output consumption from original prices, keeps catalog orig
     const manual = await f.request(
       api + "/personal-channels",
       "PUT",
-      { ...channel, consumptionMode: "manual", consumptionMultiplier: 0.3 },
+      {
+        ...channel,
+        models: {
+          ...channel.models,
+          demo: {
+            ...channel.models.demo,
+            upstreamInputPrice: 3,
+            upstreamOutputPrice: 12,
+          },
+        },
+      },
       f.alice.cookie,
     );
     expect(manual.status).toBe(200);
@@ -875,8 +894,8 @@ it("calculates input/output consumption from original prices, keeps catalog orig
     expect(updated.models.demo).toMatchObject({
       inputPrice: 10,
       outputPrice: 40,
-      inputMultiplier: 0.3,
-      outputMultiplier: 0.3,
+      upstreamInputPrice: 3,
+      upstreamOutputPrice: 12,
     });
     expect(
       await f.kernel.invoke("ai.routing@2", {

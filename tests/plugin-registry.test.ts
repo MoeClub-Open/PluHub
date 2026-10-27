@@ -329,7 +329,7 @@ it("blocks unsafe networks, credentials, insecure public HTTP and oversized down
 it("requires an administrator session and explicit permission review for online installation", async () => {
   const r = await harness();
   vi.stubEnv("PLUHUB_PLUGIN_CATALOG", r.catalog);
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     await r.add("test.online", "1.0.0", { permissions: ["secrets.read"] });
     vi.stubEnv("PLUHUB_PLUGIN_CATALOG", r.catalog);
@@ -402,7 +402,7 @@ it("requires an administrator session and explicit permission review for online 
 it("detects changed registry plans and hot-updates an eligible plugin", async () => {
   const r = await harness();
   vi.stubEnv("PLUHUB_PLUGIN_CATALOG", r.catalog);
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     await r.add("test.online", "1.0.0", {
       codeReload: "parallel",
@@ -543,7 +543,7 @@ it("recovers interrupted updates and refuses stale pending configurations", asyn
 it("stages restart updates without changing live code or exposing configuration, and supports cancellation", async () => {
   const r = await harness();
   vi.stubEnv("PLUHUB_PLUGIN_CATALOG", r.catalog);
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin();
     for (const version of ["1.0.0", "1.1.0"])

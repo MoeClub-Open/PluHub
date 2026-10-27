@@ -210,7 +210,7 @@ it("settles native search once for JSON and split SSE, preserving references and
       await f.request(
         "/api/plugins/official.auth/keys",
         "POST",
-        { name: "search", channelIds: ["1"] },
+        { name: "search", groupId: "default" },
         admin,
       )
     ).json();

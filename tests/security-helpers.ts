@@ -112,7 +112,14 @@ export async function securityFixture(branding?: Record<string, unknown>) {
   process.env.PLUHUB_TEST_TURNSTILE = "local-test-secret";
   let validations = 0;
   const f = await fixture(
-    ["users", "auth", "mailer", "turnstile", ...(branding ? ["console"] : [])],
+    [
+      "users",
+      "auth",
+      "ai-router",
+      "mailer",
+      "turnstile",
+      ...(branding ? ["console"] : []),
+    ],
     {
       console: { branding },
       auth: {

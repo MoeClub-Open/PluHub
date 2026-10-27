@@ -6,7 +6,9 @@ import { fixture } from "./helpers.js";
 import { createKernel, readConfig } from "../packages/control/dist/index.js";
 const api = "/api/plugins/official.tickets";
 async function setup(config: Record<string, unknown> = {}) {
-  const f = await fixture(["users", "auth", "tickets"], { tickets: config });
+  const f = await fixture(["users", "auth", "ai-router", "tickets"], {
+    tickets: config,
+  });
   const admin = await f.admin();
   async function user(username: string) {
     const value = await f.kernel.invoke<any>("users.manage@1", {

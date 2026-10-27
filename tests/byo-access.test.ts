@@ -27,6 +27,7 @@ async function setup() {
       "auth",
       "billing",
       "observability",
+      "rate-limit",
       "ai-router",
       "byok",
       ...["openai-chat", "openai-responses", "anthropic", "gemini"].flatMap(

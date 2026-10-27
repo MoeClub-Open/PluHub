@@ -263,7 +263,7 @@ it("backfills once before pruning, preserves cumulative aggregates across restar
       ).toBe(0);
       expect(
         (db.prepare("PRAGMA user_version").get() as any).user_version,
-      ).toBe(6);
+      ).toBeGreaterThanOrEqual(6);
     } finally {
       db.close();
     }

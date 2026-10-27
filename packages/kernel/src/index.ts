@@ -1703,9 +1703,9 @@ export class Kernel {
               if (bodyClosed) return;
               if (item.done) {
                 bodyClosed = true;
-                controller.close();
                 context.signal.removeEventListener("abort", abort);
                 await finish();
+                controller.close();
               } else controller.enqueue(item.value);
             } catch (error) {
               context.state.set("http.errorCode", "stream_error");
@@ -1720,10 +1720,13 @@ export class Kernel {
                 );
               if (!bodyClosed) {
                 bodyClosed = true;
+                context.signal.removeEventListener("abort", abort);
+                await finish();
                 controller.error(error);
+              } else {
+                context.signal.removeEventListener("abort", abort);
+                await finish();
               }
-              context.signal.removeEventListener("abort", abort);
-              await finish();
             }
           },
           cancel: async (reason) => {

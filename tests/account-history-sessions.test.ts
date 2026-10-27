@@ -104,7 +104,7 @@ it("searches and paginates the full wallet ledger, isolates owners and exports e
 });
 
 it("lists revocable device sessions without exposing token hashes and enforces ownership and recent authentication", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin();
     const create = await f.request(
@@ -220,7 +220,7 @@ it("lists revocable device sessions without exposing token hashes and enforces o
 });
 
 it("caps active devices and allows a signed-in user to recover by revoking other sessions", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin(),
       me = await (
@@ -265,7 +265,7 @@ it("caps active devices and allows a signed-in user to recover by revoking other
 });
 
 it("exports only the current log scope, rejects oversized exports, and bounds retained request history", async () => {
-  const f = await fixture(["users", "auth", "observability"]);
+  const f = await fixture(["users", "auth", "ai-router", "observability"]);
   try {
     const admin = await f.admin();
     const company = await f.kernel.invoke<any>("users.manage@1", {
@@ -366,7 +366,7 @@ it("exports only the current log scope, rejects oversized exports, and bounds re
 });
 
 it("verifies restored SQLite data offline and rejects corrupted databases without repairing them", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     await f.admin();
     await f.kernel.shutdown();
@@ -388,7 +388,7 @@ it("verifies restored SQLite data offline and rejects corrupted databases withou
 });
 
 it("requires an exact browser origin for secure-cookie mutations while preserving API key calls", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin();
     f.kernel.configure({ "official.auth": { secureCookie: true } });

@@ -115,7 +115,7 @@ it("rejects unsupported site languages atomically in OOBE and management without
       defaultLanguage: "en-US",
       description: "AI model service",
     });
-    expect(published.portal.title).toBe("AI model service");
+    expect(published.portal.title).toBe("AI models.\nFor chat and API.");
     expect(published.portal.primaryLabel).toBe("Browse models");
     expect(await (await f.request("/api/host/setup")).json()).toEqual({
       required: false,

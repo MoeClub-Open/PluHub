@@ -38,7 +38,7 @@
     },
     {
       "path": "../PluHub-Plugins/plugins/ai-router",
-      "grants": ["api.register", "http.route"],
+      "grants": ["api.register", "http.route", "http.dispatch", "http.dispatch.child", "secrets.read", "hooks.register"],
       "config": {
         "upstreams": {},
         "models": {}
@@ -157,15 +157,14 @@
     },
     {
       "path": "../PluHub-Plugins/plugins/byok",
-      "grants": ["api.register", "secrets.read"],
+      "grants": ["api.register", "secrets.read", "http.dispatch"],
       "config": {},
       "enabled": false
     },
     {
       "path": "../PluHub-Plugins/plugins/rate-limit",
       "grants": ["api.register", "hooks.register"],
-      "config": {},
-      "enabled": false
+      "config": {}
     },
     {
       "path": "../PluHub-Plugins/plugins/upstream-codex",
@@ -181,6 +180,12 @@
     },
     {
       "path": "../PluHub-Plugins/plugins/upstream-antigravity",
+      "grants": ["secrets.read", "api.register"],
+      "config": {},
+      "enabled": false
+    },
+    {
+      "path": "../PluHub-Plugins/plugins/upstream-grok",
       "grants": ["secrets.read", "api.register"],
       "config": {},
       "enabled": false

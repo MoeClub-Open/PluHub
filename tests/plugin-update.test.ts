@@ -145,7 +145,7 @@ it("keeps the old instance on startup, dependency, permission, graph and persist
   }
 });
 it("persists an authorized update in a separate immutable directory and loads it after host restart", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const old = await packageAt(f.directory, "old", "old");
     const entry = { path: old, grants: ["http.route"], config: {} };
@@ -219,7 +219,7 @@ it("persists an authorized update in a separate immutable directory and loads it
   }
 });
 it("rejects upgrades of plugins that require restart and retains the previous config after an invalid package", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin(),
       before = await readFile(f.file, "utf8");

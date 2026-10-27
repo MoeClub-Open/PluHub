@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fixture } from "./helpers.js";
 
 it("isolates personal and enterprise request logs, aggregates and filter options using current membership", async () => {
-  const f = await fixture(["users", "auth", "observability"]);
+  const f = await fixture(["users", "auth", "ai-router", "observability"]);
   const api = "/api/plugins/official.observability";
   try {
     const admin = await f.admin();

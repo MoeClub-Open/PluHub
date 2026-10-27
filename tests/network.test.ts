@@ -215,7 +215,7 @@ it("proxies HTTP/SSE and WebSocket with native transforms and cancellation", asy
 });
 
 it("honors an explicit public origin behind TLS termination for authenticated mutations", async () => {
-  const f = await fixture(["listener", "users", "auth"]);
+  const f = await fixture(["listener", "users", "auth", "ai-router"]);
   try {
     await f.admin();
     await f.kernel.shutdown();

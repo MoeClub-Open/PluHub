@@ -65,7 +65,7 @@ async function history(
 }
 
 it("attributes concurrent known and unknown login failures without persisting credentials, arbitrary UA or forwarded headers", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin();
     const a = await member(f, admin),
@@ -147,7 +147,7 @@ it("attributes concurrent known and unknown login failures without persisting cr
 });
 
 it("isolates personal histories from administrators, enterprise parents, API keys and forged administrator targets", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin(),
       parent = await member(f, admin, "history-parent", {
@@ -521,7 +521,7 @@ it("records verified registration, email binding, email login and password recov
 });
 
 it("records key IDs and validates intersecting filters and inclusive timestamps", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin();
     const response = await f.request(
@@ -594,7 +594,7 @@ it("records key IDs and validates intersecting filters and inclusive timestamps"
 });
 
 it("keeps authentication usable when history writes fail and exposes failures without database diagnostics", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   const db = database(f);
   try {
     const admin = await f.admin();
@@ -642,7 +642,7 @@ it("keeps authentication usable when history writes fail and exposes failures wi
 });
 
 it("prunes expired and excess events, persists history on restart and migrates the previous auth schema without altering sessions", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   const db = database(f);
   try {
     const admin = await f.admin();
@@ -680,7 +680,7 @@ it("prunes expired and excess events, persists history on restart and migrates t
       await restarted.shutdown();
     }
     db.exec(
-      "DROP TABLE security_events; ALTER TABLE api_keys ADD COLUMN channel_id TEXT; ALTER TABLE api_keys ADD COLUMN credential_id TEXT; ALTER TABLE api_keys DROP COLUMN channel_ids_json; ALTER TABLE api_keys DROP COLUMN secret; PRAGMA user_version=6;",
+      "DROP TABLE security_events; ALTER TABLE api_keys ADD COLUMN channel_id TEXT; ALTER TABLE api_keys ADD COLUMN credential_id TEXT; ALTER TABLE api_keys DROP COLUMN channel_ids_json; ALTER TABLE api_keys DROP COLUMN group_id; ALTER TABLE api_keys DROP COLUMN secret; PRAGMA user_version=6;",
     );
     restarted = await createKernel(f.config);
     attachManagement(restarted, f.file, f.config);
@@ -688,7 +688,7 @@ it("prunes expired and excess events, persists history on restart and migrates t
     try {
       expect(
         (db.prepare("PRAGMA user_version").get() as any).user_version,
-      ).toBe(11);
+      ).toBe(12);
       const r = await restarted.fetch(
         new Request("http://localhost" + auth + "/security/history", {
           headers: admin,

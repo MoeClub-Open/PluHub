@@ -392,6 +392,9 @@ it("closes a pending HTTP upstream when the client cancels the converted stream"
     }
     res.writeHead(200, { "content-type": "text/event-stream" });
     res.flushHeaders();
+    res.write(
+      'data: {"choices":[{"index":0,"delta":{"content":"first"}}]}\n\n',
+    );
     res.on("close", () => {
       upstreamClosed = true;
     });
@@ -424,7 +427,12 @@ it("closes a pending HTTP upstream when the client cancels the converted stream"
     );
     expect(response.status).toBe(200);
     const reader = response.body!.getReader();
-    await reader.read();
+    let received = "";
+    while (!received.includes("first")) {
+      const chunk = await reader.read();
+      expect(chunk.done).toBe(false);
+      received += new TextDecoder().decode(chunk.value);
+    }
     const pending = reader.read().catch((error) => ({ error }));
     await new Promise((resolve) => setTimeout(resolve, 10));
     await expect(reader.cancel()).resolves.toBeUndefined();

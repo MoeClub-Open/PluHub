@@ -141,6 +141,7 @@ it("runs subscription adapters through the compatible ingress matrix and omits C
       "users",
       "auth",
       "ai-router",
+      "rate-limit",
       ...protocols.map((p) => "ingress-" + p),
       "upstream-codex",
       "upstream-claude-subscription",

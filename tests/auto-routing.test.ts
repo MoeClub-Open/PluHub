@@ -75,11 +75,7 @@ async function gateway() {
   );
   const profile: any = {
     mode: "both",
-    decision: {
-      kind: "luna",
-      baseUrl: "https://classifier.example/v1",
-      model: "decision-test",
-    },
+    decision: { kind: "rules" },
     fallbackCandidate: "strong",
     candidates: [
       {
@@ -234,7 +230,9 @@ it("routes a virtual provider before billing, records final model and checks key
         "POST",
         {
           model,
-          messages: [{ role: "user", content: "debug this" }],
+          messages: [
+            { role: "user", content: "debug this distributed system" },
+          ],
           max_tokens: 16,
         },
         f.headers,
@@ -269,7 +267,7 @@ it("routes a virtual provider before billing, records final model and checks key
       decision: { candidate: "strong" },
     });
     expect((await invoke()).status).toBe(429);
-    expect(f.decisions()).toBe(1);
+    expect(f.decisions()).toBe(0);
     expect(f.answers()).toBe(1);
     now += 60000;
     const nextWindow = await invoke();
@@ -346,7 +344,10 @@ it("paces nonstream output per selected physical model and supports management w
     const response = await f.request(
       "/v1/chat/completions",
       "POST",
-      { model: "auto", messages: [{ role: "user", content: "hi" }] },
+      {
+        model: "auto",
+        messages: [{ role: "user", content: "debug this distributed system" }],
+      },
       f.headers,
     );
     expect(response.status).toBe(200);

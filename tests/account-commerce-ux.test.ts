@@ -2,7 +2,7 @@ import { it, expect } from "vitest";
 import { fixture } from "./helpers.js";
 
 it("provisions a usable account in one session request and rejects invalid passwords before creating user facts", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin();
     const path = "/api/plugins/official.auth/users";
@@ -133,7 +133,7 @@ it("rejects unavailable payment methods and incompatible currencies before recor
     for (const [provider, status] of [
       ["stripe", 409],
       ["epay", 400],
-      ["unknown", 400],
+      ["unknown", 409],
     ] as const) {
       const result = await f.request(
         api + "/checkout",

@@ -3,7 +3,7 @@ import {
   migrateLegacyChannels,
   defaultChannelFlow,
 } from "../deploy/migrations/channel-graphs.ts";
-import { compileWorkflow } from "../lib/ai/channel-graph.js";
+import { compileWorkflow } from "../../PluHub-Plugins/lib/ai/channel-graph.js";
 
 it("moves channel quotas and model pacing into graphs without losing defaults, custom tokenizers or orphan rules", () => {
   const config: any = {

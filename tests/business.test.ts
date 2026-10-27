@@ -96,6 +96,8 @@ it("verifies Stripe raw webhooks, prevents duplicate credits and bills subscript
     expect(i.headers.authorization).toBe("Bearer stripe-test-only");
     expect(i.headers["stripe-version"]).toBe("2025-03-31.basil");
     const path = new URL(i.url).pathname;
+    if (path === "/v1/customers")
+      return Response.json({ id: "cus_business_test" });
     if (path === "/v1/checkout/sessions") {
       forms.push(new URLSearchParams(i.body));
       expect(i.headers["idempotency-key"]).toMatch(/^checkout:/);
@@ -238,6 +240,13 @@ it("verifies Stripe raw webhooks, prevents duplicate credits and bills subscript
     };
     responses.set("/v1/invoices/in_1", invoice);
     expect(await webhook("invoice.paid", invoice)).toBe(200);
+    await f.kernel.shutdown();
+    const oldSchema = new DatabaseSync(
+      join(f.config.dataDir, "official.commerce", "commerce.sqlite"),
+    );
+    oldSchema.exec("DROP TABLE subscription_periods; PRAGMA user_version=6");
+    oldSchema.close();
+    await f.kernel.start();
     expect(await webhook("invoice.paid", invoice)).toBe(200);
     responses.set("/v1/invoices/in_duplicate_period", {
       ...invoice,

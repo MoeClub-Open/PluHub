@@ -63,7 +63,12 @@ it("publishes active platform model aliases and original prices without credenti
       contextWindow: 128000,
       channel: { id: "live", name: "live", scope: "platform" },
       consumptionMultiplier: 1,
-      billing: { input: 2, output: 4 },
+      billing: {
+        input: 2,
+        output: 4,
+        multiplier: 1,
+        serviceGroup: { id: "default", name: "默认分组", multiplier: 1 },
+      },
       features: ["text", "tools", "stream", "usage"],
     });
     expect(JSON.stringify(models)).not.toMatch(

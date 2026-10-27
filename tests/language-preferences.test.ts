@@ -6,7 +6,7 @@ import { fixture } from "./helpers.js";
 
 const auth = "/api/plugins/official.auth";
 it("saves only the signed-in account language, isolates users and restores it after restart", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin();
     const me = await (
@@ -71,7 +71,7 @@ it("saves only the signed-in account language, isolates users and restores it af
 });
 
 it("rejects anonymous, API-key, cross-origin, invalid and cross-account preference writes", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin();
     const saved = await (
@@ -143,22 +143,26 @@ it("rejects anonymous, API-key, cross-origin, invalid and cross-account preferen
 });
 
 it("migrates legacy users without losing facts and still allows account creation", async () => {
-  const f = await fixture(["users", "auth"], {}, async (_kernel, directory) => {
-    const data = join(directory, "data", "official.users");
-    await mkdir(data, { recursive: true });
-    const db = new DatabaseSync(join(data, "users.sqlite"));
-    db.exec(
-      "CREATE TABLE users(id TEXT PRIMARY KEY,username TEXT UNIQUE NOT NULL,role TEXT NOT NULL,enabled INTEGER NOT NULL,created_at TEXT NOT NULL); PRAGMA user_version=1;",
-    );
-    db.prepare("INSERT INTO users VALUES(?,?,?,?,?)").run(
-      "legacy",
-      "legacy-user",
-      "user",
-      1,
-      "2026-01-01",
-    );
-    db.close();
-  });
+  const f = await fixture(
+    ["users", "auth", "ai-router"],
+    {},
+    async (_kernel, directory) => {
+      const data = join(directory, "data", "official.users");
+      await mkdir(data, { recursive: true });
+      const db = new DatabaseSync(join(data, "users.sqlite"));
+      db.exec(
+        "CREATE TABLE users(id TEXT PRIMARY KEY,username TEXT UNIQUE NOT NULL,role TEXT NOT NULL,enabled INTEGER NOT NULL,created_at TEXT NOT NULL); PRAGMA user_version=1;",
+      );
+      db.prepare("INSERT INTO users VALUES(?,?,?,?,?)").run(
+        "legacy",
+        "legacy-user",
+        "user",
+        1,
+        "2026-01-01",
+      );
+      db.close();
+    },
+  );
   try {
     expect(
       await f.kernel.invoke("users.lookup@1", { id: "legacy" }),

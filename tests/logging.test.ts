@@ -221,7 +221,7 @@ it("associates native logs and completed, failed and cancelled streams with one 
 });
 
 it("allows only administrator sessions to query persisted runtime logs and avoids logging log queries", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["users", "auth", "ai-router"]);
   try {
     const admin = await f.admin();
     await (await f.request("/missing")).text();
