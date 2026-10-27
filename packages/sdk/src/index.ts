@@ -25,6 +25,8 @@ export interface Principal {
 export interface RequestContext {
   id: string;
   graphVersion: number;
+  /** Server-generated linkage for an internally dispatched child request. */
+  parent?: Readonly<{ requestId: string; nodeId: string; depth: number }>;
   request: Request;
   /** Standard Web response, available to Streaming hooks for body transforms. */
   response?: Response;
@@ -62,6 +64,23 @@ export interface Host {
   readonly id: string;
   readonly dataDir: string;
   dispatch(request: Request): Promise<Response>;
+  /** Dispatch a metered internal workflow request using the current identity and graph. */
+  dispatchChild(
+    request: Request,
+    options: {
+      nodeId: string;
+      plan?: unknown;
+      delegatedModel?: string;
+      onComplete?: (outcome: {
+        status: number;
+        errorCode?: string;
+        cancelled: boolean;
+        result?: unknown;
+      }) => void;
+    },
+  ): Promise<Response>;
+  /** Access the authenticated request context while handling a trusted workflow. */
+  requestContext(): RequestContext;
   upgrade(
     path: string,
     access: string,

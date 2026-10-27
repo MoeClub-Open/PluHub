@@ -72,12 +72,14 @@
 例如把策略 `decision` 改为：
 
 ```json
-{ "kind": "luna", "baseUrl": "https://api.openai.com/v1", "model": "gpt-6-luna", "keyRef": "secret:DECISION_KEY", "timeoutMs": 3000, "maxInputChars": 16000 }
+{ "kind": "luna", "model": "decision-model", "channelId": "decision-channel", "timeoutMs": 3000, "maxInputChars": 16000 }
 ```
 
-配置页会自动维护自动路由插件 `secretRefs: ["secret:DECISION_KEY"]`。Clef 使用部署的 SystemOne 服务地址与模型 ID；JEV 使用运行 `serve_decide.py` 的服务地址。这些接口仍需部署或开通对应服务；代码不会下载权重、读取本机登录文件或借用回答模型的凭证。
+先将决策服务配置为对应协议的渠道，填写凭据、公开模型名和价格，再在策略中选择该模型。旧配置中直接填写的服务地址和凭据需要迁移到渠道。Clef 使用部署的 SystemOne 服务，JEV 使用运行 `serve_decide.py` 的服务；这些服务需要自行部署或开通。
 
-概率分布、选项和 confidence 会严格检查。超时、无效响应、输入超出决策长度或低置信度，按 `onFailure` 使用保底候选或拒绝；请求取消直接退出。保底模型仍须通过上下文、协议和 BYOK 过滤。远程决策有独立的每用户自然分钟配额 `decisionRpm`（默认 60）与全局并发 `decisionConcurrency`（默认 8），超限返回 429。远程决策会向配置的服务发送任务正文；日志只存选择元数据，决策费用目前属于平台开销，不计入回答模型账单。
+概率分布、选项和 confidence 会严格检查。超时、无效响应、输入超出决策长度或低置信度，按 `onFailure` 使用保底候选或拒绝；请求取消直接退出。保底模型仍须通过上下文、协议和 BYOK 过滤。远程决策有独立的每用户自然分钟配额 `decisionRpm`（默认 60）与全局并发 `decisionConcurrency`（默认 8），超限返回 429。远程决策会向配置的服务发送任务正文；决策调用按其模型价格单独预留、结算并记录，与回答模型的调用分别计费。
+
+流程图中的「Jev 请求」节点也使用单独配置的模型和价格，配置方法及费用说明见 [渠道流程图](WORKFLOWS.md#配置-jev)。
 
 思考参数按协议映射：Chat 的 `reasoning_effort`、Responses 的 `reasoning.effort`、Anthropic 的 `output_config.effort`、Gemini 的 `generationConfig.thinkingConfig`。不支持的预算、档位或冲突设置明确拒绝。服务商内部 thinking/thought 文本不作为最终回答输出；用量仍包含可获得的隐藏思考 Token。各模型支持的档位以服务商说明为准：[OpenAI](https://developers.openai.com/api/docs/guides/reasoning)、[Claude](https://platform.claude.com/docs/en/build-with-claude/effort)、[Gemini](https://ai.google.dev/gemini-api/docs/thinking)。
 

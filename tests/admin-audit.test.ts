@@ -6,6 +6,73 @@ import { DatabaseSync } from "node:sqlite";
 import { auditStore } from "../packages/control/dist/audit.js";
 import { fixture } from "./helpers.js";
 
+it("hides historical read-only requests without deleting them or hiding changes", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "pluhub-audit-operations-"));
+  const store = auditStore(directory);
+  try {
+    for (const [id, path, status] of [
+      ["quote", "/api/plugins/official.billing/quote", 200],
+      ["preview", "/api/plugins/official.ai-router/graph/preview", undefined],
+      ["change", "/api/plugins/official.ai-router/configuration", 200],
+    ] as const)
+      store.write({
+        id,
+        actorId: "admin",
+        createdAt: Date.now() - 400000,
+        method: "POST",
+        path,
+        status,
+      });
+    expect(
+      store.read(new URLSearchParams()).items.map((row) => row.id),
+    ).toEqual(["change"]);
+    expect(store.status().unresolved).toBe(0);
+    const db = new DatabaseSync(join(directory, "admin-audit.sqlite"));
+    try {
+      expect(db.prepare("SELECT count(*) n FROM admin_audit").get()!.n).toBe(3);
+    } finally {
+      db.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it("records management changes but not read-only POST requests", async () => {
+  const f = await fixture(["users", "auth"]);
+  try {
+    const admin = await f.admin();
+    const quote = await f.request(
+      "/api/plugins/official.billing/quote",
+      "POST",
+      {},
+      admin,
+    );
+    const id = quote.headers.get("x-pluhub-request-id")!;
+    const records = await (
+      await f.request(
+        "/api/host/audit?requestId=" + id,
+        "GET",
+        undefined,
+        admin,
+      )
+    ).json();
+    expect(records.total).toBe(0);
+    const db = new DatabaseSync(
+      join(f.directory, "data", "admin-audit.sqlite"),
+    );
+    try {
+      expect(
+        db.prepare("SELECT count(*) n FROM admin_audit WHERE id=?").get(id)!.n,
+      ).toBe(0);
+    } finally {
+      db.close();
+    }
+  } finally {
+    await f.close();
+  }
+});
+
 it("filters audit results, methods, request IDs, inclusive dates and literal search without changing fault counters", async () => {
   const directory = await mkdtemp(join(tmpdir(), "pluhub-audit-query-"));
   const store = auditStore(directory),

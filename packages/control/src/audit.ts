@@ -1,7 +1,11 @@
 import { DatabaseSync } from "node:sqlite";
 import { chmodSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { createLogSanitizer, type AdminAudit } from "@pluhub/kernel";
+import {
+  createLogSanitizer,
+  nonAdminOperationPosts,
+  type AdminAudit,
+} from "@pluhub/kernel";
 import { HostError } from "@pluhub/sdk";
 
 export function auditStore(
@@ -9,6 +13,7 @@ export function auditStore(
   redact = createLogSanitizer().text,
 ) {
   const retentionDays = 90;
+  const operationClause = `NOT (method='POST' AND path IN (${nonAdminOperationPosts.map(() => "?").join(",")}))`;
   let failures = 0,
     writeFailures = 0,
     lastFaultAt = -Infinity;
@@ -74,9 +79,11 @@ export function auditStore(
         (
           db
             .prepare(
-              "SELECT COUNT(*) n FROM admin_audit WHERE status IS NULL AND created_at<?",
+              `SELECT COUNT(*) n FROM admin_audit WHERE status IS NULL AND created_at<? AND ${operationClause}`,
             )
-            .get(Date.now() - 300000) as { n: number }
+            .get(Date.now() - 300000, ...nonAdminOperationPosts) as {
+            n: number;
+          }
         ).n,
       ),
     };
@@ -146,8 +153,8 @@ export function auditStore(
         offset < 0
       )
         throw new HostError("invalid_request", "Invalid audit pagination");
-      const where: string[] = [],
-        values: (string | number)[] = [];
+      const where: string[] = [operationClause],
+        values: (string | number)[] = [...nonAdminOperationPosts];
       const filter = (key: string, max = 256) => {
         const value = query.get(key) ?? "";
         if (value.length > max || /[\u0000-\u001f\u007f]/.test(value))

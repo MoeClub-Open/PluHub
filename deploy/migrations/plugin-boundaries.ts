@@ -4,16 +4,20 @@ import { writeConfig } from "@pluhub/control";
 import type { HostConfig } from "@pluhub/sdk";
 import { migrateLegacyChannels } from "./channel-graphs.ts";
 import { prepareKeyScopes } from "./key-scopes.ts";
+import { migrateWorkflowConditions } from "@pluhub/contracts/workflow-migration";
+import type { ChannelWorkflow } from "@pluhub/contracts/workflow";
 
 const retired = new Set(["official.workflow", "official.protocol-converter"]);
 export async function migratePluginBoundaries(file: string, write = true) {
   const marker = file + ".plugin-boundaries.json";
   let applied = false,
-    compositionApplied = false;
+    compositionApplied = false,
+    workflowGrantsApplied = false;
   try {
     const version = JSON.parse(await readFile(marker, "utf8")).version;
     applied = version >= 1;
     compositionApplied = version >= 2;
+    workflowGrantsApplied = version >= 3;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
@@ -63,6 +67,15 @@ export async function migratePluginBoundaries(file: string, write = true) {
   const router = config.plugins.find(
     (plugin) => identities.get(plugin.path) === "official.ai-router",
   );
+  // Convert legacy condition nodes before the new plugin validates its config.
+  for (const channel of Object.values(
+    (router?.config?.upstreams ?? {}) as Record<
+      string,
+      { flow?: ChannelWorkflow }
+    >,
+  )) {
+    if (channel.flow) channel.flow = migrateWorkflowConditions(channel.flow);
+  }
   if (
     config.plugins.some(
       (plugin) =>
@@ -118,6 +131,15 @@ export async function migratePluginBoundaries(file: string, write = true) {
     !router.grants.includes("http.dispatch")
   )
     router.grants.push("http.dispatch");
+  // Only the official router receives the new internal execution permissions.
+  if (!workflowGrantsApplied && router && !router.grants.includes("*")) {
+    for (const permission of [
+      "http.dispatch.child",
+      "secrets.read",
+      "hooks.register",
+    ])
+      if (!router.grants.includes(permission)) router.grants.push(permission);
+  }
   const changed =
     JSON.stringify(JSON.parse(original)) !== JSON.stringify(config);
   if (changed && write) {
@@ -129,7 +151,8 @@ export async function migratePluginBoundaries(file: string, write = true) {
     await writeConfig(file, config);
   }
   if (write) keyScopes.apply();
-  if (write && !compositionApplied) await writeConfig(marker, { version: 2 });
+  if (write && !workflowGrantsApplied)
+    await writeConfig(marker, { version: 3 });
   return {
     changed: changed || keyScopes.count > 0,
     written: write && (changed || keyScopes.count > 0),

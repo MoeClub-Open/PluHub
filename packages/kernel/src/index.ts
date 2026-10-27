@@ -126,6 +126,7 @@ interface Snapshot {
 interface Scope {
   snapshot: Snapshot;
   context: RequestContext;
+  callers?: readonly string[];
 }
 export interface AdminAudit {
   id: string;
@@ -139,6 +140,21 @@ export interface AdminAudit {
   errorCode?: string;
   reason?: string;
 }
+/** Read-only or account-session requests use POST but are not management changes. */
+export const nonAdminOperationPosts = [
+  "/api/plugins/official.auth/logout",
+  "/api/plugins/official.auth/reauth",
+  "/api/plugins/official.billing/quote",
+  "/api/plugins/official.ai-router/graph/preview",
+  "/api/plugins/official.ai-router/channel-models",
+  "/api/plugins/official.ai-router/test",
+  "/api/plugins/official.auto-router/preview",
+  "/api/plugins/official.byok/personal-channels/preview",
+  "/api/plugins/official.byok/personal-channels/discover",
+  "/api/plugins/official.byok/personal-channels/sync",
+  "/api/plugins/official.byok/personal-channels/test",
+  "/api/host/registry/plan",
+] as const;
 export class Kernel {
   private records = new Map<string, RecordData>();
   private seq = 0;
@@ -150,6 +166,10 @@ export class Kernel {
   private closing = false;
   private starting = false;
   private pipelineContexts = new WeakSet<RequestContext>();
+  private requestRoutes = new WeakMap<
+    RequestContext,
+    { owner: string; path: string }
+  >();
   private management?: Handler;
   private publicAssetHandler?: (
     request: Request,
@@ -262,6 +282,8 @@ export class Kernel {
       !this.audit ||
       !path.startsWith("/api/") ||
       ["GET", "HEAD", "OPTIONS"].includes(context.request.method) ||
+      (context.request.method === "POST" &&
+        (nonAdminOperationPosts as readonly string[]).includes(path)) ||
       !context.principal?.session ||
       !context.principal.permissions.includes("*")
     )
@@ -997,6 +1019,135 @@ export class Kernel {
         ensure();
         return this.fetch(request);
       },
+      requestContext: () => {
+        this.require(r, "http.dispatch.child");
+        ensure();
+        const scope = this.storage.getStore();
+        const context = scope?.context;
+        const route = context && this.requestRoutes.get(context);
+        const trusted = new Set([
+          "official.ai-router",
+          "official.auto-router",
+          "official.ingress-openai-chat",
+          "official.ingress-openai-responses",
+          "official.ingress-anthropic",
+          "official.ingress-gemini",
+          "official.ingress-openai-media",
+        ]);
+        if (
+          r.manifest.id !== "official.ai-router" ||
+          !context ||
+          !this.pipelineContexts.has(context) ||
+          !context.principal ||
+          !route ||
+          !trusted.has(route.owner) ||
+          (scope?.callers ?? []).some((caller) => !trusted.has(caller))
+        )
+          throw new HostError(
+            "permission_denied",
+            "Request context unavailable",
+            403,
+          );
+        context.signal.throwIfAborted();
+        return context;
+      },
+      dispatchChild: (request, options) => {
+        this.require(r, "http.dispatch.child");
+        ensure();
+        const parent = this.storage.getStore();
+        if (
+          !parent ||
+          !this.pipelineContexts.has(parent.context) ||
+          !parent.context.principal
+        )
+          throw new HostError(
+            "invalid_child_request",
+            "An authenticated request context is required",
+            403,
+          );
+        parent.context.signal.throwIfAborted();
+        const depth = (parent.context.parent?.depth ?? 0) + 1;
+        if (
+          depth > 8 ||
+          typeof options.nodeId !== "string" ||
+          !options.nodeId.trim() ||
+          options.nodeId.length > 128
+        )
+          throw new HostError(
+            "invalid_child_request",
+            "Invalid internal request origin",
+            400,
+          );
+        const path = new URL(request.url).pathname;
+        const allowed = [
+          "/v1/chat/completions",
+          "/v1/responses",
+          "/v1/messages",
+          "/internal/workflow/provider",
+          "/internal/workflow/jev",
+          "/internal/workflow/decision",
+        ];
+        if (
+          request.method !== "POST" ||
+          (!allowed.includes(path) &&
+            !/^\/v1beta\/models\/.+:(generateContent|streamGenerateContent)$/.test(
+              path,
+            ))
+        )
+          throw new HostError(
+            "invalid_child_request",
+            "Unsupported internal request route",
+            403,
+          );
+        if (
+          options.plan !== undefined &&
+          !path.startsWith("/internal/workflow/")
+        )
+          throw new HostError(
+            "invalid_child_request",
+            "Internal plan requires a workflow route",
+            403,
+          );
+        if (
+          path.startsWith("/internal/workflow/") &&
+          r.manifest.id !== "official.ai-router"
+        )
+          throw new HostError(
+            "permission_denied",
+            "Only the router may dispatch an internal workflow request",
+            403,
+          );
+        if (
+          options.delegatedModel !== undefined &&
+          (r.manifest.id !== "official.ai-router" ||
+            typeof options.delegatedModel !== "string" ||
+            !options.delegatedModel.trim() ||
+            options.delegatedModel.length > 256)
+        )
+          throw new HostError(
+            "permission_denied",
+            "Invalid delegated model",
+            403,
+          );
+        if (
+          options.onComplete &&
+          (r.manifest.id !== "official.ai-router" ||
+            path !== "/internal/workflow/provider")
+        )
+          throw new HostError(
+            "permission_denied",
+            "Invalid completion callback",
+            403,
+          );
+        return this.fetchInternal(request, {
+          parent,
+          nodeId: options.nodeId,
+          depth,
+          plan: options.plan,
+          delegatedModel: options.delegatedModel,
+          onComplete: options.onComplete,
+        });
+      },
       acceptUpgrade: (request) => {
         this.require(r, "http.listen");
         ensure();
@@ -1082,6 +1233,24 @@ export class Kernel {
         providerId?: string,
       ) => {
         ensure();
+        // Workflow execution can spend a user's balance using a prepared plan.
+        // Until capabilities have caller policies, restrict this entry to the
+        // router and the ingress plugins that establish the authenticated plan.
+        if (
+          name === "ai.workflow-execution@1" &&
+          ![
+            "official.ai-router",
+            "official.ingress-openai-chat",
+            "official.ingress-openai-responses",
+            "official.ingress-anthropic",
+            "official.ingress-gemini",
+          ].includes(r.manifest.id)
+        )
+          throw new HostError(
+            "permission_denied",
+            "Workflow execution is restricted",
+            403,
+          );
         if (
           !r.manifest.requires.includes(name) &&
           !r.manifest.optionalRequires?.includes(name) &&
@@ -1092,7 +1261,13 @@ export class Kernel {
             "Undeclared capability dependency",
             403,
           );
-        return this.invoke<T>(name, input, signal, providerId);
+        const scope = this.storage.getStore();
+        return scope
+          ? this.storage.run(
+              { ...scope, callers: [...(scope.callers ?? []), r.manifest.id] },
+              () => this.invoke<T>(name, input, signal, providerId),
+            )
+          : this.invoke<T>(name, input, signal, providerId);
       },
       api: (route) => {
         this.require(r, "api.register");
@@ -1259,11 +1434,15 @@ export class Kernel {
       provider.inflight.delete(controller);
     }
   }
-  private acquire(request: Request) {
-    const snapshot = this.current;
-    if (this.starting)
+  private acquire(
+    request: Request,
+    parent?: Scope,
+    onComplete?: Parameters<Host["dispatchChild"]>[1]["onComplete"],
+  ) {
+    const snapshot = parent?.snapshot ?? this.current;
+    if (this.starting && !parent)
       throw new HostError("starting_up", "Host is starting", 503);
-    if (this.closing)
+    if (this.closing && !parent)
       throw new HostError("shutting_down", "Host is draining", 503);
     snapshot.refs++;
     const controller = new AbortController();
@@ -1271,6 +1450,7 @@ export class Kernel {
       request.signal,
       snapshot.abort.signal,
       controller.signal,
+      ...(parent ? [parent.context.signal] : []),
     ]);
     const context: RequestContext = {
       id: randomUUID(),
@@ -1280,48 +1460,65 @@ export class Kernel {
       state: new Map<string, unknown>([["log.startedAt", Date.now()]]),
       config: {},
     };
-    let released = false;
+    let finalization: Promise<void> | undefined;
+    let aborted = false;
     return {
       snapshot,
       context,
       cancel: (reason?: unknown) => controller.abort(reason),
       release: async (abort = true) => {
-        if (released) {
-          if (abort) {
-            this.recordRequest(context);
-            controller.abort(
-              new DOMException("Request completed", "AbortError"),
-            );
-          }
-          return;
+        if (!finalization) {
+          finalization = Promise.resolve().then(async () => {
+            try {
+              await this.storage.run({ snapshot, context }, () =>
+                !this.pipelineContexts.has(context)
+                  ? Promise.resolve()
+                  : snapshot.pipeline.run("Finalize", context),
+              );
+            } catch (error) {
+              this.storage.run({ snapshot, context }, () =>
+                this.log(
+                  "host",
+                  "error",
+                  error instanceof AggregateError
+                    ? error.message
+                    : "Finalize hook failed",
+                ),
+              );
+            } finally {
+              if (onComplete) {
+                try {
+                  const errorCode = context.state.get("http.errorCode");
+                  const result = context.state.get("internal.result");
+                  onComplete({
+                    status: Number(context.state.get("http.status") ?? 500),
+                    ...(typeof errorCode === "string" ? { errorCode } : {}),
+                    cancelled:
+                      context.signal.aborted ||
+                      context.state.get("http.cancelled") === true,
+                    ...(result !== undefined
+                      ? { result: structuredClone(result) }
+                      : {}),
+                  });
+                } catch {
+                  this.log(
+                    "host",
+                    "error",
+                    "Internal request completion callback failed",
+                  );
+                }
+              }
+              snapshot.refs--;
+              if (snapshot !== this.current && snapshot.refs === 0)
+                this.snapshots.delete(snapshot);
+            }
+          });
         }
-        released = true;
-        try {
-          await this.storage.run({ snapshot, context }, () =>
-            !this.pipelineContexts.has(context)
-              ? Promise.resolve()
-              : snapshot.pipeline.run("Finalize", context),
-          );
-        } catch (error) {
-          this.storage.run({ snapshot, context }, () =>
-            this.log(
-              "host",
-              "error",
-              error instanceof AggregateError
-                ? error.message
-                : "Finalize hook failed",
-            ),
-          );
-        } finally {
-          if (abort) {
-            this.recordRequest(context);
-            controller.abort(
-              new DOMException("Request completed", "AbortError"),
-            );
-          }
-          snapshot.refs--;
-          if (snapshot !== this.current && snapshot.refs === 0)
-            this.snapshots.delete(snapshot);
+        await finalization;
+        if (abort && !aborted) {
+          aborted = true;
+          this.recordRequest(context);
+          controller.abort(new DOMException("Request completed", "AbortError"));
         }
       },
     };
@@ -1331,10 +1528,11 @@ export class Kernel {
     snapshot: Snapshot,
     context: RequestContext,
     access: string,
+    inheritedPrincipal?: Principal,
   ) {
-    context.principal = await snapshot.records
-      .find((r) => r.identity)
-      ?.identity?.(request);
+    context.principal =
+      inheritedPrincipal ??
+      (await snapshot.records.find((r) => r.identity)?.identity?.(request));
     if (access !== "public" && !context.principal)
       throw new HostError("unauthorized", "Authentication required", 401);
     if (
@@ -1358,15 +1556,41 @@ export class Kernel {
       : pattern === path;
   }
   async fetch(request: Request): Promise<Response> {
+    return this.fetchInternal(request);
+  }
+  private async fetchInternal(
+    request: Request,
+    child?: {
+      parent: Scope;
+      nodeId: string;
+      depth: number;
+      plan?: unknown;
+      delegatedModel?: string;
+      onComplete?: Parameters<Host["dispatchChild"]>[1]["onComplete"];
+    },
+  ): Promise<Response> {
     let lease: ReturnType<Kernel["acquire"]> | undefined;
     let selectedRoute: OwnedRoute | undefined;
     try {
-      lease = this.acquire(request);
+      lease = this.acquire(request, child?.parent, child?.onComplete);
       const { snapshot, context } = lease;
+      if (child) {
+        context.parent = Object.freeze({
+          requestId: child.parent.context.id,
+          nodeId: child.nodeId,
+          depth: child.depth,
+        });
+        if (child.plan !== undefined)
+          context.state.set("internal.plan", structuredClone(child.plan));
+        if (child.delegatedModel !== undefined)
+          context.state.set("internal.delegatedModel", child.delegatedModel);
+      }
       request = new Request(request, { signal: context.signal });
       context.request = request;
       return await this.storage.run({ snapshot, context }, async () => {
         const path = new URL(request.url).pathname;
+        if (path.startsWith("/internal/workflow/") && !child)
+          throw new HostError("not_found", "Not found", 404);
         const publicAsset = await this.publicAssetHandler?.(request);
         if (publicAsset) {
           context.state.set("http.status", publicAsset.status);
@@ -1388,6 +1612,8 @@ export class Kernel {
             this.matches(route.path, path),
         );
         selectedRoute = route;
+        if (route)
+          this.requestRoutes.set(context, { owner: route.owner, path });
         const pipeline =
           !!route && route.pipeline !== false && !path.startsWith("/api/");
         if (pipeline) this.pipelineContexts.add(context);
@@ -1404,6 +1630,7 @@ export class Kernel {
           snapshot,
           context,
           route?.access ?? hostAccess,
+          child?.parent.context.principal,
         );
         context.state.set("admin.startedAt", Date.now());
         this.recordAdmin(context);
