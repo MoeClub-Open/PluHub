@@ -85,7 +85,10 @@ const frozen = <T>(value: T): T => {
   }
   return value;
 };
-type Capability = (input: any, signal: AbortSignal) => any;
+type Capability = {
+  handle: (input: any, signal: AbortSignal) => any;
+  callers?: readonly string[];
+};
 type UpgradeRoute = {
   owner: string;
   path: string;
@@ -140,21 +143,6 @@ export interface AdminAudit {
   errorCode?: string;
   reason?: string;
 }
-/** Read-only or account-session requests use POST but are not management changes. */
-export const nonAdminOperationPosts = [
-  "/api/plugins/official.auth/logout",
-  "/api/plugins/official.auth/reauth",
-  "/api/plugins/official.billing/quote",
-  "/api/plugins/official.ai-router/graph/preview",
-  "/api/plugins/official.ai-router/channel-models",
-  "/api/plugins/official.ai-router/test",
-  "/api/plugins/official.auto-router/preview",
-  "/api/plugins/official.byok/personal-channels/preview",
-  "/api/plugins/official.byok/personal-channels/discover",
-  "/api/plugins/official.byok/personal-channels/sync",
-  "/api/plugins/official.byok/personal-channels/test",
-  "/api/host/registry/plan",
-] as const;
 export class Kernel {
   private records = new Map<string, RecordData>();
   private seq = 0;
@@ -168,7 +156,7 @@ export class Kernel {
   private pipelineContexts = new WeakSet<RequestContext>();
   private requestRoutes = new WeakMap<
     RequestContext,
-    { owner: string; path: string }
+    { owner: string; path: string; audit?: boolean }
   >();
   private management?: Handler;
   private publicAssetHandler?: (
@@ -283,7 +271,9 @@ export class Kernel {
       !path.startsWith("/api/") ||
       ["GET", "HEAD", "OPTIONS"].includes(context.request.method) ||
       (context.request.method === "POST" &&
-        (nonAdminOperationPosts as readonly string[]).includes(path)) ||
+        path === "/api/host/registry/plan") ||
+      this.requestRoutes.get(context)?.audit === false ||
+      (path.startsWith("/api/plugins/") && !this.requestRoutes.has(context)) ||
       !context.principal?.session ||
       !context.principal.permissions.includes("*")
     )
@@ -1019,23 +1009,14 @@ export class Kernel {
         ensure();
         return this.fetch(request);
       },
-      requestContext: () => {
+      requestContext: (options) => {
         this.require(r, "http.dispatch.child");
         ensure();
         const scope = this.storage.getStore();
         const context = scope?.context;
         const route = context && this.requestRoutes.get(context);
-        const trusted = new Set([
-          "official.ai-router",
-          "official.auto-router",
-          "official.ingress-openai-chat",
-          "official.ingress-openai-responses",
-          "official.ingress-anthropic",
-          "official.ingress-gemini",
-          "official.ingress-openai-media",
-        ]);
+        const trusted = new Set(options?.callers ?? [r.manifest.id]);
         if (
-          r.manifest.id !== "official.ai-router" ||
           !context ||
           !this.pipelineContexts.has(context) ||
           !context.principal ||
@@ -1079,65 +1060,33 @@ export class Kernel {
             400,
           );
         const path = new URL(request.url).pathname;
-        const allowed = [
-          "/v1/chat/completions",
-          "/v1/responses",
-          "/v1/messages",
-          "/internal/workflow/provider",
-          "/internal/workflow/jev",
-          "/internal/workflow/decision",
-        ];
-        if (
-          request.method !== "POST" ||
-          (!allowed.includes(path) &&
-            !/^\/v1beta\/models\/.+:(generateContent|streamGenerateContent)$/.test(
-              path,
-            ))
-        )
-          throw new HostError(
-            "invalid_child_request",
-            "Unsupported internal request route",
-            403,
-          );
-        if (
-          options.plan !== undefined &&
-          !path.startsWith("/internal/workflow/")
-        )
-          throw new HostError(
-            "invalid_child_request",
-            "Internal plan requires a workflow route",
-            403,
-          );
-        if (
-          path.startsWith("/internal/workflow/") &&
-          r.manifest.id !== "official.ai-router"
-        )
+        const route = parent.snapshot.routes.find(
+          (route) =>
+            route.method.toUpperCase() === request.method &&
+            this.matches(route.path, path),
+        );
+        if (!route?.childCallers?.includes(r.manifest.id))
           throw new HostError(
             "permission_denied",
-            "Only the router may dispatch an internal workflow request",
+            "Child dispatch is not allowed by this route",
+            403,
+          );
+        if (options.plan !== undefined && !route.internal)
+          throw new HostError(
+            "invalid_child_request",
+            "Prepared context requires an internal route",
             403,
           );
         if (
           options.delegatedModel !== undefined &&
-          (r.manifest.id !== "official.ai-router" ||
-            typeof options.delegatedModel !== "string" ||
+          (typeof options.delegatedModel !== "string" ||
             !options.delegatedModel.trim() ||
             options.delegatedModel.length > 256)
         )
           throw new HostError(
-            "permission_denied",
-            "Invalid delegated model",
-            403,
-          );
-        if (
-          options.onComplete &&
-          (r.manifest.id !== "official.ai-router" ||
-            path !== "/internal/workflow/provider")
-        )
-          throw new HostError(
-            "permission_denied",
-            "Invalid completion callback",
-            403,
+            "invalid_child_request",
+            "Invalid delegated target",
+            400,
           );
         return this.fetchInternal(request, {
           parent,
@@ -1188,14 +1137,17 @@ export class Kernel {
             other.provided.has(name),
         );
       },
-      provide: (name, handler) => {
+      provide: (name, handler, options) => {
         ensure();
         if (!r.manifest.provides.includes(name) || r.provided.has(name))
           throw new HostError(
             "invalid_registration",
             "Undeclared or duplicate capability " + name,
           );
-        r.provided.set(name, handler);
+        r.provided.set(name, {
+          handle: handler,
+          callers: options?.callers && [...options.callers],
+        });
       },
       providers: (name) => {
         ensure();
@@ -1233,24 +1185,6 @@ export class Kernel {
         providerId?: string,
       ) => {
         ensure();
-        // Workflow execution can spend a user's balance using a prepared plan.
-        // Until capabilities have caller policies, restrict this entry to the
-        // router and the ingress plugins that establish the authenticated plan.
-        if (
-          name === "ai.workflow-execution@1" &&
-          ![
-            "official.ai-router",
-            "official.ingress-openai-chat",
-            "official.ingress-openai-responses",
-            "official.ingress-anthropic",
-            "official.ingress-gemini",
-          ].includes(r.manifest.id)
-        )
-          throw new HostError(
-            "permission_denied",
-            "Workflow execution is restricted",
-            403,
-          );
         if (
           !r.manifest.requires.includes(name) &&
           !r.manifest.optionalRequires?.includes(name) &&
@@ -1290,7 +1224,11 @@ export class Kernel {
           )
         )
           throw new HostError("invalid_route", "Reserved or invalid route");
-        r.routes.push({ ...route, owner: r.manifest.id });
+        r.routes.push({
+          ...route,
+          childCallers: route.childCallers && [...route.childCallers],
+          owner: r.manifest.id,
+        });
       },
       upgrade: (path, access, handler) => {
         this.require(r, "http.route");
@@ -1411,12 +1349,23 @@ export class Kernel {
         "Capability provider failed",
         503,
       );
-    const handler = provider.provided.get(name);
-    if (!handler)
+    const capability = provider.provided.get(name);
+    if (!capability)
       throw new HostError(
         "plugin_unavailable",
         "Capability is unavailable",
         503,
+      );
+    const callers = this.storage.getStore()?.callers ?? [];
+    if (
+      capability.callers &&
+      (!callers.length ||
+        callers.some((id) => !capability.callers!.includes(id)))
+    )
+      throw new HostError(
+        "permission_denied",
+        "Capability caller is not authorized",
+        403,
       );
     const activeSignal =
       signal ??
@@ -1426,7 +1375,7 @@ export class Kernel {
     const controller = new AbortController();
     provider.inflight.add(controller);
     try {
-      return await handler(
+      return await capability.handle(
         input,
         AbortSignal.any([activeSignal, controller.signal]),
       );
@@ -1589,8 +1538,6 @@ export class Kernel {
       context.request = request;
       return await this.storage.run({ snapshot, context }, async () => {
         const path = new URL(request.url).pathname;
-        if (path.startsWith("/internal/workflow/") && !child)
-          throw new HostError("not_found", "Not found", 404);
         const publicAsset = await this.publicAssetHandler?.(request);
         if (publicAsset) {
           context.state.set("http.status", publicAsset.status);
@@ -1611,9 +1558,15 @@ export class Kernel {
             route.method.toUpperCase() === request.method &&
             this.matches(route.path, path),
         );
+        if (route?.internal && !child)
+          throw new HostError("not_found", "Not found", 404);
         selectedRoute = route;
         if (route)
-          this.requestRoutes.set(context, { owner: route.owner, path });
+          this.requestRoutes.set(context, {
+            owner: route.owner,
+            path,
+            audit: route.audit,
+          });
         const pipeline =
           !!route && route.pipeline !== false && !path.startsWith("/api/");
         if (pipeline) this.pipelineContexts.add(context);

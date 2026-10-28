@@ -14,21 +14,29 @@ Manifest 可填写 `name`（最多 80 字符）和 `description`（最多 400 �
 
 验证、启动或持久化失败保留旧实例；新包目录不覆盖旧包。已退休的旧目录保留供维护回退，不自动逆转数据库迁移，不提供跨进程掉电事务或任意有状态插件的无损升级保证。Native ESM 模块不能完全从加载缓存中卸载，持续升级较大的原生模块后可通过维护重启回收缓存。更新包需自包含依赖；Docker 部署时将插件包目录挂载到容器后填写容器内路径。
 
-| API | 约定 |
-|---|---|
-| host.provide(name, handler) | 只能提供 Manifest.provides 中的能力 |
-| host.call(name, input, signal) | 只能调用自身提供或 requires / optionalRequires 声明的能力 |
-| host.hasCapability(name) | 查询已声明的可选依赖是否可用 |
-| host.api(route) | 挂载在 /api/plugins/插件ID 下，需要 api.register 权限 |
-| host.route(route) | 注册业务 HTTP 路由，需要 http.route 权限，不得占用管理命名空间 |
-| host.hook(hook) | 注册具名阶段 Hook，需要 hooks.register 权限 |
-| host.config() | 请求中读取对应图版本的配置快照 |
-| host.validateConfig(check) | 在启动和配置切换前检查跨字段约束 |
-| host.secret(reference) | 读取 secrets.read 授权且列入 secretRefs 的托管凭据 |
-| host.cleanup(callback) | 停止时逆序释放资源 |
-| host.publish / subscribe | 诊断通知；不用于资金事实交付 |
+| API                                   | 约定                                                                                          |
+| ------------------------------------- | --------------------------------------------------------------------------------------------- |
+| host.provide(name, handler, options?) | 只能提供 Manifest.provides 中的能力；可通过 options.callers 限定调用方插件                    |
+| host.call(name, input, signal)        | 只能调用自身提供或 requires / optionalRequires 声明的能力                                     |
+| host.hasCapability(name)              | 查询已声明的可选依赖是否可用                                                                  |
+| host.api(route)                       | 挂载在 /api/plugins/插件ID 下，需要 api.register 权限                                         |
+| host.route(route)                     | 注册业务 HTTP 路由，需要 http.route 权限，不得占用管理命名空间                                |
+| host.hook(hook)                       | 注册具名阶段 Hook，需要 hooks.register 权限                                                   |
+| host.config()                         | 请求中读取对应图版本的配置快照                                                                |
+| host.validateConfig(check)            | 在启动和配置切换前检查跨字段约束                                                              |
+| host.secret(reference)                | 读取 secrets.read 授权且列入 secretRefs 的托管凭据                                            |
+| host.cleanup(callback)                | 停止时逆序释放资源                                                                            |
+| host.publish / subscribe              | 诊断通知；不用于资金事实交付                                                                  |
+| host.dispatchChild(request, options)  | 使用当前身份和配置快照执行子请求，需要 http.dispatch.child 权限及目标路由的 childCallers 授权 |
+| host.requestContext(options?)         | 获取当前已认证的数据面请求；options.callers 限定入口及完整调用链，默认仅允许本插件            |
 
 route 包含 method、path、access、handle，可选 prepare 与 error。prepare 位于 Planning Hook 之前，用于解码和生成计划；handle 在 Execution 阶段执行。管理 API 不进入数据面 Hook。
+
+只读 POST、预览和会话确认接口应声明 `audit: false`，避免进入管理员操作记录；写操作默认记录。历史版本留下的只读记录由控制面的查询规则过滤。
+
+子请求入口通过 `childCallers` 列出允许调用的插件 ID；未声明时拒绝子请求。`internal: true` 的路由只接受受信任子请求，外部访问返回 404。携带预先准备的 `plan` 仅允许进入内部路由；`delegatedModel` 是服务端传递的受托目标，不能从普通 HTTP 请求头取得。子请求继承父请求身份、配置快照及取消信号，拥有独立状态、结束处理和结果回调；嵌套深度最多为 8。
+
+能力提供者可声明 `host.provide(name, handler, { callers: ["example.entry"] })`。宿主检查完整插件调用链，不能通过中间插件绕过限制；受限能力也不能在没有调用方身份时直接调用。提供者应根据自身业务确定允许列表，宿主不内置官方业务插件名称。
 
 access 为 public、authenticated，或认证插件提供的权限名。管理员与普通用户的具体角色由 Auth 插件定义，Kernel 只检查返回的权限集合。
 
@@ -40,7 +48,7 @@ Hook 的实际 ID 为“插件ID:Hook名”，before / after 使用完整 ID；�
 
 Manifest 的 ui 声明入口、标题、页面路径；可选 slots 声明命名插槽贡献：
 
-~~~json
+```json
 {
   "ui": {
     "entry": "dist/ui.js",
@@ -50,7 +58,7 @@ Manifest 的 ui 声明入口、标题、页面路径；可选 slots 声明命名
       { "name": "dashboard.top", "entry": "dist/widget.js" }
     ]
   }
-~~~
+```
 
 入口模块导出 mount(element, host)，返回注销函数。UIHost 提供 request、navigate、refresh；在插槽中还提供 slot 名称。页面与 Widget 的资源放在同一个 Bundle 目录。
 
@@ -68,7 +76,7 @@ Console 将 `ui.public: true` 的页面提供给已登录的普通用户；其�
 
 一个插件可通过可选 `ui.pages` 额外声明最多 32 个页面，共用 `ui.entry` 模块。每个页面独立声明 `title`、`path`、`public`、`group` 和 `order`；`public` 默认 false，不继承主页面。所有页面路径在插件内必须唯一。宿主将所选页面路径通过 `host.page` 传给 `mount`，插件据此呈现对应功能，返回的注销函数仍负责清理该页面。已有单页 Manifest 和 URL 保持兼容。
 
-~~~json
+```json
 {
   "ui": {
     "entry": "dist/ui.js",
@@ -76,11 +84,16 @@ Console 将 `ui.public: true` 的页面提供给已登录的普通用户；其�
     "path": "/commerce",
     "public": true,
     "pages": [
-      { "title": "商品与订阅", "path": "/settings/commerce", "group": "payments", "order": 30 }
+      {
+        "title": "商品与订阅",
+        "path": "/settings/commerce",
+        "group": "payments",
+        "order": 30
+      }
     ]
   }
 }
-~~~
+```
 
 Console 按公开扩展注册表加载页面，不导入业务插件源码。后端仍独立验证权限；个人页面不混入站点设置。
 

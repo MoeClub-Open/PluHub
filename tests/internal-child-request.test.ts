@@ -38,12 +38,12 @@ export default { setup(h) {
   h.provide('test.child-state@1',()=>({identityCalls, finalized, completions, waiting, childStarted, finalizeWaiting, cancelReturned}));
   h.provide('test.child-resume@1',()=>resume?.());
   h.provide('test.finalize-resume@1',()=>resumeFinalize?.());
-  h.provide('test.get-context@1',()=>h.requestContext());
-  h.provide('ai.workflow-execution@1',()=>({ok:true}));
+  h.provide('test.get-context@1',()=>h.requestContext({callers:['test.router','test.ingress']}));
+  h.provide('ai.workflow-execution@1',()=>({ok:true}),{callers:['test.router','test.ingress']});
   h.route({method:'POST',path:'/outer',access:'authenticated',async handle(request,ctx) {
     const { action } = await request.json();
     ctx.state.set('parent-only','secret');
-    const contextMatches = h.requestContext() === ctx && h.requestContext().principal.id === 'alice';
+    const contextMatches = h.requestContext({callers:['test.router','test.ingress']}) === ctx && h.requestContext({callers:['test.router','test.ingress']}).principal.id === 'alice';
     if(action === 'snapshot') { waiting = true; await new Promise(resolve => { resume = resolve; }); }
     const childAbort = new AbortController();
     const child = await h.dispatchChild(new Request('http://test/internal/workflow/provider', {
@@ -58,7 +58,7 @@ export default { setup(h) {
     if(action === 'cancel') { await child.body.cancel(); return Response.json({parentId:ctx.id,childStatus:child.status,contextMatches}); }
     return Response.json({parentId:ctx.id,parentVersion:ctx.graphVersion,childStatus:child.status,contextMatches,child:await child.json()});
   }});
-  h.route({method:'POST',path:'/internal/workflow/provider',access:'authenticated',async handle(request,ctx) {
+  h.route({internal:true,childCallers:['test.router'],method:'POST',path:'/internal/workflow/provider',access:'authenticated',async handle(request,ctx) {
     const {action} = await request.json();
     if(action === 'failure') throw Object.assign(new Error('failure'),{status:502,code:'upstream_error'});
     if(action === 'delayed-cancel') { ctx.state.set('delay-finalize',true); return new Response(new ReadableStream({pull(c){c.enqueue(new Uint8Array([1]))}})); }
@@ -79,7 +79,7 @@ async function fixture() {
   const f = await mockHost();
   await f.plugin(
     manifest(
-      "official.ai-router",
+      "test.router",
       [
         "http.route",
         "http.dispatch.child",
@@ -113,7 +113,7 @@ export default {setup(h){h.provide('test.proxy-context@1',()=>h.call('test.get-c
   try { await h.dispatchChild(new Request('http://test/v1/chat/completions',{method:'POST'}),{nodeId:'x',delegatedModel:'forged'}); return new Response('allowed'); }
   catch(error) { return Response.json({code:error.code},{status:error.status}); }
 }});h.route({method:'POST',path:'/other-context',access:'authenticated',async handle(){
-  try { h.requestContext(); return new Response('allowed'); }
+  try { await h.call('test.get-context@1'); return new Response('allowed'); }
   catch(error) { return Response.json({code:error.code},{status:error.status}); }
 }});h.route({method:'POST',path:'/other-call',access:'authenticated',async handle(){
   try { return Response.json(await h.call('ai.workflow-execution@1')); }
@@ -122,7 +122,7 @@ export default {setup(h){h.provide('test.proxy-context@1',()=>h.call('test.get-c
   );
   await f.plugin(
     {
-      ...manifest("official.ingress-openai-chat", ["http.route"]),
+      ...manifest("test.ingress", ["http.route"]),
       requires: ["ai.workflow-execution@1", "test.proxy-context@1"],
     },
     `
@@ -141,7 +141,7 @@ export default {setup(h){h.route({method:'POST',path:'/ungranted',access:'authen
   catch(error) { return Response.json({code:error.code},{status:error.status}); }
 }})}}`,
   );
-  f.kernel.configure({ "official.ai-router": { value: "old" } });
+  f.kernel.configure({ "test.router": { value: "old" } });
   await f.kernel.start();
   return f;
 }
@@ -171,7 +171,7 @@ describe("internal child requests", () => {
       expect((await f.kernel.invoke<any>("test.child-state@1")).waiting).toBe(
         true,
       );
-      f.kernel.configure({ "official.ai-router": { value: "new" } });
+      f.kernel.configure({ "test.router": { value: "new" } });
       await f.kernel.invoke("test.child-resume@1");
       const result = (await (await pending).json()) as any;
       expect(result.childStatus).toBe(200);

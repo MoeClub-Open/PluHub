@@ -1,12 +1,24 @@
 import { DatabaseSync } from "node:sqlite";
 import { chmodSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import {
-  createLogSanitizer,
-  nonAdminOperationPosts,
-  type AdminAudit,
-} from "@pluhub/kernel";
+import { createLogSanitizer, type AdminAudit } from "@pluhub/kernel";
 import { HostError } from "@pluhub/sdk";
+
+/** Historical records written before routes declared their audit behavior. */
+const nonAdminOperationPosts = [
+  "/api/plugins/official.auth/logout",
+  "/api/plugins/official.auth/reauth",
+  "/api/plugins/official.billing/quote",
+  "/api/plugins/official.ai-router/graph/preview",
+  "/api/plugins/official.ai-router/channel-models",
+  "/api/plugins/official.ai-router/test",
+  "/api/plugins/official.auto-router/preview",
+  "/api/plugins/official.byok/personal-channels/preview",
+  "/api/plugins/official.byok/personal-channels/discover",
+  "/api/plugins/official.byok/personal-channels/sync",
+  "/api/plugins/official.byok/personal-channels/test",
+  "/api/host/registry/plan",
+] as const;
 
 export function auditStore(
   directory: string,

@@ -38,13 +38,22 @@ async function setup(rule: any = { rpm: 1 }) {
       { id: "s", type: "start", next: "branch" },
       {
         id: "branch",
-        type: "condition",
-        test: "stream",
+        type: "branch",
+        condition: false,
         yes: "limit",
         no: "provider",
       },
+      { id: "branch-predicate", type: "predicate", test: "stream" },
       { id: "limit", type: "rateLimit", rule, next: "provider" },
       { id: "provider", type: "provider" },
+    ],
+    bindings: [
+      {
+        source: "branch-predicate",
+        output: "result",
+        target: "branch",
+        input: "condition",
+      },
     ],
   };
   const router: any = {
@@ -245,8 +254,10 @@ it("supports personal channel limit nodes while preventing bypass of platform pa
 it("reserves the graph's effective output budget, refunds actual usage and releases upstream errors", async () => {
   const f = await setup({ concurrency: 1, tpm: 4000 });
   try {
-    f.router.upstreams.c.flow.nodes[0].next = "limit";
-    f.router.upstreams.c.flow.nodes.splice(1, 1);
+    f.router.upstreams.c.flow.nodes = f.router.upstreams.c.flow.nodes.filter(
+      (node) => !["branch", "branch-predicate"].includes(node.id),
+    );
+    f.router.upstreams.c.flow.bindings = [];
     f.router.upstreams.c.flow.nodes[0].next = "budget";
     f.router.upstreams.c.flow.nodes.push({
       id: "budget",

@@ -43,6 +43,12 @@ export interface ApiRoute {
   method: string;
   path: string;
   access: string;
+  /** Only trusted child dispatches may enter this route. */
+  internal?: boolean;
+  /** Plugin IDs allowed to dispatch children to this route. Omitted denies child entry. */
+  childCallers?: readonly string[];
+  /** Set false for read-only POST endpoints and account-session operations. */
+  audit?: boolean;
   pipeline?: boolean;
   prepare?: (request: Request, context: RequestContext) => Promise<void>;
   error?: (error: unknown) => Response;
@@ -80,7 +86,7 @@ export interface Host {
     },
   ): Promise<Response>;
   /** Access the authenticated request context while handling a trusted workflow. */
-  requestContext(): RequestContext;
+  requestContext(options?: { callers?: readonly string[] }): RequestContext;
   upgrade(
     path: string,
     access: string,
@@ -101,6 +107,7 @@ export interface Host {
   provide(
     name: string,
     handler: (input: any, signal: AbortSignal) => any,
+    options?: { callers?: readonly string[] },
   ): void;
   providers(name: string): CapabilityProvider[];
   call<T = unknown>(

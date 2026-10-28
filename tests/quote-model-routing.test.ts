@@ -15,11 +15,16 @@ it("quotes the selected route using its public model name even when IDs collide"
                 { id: "start", type: "start", next: "condition" },
                 {
                   id: "condition",
-                  type: "condition",
-                  test: "model",
-                  models: ["assistant"],
+                  type: "branch",
+                  condition: false,
                   yes: "matched",
                   no: "other",
+                },
+                {
+                  id: "condition-predicate",
+                  type: "predicate",
+                  test: "model",
+                  models: ["assistant"],
                 },
                 {
                   id: "matched",
@@ -32,6 +37,14 @@ it("quotes the selected route using its public model name even when IDs collide"
                   type: "upstream",
                   target: "expensive",
                   mode: "implicit",
+                },
+              ],
+              bindings: [
+                {
+                  source: "condition-predicate",
+                  output: "result",
+                  target: "condition",
+                  input: "condition",
                 },
               ],
             },

@@ -138,11 +138,16 @@ it("resolves quotes and execution through the same conditional route and entry/g
                 { id: "s", type: "start", next: "branch" },
                 {
                   id: "branch",
-                  type: "condition",
-                  test: "textLengthAbove",
-                  value: 0,
+                  type: "branch",
+                  condition: false,
                   yes: "fixed",
                   no: "token",
+                },
+                {
+                  id: "branch-predicate",
+                  type: "predicate",
+                  test: "textLengthAbove",
+                  value: 0,
                 },
                 {
                   id: "fixed",
@@ -155,6 +160,14 @@ it("resolves quotes and execution through the same conditional route and entry/g
                   type: "upstream",
                   target: "demo",
                   mode: "implicit",
+                },
+              ],
+              bindings: [
+                {
+                  source: "branch-predicate",
+                  output: "result",
+                  target: "branch",
+                  input: "condition",
                 },
               ],
             },

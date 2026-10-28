@@ -28,11 +28,16 @@ it("enforces personal-channel permissions after resolving typed inputs", async (
         { id: "s", type: "start", next: "condition" },
         {
           id: "condition",
-          type: "condition",
-          test: "model",
-          models: ["demo"],
+          type: "branch",
+          condition: false,
           yes: "limit",
           no: "limit",
+        },
+        {
+          id: "condition-predicate",
+          type: "predicate",
+          test: "model",
+          models: ["demo"],
         },
         { id: "limit", type: "rateLimit", rule: {}, next: "call" },
         { id: "call", type: "provider" },
@@ -47,6 +52,12 @@ it("enforces personal-channel permissions after resolving typed inputs", async (
       bindings: [
         { source: "rpm", output: "value", target: "limit", input: "rule.rpm" },
         { source: "model", output: "value", target: "call", input: "model" },
+        {
+          source: "condition-predicate",
+          output: "result",
+          target: "condition",
+          input: "condition",
+        },
       ],
     };
     const created = await f.request(

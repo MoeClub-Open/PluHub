@@ -131,23 +131,47 @@ it("uses the same requested/mapped model conditions for preview, execution and q
         { id: "s", type: "start", next: "requested" },
         {
           id: "requested",
-          type: "condition",
-          test: "model",
-          models: ["assistant"],
+          type: "branch",
+          condition: false,
           yes: "mapped",
           no: "other",
         },
         {
-          id: "mapped",
-          type: "condition",
+          id: "requested-predicate",
+          type: "predicate",
           test: "model",
-          modelSource: "mapped",
-          models: ["vendor-*"],
+          models: ["assistant"],
+        },
+        {
+          id: "mapped",
+          type: "branch",
+          condition: false,
           yes: "match",
           no: "other",
         },
+        {
+          id: "mapped-predicate",
+          type: "predicate",
+          test: "model",
+          modelSource: "mapped",
+          models: ["vendor-*"],
+        },
         { id: "match", type: "provider", model: "vendor-selected" },
         { id: "other", type: "provider", model: "vendor-other" },
+      ],
+      bindings: [
+        {
+          source: "requested-predicate",
+          output: "result",
+          target: "requested",
+          input: "condition",
+        },
+        {
+          source: "mapped-predicate",
+          output: "result",
+          target: "mapped",
+          input: "condition",
+        },
       ],
     };
     const configuration = await f.request(
@@ -336,16 +360,23 @@ it("keeps same-protocol restrictions across redirects and lets branches select b
       entry: "s",
       nodes: [
         { id: "s", type: "start", next: "branch" },
+        { id: "branch", type: "branch", condition: false, yes: "a", no: "b" },
         {
-          id: "branch",
-          type: "condition",
+          id: "branch-predicate",
+          type: "predicate",
           test: "protocol",
           protocol: "anthropic",
-          yes: "a",
-          no: "b",
         },
         { id: "a", type: "provider", model: "vendor-anthropic" },
         { id: "b", type: "provider", model: "vendor-other" },
+      ],
+      bindings: [
+        {
+          source: "branch-predicate",
+          output: "result",
+          target: "branch",
+          input: "condition",
+        },
       ],
     };
     f.kernel.configure({ "official.ai-router": f.router });
@@ -959,11 +990,12 @@ it("persists one untyped channel with multiple provider branches, validates prev
               { id: "s", type: "start", next: "condition" },
               {
                 id: "condition",
-                type: "condition",
-                test: "stream",
+                type: "branch",
+                condition: false,
                 yes: "budget",
                 no: "short",
               },
+              { id: "condition-predicate", type: "predicate", test: "stream" },
               { id: "budget", type: "maxTokens", limit: 20, next: "stream" },
               {
                 id: "stream",
@@ -976,6 +1008,14 @@ it("persists one untyped channel with multiple provider branches, validates prev
                 type: "provider",
                 model: "short-model",
                 upstream: f.router.upstreams.p,
+              },
+            ],
+            bindings: [
+              {
+                source: "condition-predicate",
+                output: "result",
+                target: "condition",
+                input: "condition",
               },
             ],
           },

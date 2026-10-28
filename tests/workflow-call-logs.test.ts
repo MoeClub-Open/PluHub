@@ -29,7 +29,7 @@ it("records the host-created parent and node identity for an actual child dispat
       await writeFile(
         join(path, "index.js"),
         `export default { setup(host) {
-      host.route({ method: "POST", path: "/v1/chat/completions", access: "authenticated",
+      host.route({ childCallers: [host.id], method: "POST", path: "/v1/chat/completions", access: "authenticated",
         async handle(request, ctx) {
           const observation = ctx.state.get("ai.observation");
           Object.assign(observation, { model: "test-model", upstream: "test-provider", finished: true,

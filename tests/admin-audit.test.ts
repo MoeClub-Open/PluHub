@@ -5,6 +5,48 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { auditStore } from "../packages/control/dist/audit.js";
 import { fixture } from "./helpers.js";
+import { mockHost } from "../packages/testkit/dist/index.js";
+
+it("uses each plugin's route declaration to distinguish previews from changes", async () => {
+  const f = await mockHost();
+  const entries: { path: string }[] = [];
+  f.kernel.setAuditHandler((entry) => {
+    entries.push(entry);
+  });
+  await f.plugin(
+    {
+      schemaVersion: 1,
+      id: "example.operations",
+      version: "1.0.0",
+      host: ">=0.1.0-alpha.1",
+      runtime: { kind: "native", entry: "index.js" },
+      provides: [],
+      requires: [],
+      permissions: ["api.register", "identity.provide"],
+    },
+    `export default { setup(host) {
+    host.identity(async () => ({id:'admin',session:true,permissions:['*']}));
+    host.api({method:'POST',path:'/preview',access:'host.manage',audit:false,handle:()=>Response.json({ok:true})});
+    host.api({method:'POST',path:'/change',access:'host.manage',handle:()=>Response.json({ok:true})});
+  } }`,
+  );
+  try {
+    await f.kernel.start();
+    for (const action of ["preview", "change"]) {
+      const response = await f.kernel.fetch(
+        new Request("http://test/api/plugins/example.operations/" + action, {
+          method: "POST",
+        }),
+      );
+      expect(response.status).toBe(200);
+      await response.json();
+    }
+    expect(entries).toHaveLength(2);
+    expect(entries.every((entry) => entry.path.endsWith("/change"))).toBe(true);
+  } finally {
+    await f.close();
+  }
+});
 
 it("hides historical read-only requests without deleting them or hiding changes", async () => {
   const directory = await mkdtemp(join(tmpdir(), "pluhub-audit-operations-"));

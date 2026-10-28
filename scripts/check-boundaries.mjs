@@ -47,7 +47,7 @@ async function checkGeneric(dir) {
     else if (/\.tsx?$/.test(e.name)) {
       const source = await readFile(file, "utf8");
       if (
-        /@pluhub\/contracts\/(?:ai|routing|commerce|security|workflow|subscription)/.test(
+        /(?:@pluhub\/contracts\/(?:ai|routing|commerce|security|workflow|subscription)|\bofficial\.)/.test(
           source,
         )
       )
