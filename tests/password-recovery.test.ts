@@ -167,6 +167,14 @@ async function recoveryFixture() {
 it("resets only the verified owner, revokes all their sessions, preserves API keys and follows their language", async () => {
   const f = await recoveryFixture();
   try {
+    await f.read(
+      await f.request(
+        auth + "/preferences",
+        "PATCH",
+        { language: "en-US" },
+        f.session,
+      ),
+    );
     const second = await f.login(originalPassword);
     await f.read(second);
     const secondSession = cookie(second);
