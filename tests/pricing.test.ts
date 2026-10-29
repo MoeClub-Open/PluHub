@@ -1,4 +1,5 @@
-import { migrateLegacyChannels } from "../deploy/migrations/channel-graphs.ts";
+import { defaultChannelFlow } from "../deploy/migrations/channel-graphs.ts";
+import { migrateModelRedirects } from "../deploy/migrations/model-redirects.ts";
 import { it, expect } from "vitest";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -46,6 +47,7 @@ const router = {
       protocol: "openai-chat",
       baseUrl: "https://test.example",
       keyRef: "env:PLUHUB_TEST_UPSTREAM_KEY",
+      flow: defaultChannelFlow(),
       consumptionMultiplier: 0.5,
     },
   },
@@ -59,7 +61,7 @@ const router = {
   },
   redirects: { alias: { target: "demo", mode: "implicit" } },
 };
-migrateLegacyChannels({ plugins: [{ path: "/ai-router", config: router }] });
+migrateModelRedirects(router as any);
 
 const usage = {
   prompt_tokens: 1000,

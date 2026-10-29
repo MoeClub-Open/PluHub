@@ -1,4 +1,5 @@
 import { migrateLegacyChannels } from "../deploy/migrations/channel-graphs.ts";
+import { migrateModelRedirects } from "../deploy/migrations/model-redirects.ts";
 import { it, expect } from "vitest";
 import { createServer } from "node:http";
 import { fixture } from "./helpers.js";
@@ -103,14 +104,17 @@ async function setup() {
       },
     },
   };
+  const connection = structuredClone(router.upstreams.p);
   router.upstreams.composed = { flow: workflow.flows.standard };
-  migrateLegacyChannels({ plugins: [{ path: "/ai-router", config: router }] });
+  router.upstreams.p.flow = defaultChannelFlow();
+  migrateModelRedirects(router);
   f.kernel.configure({ "official.ai-router": router });
   const admin = await f.admin();
   return {
     ...f,
     admin,
     router,
+    connection,
     workflow,
     sent,
     async cleanup() {
@@ -1002,13 +1006,13 @@ it("persists one untyped channel with multiple provider branches, validates prev
                 id: "stream",
                 type: "provider",
                 model: "stream-model",
-                upstream: f.router.upstreams.p,
+                upstream: f.connection,
               },
               {
                 id: "short",
                 type: "provider",
                 model: "short-model",
-                upstream: f.router.upstreams.p,
+                upstream: f.connection,
               },
             ],
             bindings: [
