@@ -20,6 +20,12 @@ it("publishes only public content and preserves portal and onboarding across res
       portal: {
         title: "门户上线",
         description: '<img src=x onerror="alert(1)">',
+        translations: {
+          "en-US": {
+            title: "English portal",
+            description: "English description",
+          },
+        },
         pages: [
           {
             slug: "help",
@@ -48,6 +54,15 @@ it("publishes only public content and preserves portal and onboarding across res
     const html = await (await f.request("/")).text();
     expect(html).toContain("&lt;img");
     expect(html).not.toContain("<img src=x");
+    const english = await (
+      await f.kernel.fetch(
+        new Request("http://localhost/", {
+          headers: { "accept-language": "en-GB,en;q=0.9" },
+        }),
+      )
+    ).text();
+    expect(english).toContain('<html lang="en-US">');
+    expect(english).toContain('content="English description"');
     const head = await f.kernel.fetch(
       new Request("http://localhost/", { method: "HEAD" }),
     );

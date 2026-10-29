@@ -197,15 +197,15 @@ it("delivers branded MIME alternatives and follows browser, site and recipient a
     });
     expect(created.status).toBe(200);
     const user = await created.json();
-    expect(user.language).toBe("en-US");
+    expect(user.language).toBeNull();
     now += 61000;
     await f.request(auth + "/email/request", "POST", {
       email: "recipient@example.test",
       purpose: "login",
       language: "zh-CN",
     });
-    expect(f.deliveries.at(-1)?.subject).toBe("Moe & API · Your sign-in code");
-    expect(f.deliveries.at(-1)?.html).toContain('lang="en-US"');
+    expect(f.deliveries.at(-1)?.subject).toBe("Moe & API · 登录验证码");
+    expect(f.deliveries.at(-1)?.html).toContain('lang="zh-CN"');
 
     await f.kernel.invoke("users.manage@1", {
       action: "preferences",

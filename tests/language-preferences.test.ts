@@ -77,7 +77,13 @@ it("rejects anonymous, API-key, cross-origin, invalid and cross-account preferen
     const saved = await (
       await f.request(auth + "/me", "GET", undefined, admin)
     ).json();
-    for (const language of [null, "site", "en-GB", "<script>bad</script>", 1])
+    for (const language of [
+      undefined,
+      "site",
+      "en-GB",
+      "<script>bad</script>",
+      1,
+    ])
       expect(
         (await f.request(auth + "/preferences", "PATCH", { language }, admin))
           .status,
@@ -137,6 +143,29 @@ it("rejects anonymous, API-key, cross-origin, invalid and cross-account preferen
     expect(
       await (await f.request(auth + "/me", "GET", undefined, admin)).json(),
     ).toMatchObject({ id: saved.id, language: null });
+    expect(
+      (
+        await f.request(
+          auth + "/preferences",
+          "PATCH",
+          { language: "en-US" },
+          admin,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await f.request(
+          auth + "/preferences",
+          "PATCH",
+          { language: null },
+          admin,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      await (await f.request(auth + "/me", "GET", undefined, admin)).json(),
+    ).toMatchObject({ language: null });
   } finally {
     await f.close();
   }
