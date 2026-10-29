@@ -67,6 +67,11 @@ async function setup(
             id: "call",
             type: "provider",
             upstream: { protocol: "openai-chat", baseUrl, keyRef: "test-key" },
+            modelMap: {
+              "first-upstream": "first-upstream",
+              "second-upstream": "second-upstream",
+              "summary-upstream": "summary-upstream",
+            },
           },
         ],
       },

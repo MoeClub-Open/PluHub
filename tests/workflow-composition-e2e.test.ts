@@ -98,7 +98,12 @@ async function gateway(forceParallel = false) {
           entry: "start",
           nodes: [
             { id: "start", type: "start", next: "call" },
-            { id: "call", type: "provider", upstream: connection },
+            {
+              id: "call",
+              type: "provider",
+              upstream: connection,
+              modelMap: { [`vendor-${name}`]: `vendor-${name}` },
+            },
           ],
         },
       },

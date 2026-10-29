@@ -70,6 +70,7 @@ it("records only explicitly enabled upstream response model IDs for both respons
                 id: "call",
                 type: "provider",
                 upstream: connection,
+                modelMap: { "requested-upstream": "requested-upstream" },
                 ...(enabled ? { recordResponseModel: true } : {}),
               },
             ],

@@ -77,6 +77,7 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
             {
               id: "call",
               type: "provider",
+              modelMap: { "paid-upstream": "paid-upstream" },
               upstream: {
                 protocol: "openai-chat",
                 baseUrl: `${origin}/platform/v1`,

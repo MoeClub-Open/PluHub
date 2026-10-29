@@ -74,7 +74,7 @@ it("routes via a metered Jev node and settles at the reservation when usage is a
       )
     ).json();
     const baseUrl = `http://127.0.0.1:${(server.address() as any).port}/v1`;
-    const provider = (protocol: string, keyRef: string) => ({
+    const provider = (protocol: string, keyRef: string, models: string[]) => ({
       flow: {
         entry: "start",
         nodes: [
@@ -83,13 +83,17 @@ it("routes via a metered Jev node and settles at the reservation when usage is a
             id: "call",
             type: "provider",
             upstream: { protocol, baseUrl, keyRef },
+            modelMap: Object.fromEntries(models.map((model) => [model, model])),
           },
         ],
       },
     });
     settings.config.upstreams = {
-      decision: provider("systemone", "jev-test-key"),
-      text: provider("openai-chat", "chat-test-key"),
+      decision: provider("systemone", "jev-test-key", ["jev-provider"]),
+      text: provider("openai-chat", "chat-test-key", [
+        "strong-provider",
+        "fast-provider",
+      ]),
       route: {
         flow: {
           entry: "start",

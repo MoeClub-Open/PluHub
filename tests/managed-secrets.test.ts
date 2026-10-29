@@ -259,6 +259,7 @@ it("seals bound credential values and only grants them to the effective provider
             {
               id: "call",
               type: "provider",
+              modelMap: { vendor: "vendor" },
               upstream: {
                 protocol: "openai-chat",
                 baseUrl: `http://127.0.0.1:${(server.address() as any).port}/v1`,

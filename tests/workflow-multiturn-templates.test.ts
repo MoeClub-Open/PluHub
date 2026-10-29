@@ -76,7 +76,12 @@ it("preserves the full conversation when discussing or polishing a response", as
             entry: "start",
             nodes: [
               { id: "start", type: "start", next: "call" },
-              { id: "call", type: "provider", upstream: connection },
+              {
+                id: "call",
+                type: "provider",
+                upstream: connection,
+                modelMap: { [`vendor-${name}`]: `vendor-${name}` },
+              },
             ],
           },
         },
