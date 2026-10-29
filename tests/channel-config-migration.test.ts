@@ -5,6 +5,49 @@ import {
 } from "../deploy/migrations/channel-graphs.ts";
 import { compileWorkflow } from "../../PluHub-Plugins/lib/ai/channel-graph.js";
 
+it("persists implicit provider targets without expanding an explicit node mapping", () => {
+  const config: any = {
+    plugins: [
+      {
+        path: "/plugins/ai-router",
+        config: {
+          upstreams: {
+            c: {
+              flow: {
+                entry: "start",
+                nodes: [
+                  { id: "start", type: "start", next: "legacy" },
+                  { id: "legacy", type: "provider", model: "original-target" },
+                  {
+                    id: "explicit",
+                    type: "provider",
+                    modelMap: { other: "only-this-target" },
+                  },
+                ],
+              },
+            },
+          },
+          models: {
+            alias: { upstream: "c", model: "channel-model", inputPrice: 2 },
+          },
+        },
+      },
+    ],
+  };
+  expect(migrateLegacyChannels(config)).toBe(true);
+  const router = config.plugins[0].config;
+  expect(router.upstreams.c.flow.nodes[1]).toEqual({
+    id: "legacy",
+    type: "provider",
+    modelMap: { "channel-model": "original-target" },
+  });
+  expect(router.upstreams.c.flow.nodes[2].modelMap).toEqual({
+    other: "only-this-target",
+  });
+  expect(router.models.alias.inputPrice).toBe(2);
+  expect(migrateLegacyChannels(config)).toBe(false);
+});
+
 it("moves channel quotas and model pacing into graphs without losing defaults, custom tokenizers or orphan rules", () => {
   const config: any = {
     plugins: [
@@ -189,7 +232,12 @@ it("moves provider settings into graph nodes without changing secret grants", ()
       entry: "start",
       nodes: [
         { id: "start", type: "start", next: "provider" },
-        { id: "provider", type: "provider", upstream: connection },
+        {
+          id: "provider",
+          type: "provider",
+          upstream: connection,
+          modelMap: {},
+        },
       ],
     },
   });

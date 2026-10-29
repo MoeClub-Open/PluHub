@@ -143,5 +143,27 @@ export function migrateLegacyChannels(config: {
       return false;
     });
   }
-  return migrateModelRedirects(router) || changed;
+  changed = migrateModelRedirects(router) || changed;
+  for (const [id, channel] of Object.entries(upstreams)) {
+    for (const node of channel.flow?.nodes ?? []) {
+      if (
+        node.type !== "provider" ||
+        node.modelMap !== undefined ||
+        channel.flow.bindings?.some(
+          (binding: any) =>
+            binding.target === node.id &&
+            ["model", "modelMap"].includes(binding.input),
+        )
+      )
+        continue;
+      node.modelMap = Object.fromEntries(
+        Object.values(models)
+          .filter((route) => route.upstream === id)
+          .map((route) => [route.model, node.model ?? route.model]),
+      );
+      delete node.model;
+      changed = true;
+    }
+  }
+  return changed;
 }
