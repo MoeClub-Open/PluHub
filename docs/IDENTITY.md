@@ -56,7 +56,7 @@ hCaptcha 使用 `provider: "hcaptcha"`，填写 Site Key 和 Secret Key；密钥
 
 服务端以表单格式向 `https://api.hcaptcha.com/siteverify` 提交 `secret`、`response` 和配置中的 `sitekey`，由官方接口约束站点归属、有效期及单次使用；本站校验 `success`，并额外记录两分钟内已用令牌。hCaptcha 的 `hostname` 是统计字段，可能返回 `not-provided`，不作为认证条件；允许域名在 hCaptcha 控制台设置，本站不显示 Turnstile/reCAPTCHA 的主机名配置。标准接入不依赖企业版评分。
 
-所有服务通过 `captcha.options@1` 和 `captcha.verify@1` 接入 Auth。浏览器统一提交 `captchaToken`；旧客户端的 `turnstileToken` 继续兼容。极验将 `getValidate()` 结果编码为 JSON 字符串传递。成功令牌按提供商与 Site Key 隔离缓存摘要，极验以流水号去重，防止更改 JSON 字段顺序绕过本地重放检查。失败、超时或异常响应均不放行，Secret Key 不进入前端。Console 仅在需要验证时加载所选提供商的组件，CSP 允许固定的官方脚本、连接与 iframe 来源。
+所有服务通过 `captcha.options@1` 和 `captcha.verify@1` 接入 Auth。浏览器从 `captchaProvider` 获取验证配置，统一提交 `captchaToken`。极验将 `getValidate()` 结果编码为 JSON 字符串传递。成功令牌按提供商与 Site Key 隔离缓存摘要，极验以流水号去重，防止更改 JSON 字段顺序绕过本地重放检查。失败、超时或异常响应均不放行，Secret Key 不进入前端。Console 仅在需要验证时加载所选提供商的组件，CSP 允许固定的官方脚本、连接与 iframe 来源。
 
 `official.auth`：
 
@@ -117,20 +117,20 @@ bun apps/cli/dist/index.js call auth.reset-factors@1 '{"username":"admin"}' --co
 
 管理和个人 API 均位于 `/api/plugins/official.auth`。`/options` 公开查询启用的方式和必要的公开 Site Key；不会返回任何秘密。
 
-| 流程 | 接口 |
-| --- | --- |
-| 密码登录 | `POST /login` |
-| 第二步 | `POST /login/mfa`，携带 `challenge` 和 `code` 或 `recoveryCode` |
-| 邮件验证 | `POST /email/request`，`purpose` 为 `register`、`login` 或 `bind` |
-| 找回密码 | `POST /email/request`，`purpose: "reset"`；`POST /password/reset` 提交邮箱、`challenge`、`code` 和新 `password` |
-| 恢复的第二步 | `POST /password/reset/finish`，提交恢复 `challenge` 和 `code` 或 `recoveryCode`；或先完成 Passkey 登录再提交恢复挑战 |
-| 注册 / 邮件登录 / 绑定 | `POST /register`、`POST /email/login`、`POST /email/bind` |
-| 安全状态 / 再认证 | `GET /security`、`POST /reauth` |
-| TOTP | `POST /totp/setup`、`POST /totp/confirm`、`DELETE /totp` |
-| 重建恢复码 | `POST /recovery-codes` |
-| WebAuthn 绑定 | `POST /passkeys/register/options`、`POST /passkeys/register/verify` |
-| WebAuthn 登录 | `POST /passkeys/login/options`、`POST /passkeys/login/verify` |
-| 撤销凭据 | `DELETE /passkeys?id=凭据ID` |
+| 流程                   | 接口                                                                                                                 |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 密码登录               | `POST /login`                                                                                                        |
+| 第二步                 | `POST /login/mfa`，携带 `challenge` 和 `code` 或 `recoveryCode`                                                      |
+| 邮件验证               | `POST /email/request`，`purpose` 为 `register`、`login` 或 `bind`                                                    |
+| 找回密码               | `POST /email/request`，`purpose: "reset"`；`POST /password/reset` 提交邮箱、`challenge`、`code` 和新 `password`      |
+| 恢复的第二步           | `POST /password/reset/finish`，提交恢复 `challenge` 和 `code` 或 `recoveryCode`；或先完成 Passkey 登录再提交恢复挑战 |
+| 注册 / 邮件登录 / 绑定 | `POST /register`、`POST /email/login`、`POST /email/bind`                                                            |
+| 安全状态 / 再认证      | `GET /security`、`POST /reauth`                                                                                      |
+| TOTP                   | `POST /totp/setup`、`POST /totp/confirm`、`DELETE /totp`                                                             |
+| 重建恢复码             | `POST /recovery-codes`                                                                                               |
+| WebAuthn 绑定          | `POST /passkeys/register/options`、`POST /passkeys/register/verify`                                                  |
+| WebAuthn 登录          | `POST /passkeys/login/options`、`POST /passkeys/login/verify`                                                        |
+| 撤销凭据               | `DELETE /passkeys?id=凭据ID`                                                                                         |
 
 密码或邮件验证通过但仍需第二因素时，响应为 `{ "mfaRequired": true, "challenge": "...", "methods": ["totp", "recovery"] }`，此时不会颁发登录会话。客户端完成 `/login/mfa` 后才获得 `pluhub_session`。安全接口返回 `Cache-Control: no-store`。
 

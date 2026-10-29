@@ -347,14 +347,21 @@ it("supports all Epay version/signature combinations with signed V2 responses an
       };
       const config = {
         enabled: true,
-        version,
-        algorithm,
-        pid: "123",
-        baseUrl: "https://epay.example",
-        publicUrl: "http://localhost",
-        keyRef: "env:PLUHUB_EPAY_MD5",
-        privateKeyRef: "env:PLUHUB_EPAY_PRIVATE",
-        platformPublicKeyRef: "env:PLUHUB_EPAY_PUBLIC",
+        methods: [
+          {
+            id: "1",
+            enabled: true,
+            paymentType: "alipay",
+            version,
+            algorithm,
+            pid: "123",
+            baseUrl: "https://epay.example",
+            publicUrl: "http://localhost",
+            keyRef: "env:PLUHUB_EPAY_MD5",
+            privateKeyRef: "env:PLUHUB_EPAY_PRIVATE",
+            platformPublicKeyRef: "env:PLUHUB_EPAY_PUBLIC",
+          },
+        ],
         secretRefs: [
           "env:PLUHUB_EPAY_MD5",
           "env:PLUHUB_EPAY_PRIVATE",
@@ -404,7 +411,7 @@ it("supports all Epay version/signature combinations with signed V2 responses an
         async function notify(value: any) {
           const response = await f.kernel.fetch(
             new Request(
-              "http://localhost/api/plugins/official.payments-epay/notify?pluhub_method=default&" +
+              "http://localhost/api/plugins/official.payments-epay/notify?pluhub_method=1&" +
                 new URLSearchParams(value),
             ),
           );

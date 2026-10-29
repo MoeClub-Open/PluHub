@@ -48,15 +48,6 @@ export function validateConfig(value: unknown): asserts value is HostConfig {
 export async function readConfig(file: string): Promise<HostConfig> {
   const config = JSON.parse(await readFile(file, "utf8"));
   validateConfig(config);
-  if (
-    config.schemaVersion !== 1 ||
-    typeof config.dataDir !== "string" ||
-    !Array.isArray(config.plugins)
-  )
-    throw new HostError("invalid_config", "Invalid host config");
-  for (const plugin of config.plugins)
-    if (typeof plugin.path !== "string" || !Array.isArray(plugin.grants))
-      throw new HostError("invalid_config", "Invalid plugin config");
   config.dataDir = resolve(dirname(file), config.dataDir);
   for (const plugin of config.plugins)
     plugin.path = resolve(dirname(file), plugin.path);

@@ -541,7 +541,7 @@ it("authorizes Passkey recovery only after CAPTCHA and verified email, without a
       400,
     );
     const proof = await f.requestReset({
-      turnstileToken: "valid-login-recovery",
+      captchaToken: "valid-login-recovery",
     });
     const pending = await f.read(
       await f.post("/password/reset", proof.input, proof.headers),

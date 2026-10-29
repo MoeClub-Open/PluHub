@@ -473,7 +473,7 @@ it("requires Turnstile server verification before password login or registration
       (
         await f.request(auth + "/login", "POST", {
           ...input,
-          turnstileToken: "invalid",
+          captchaToken: "invalid",
         })
       ).status,
     ).toBe(400);
@@ -482,7 +482,7 @@ it("requires Turnstile server verification before password login or registration
       (
         await f.request(auth + "/login", "POST", {
           ...input,
-          turnstileToken: token,
+          captchaToken: token,
         })
       ).status,
     ).toBe(200);
@@ -490,7 +490,7 @@ it("requires Turnstile server verification before password login or registration
       (
         await f.request(auth + "/login", "POST", {
           ...input,
-          turnstileToken: token,
+          captchaToken: token,
         })
       ).status,
     ).toBe(400);
@@ -508,7 +508,7 @@ it("requires Turnstile server verification before password login or registration
         await f.request(auth + "/email/request", "POST", {
           email: "human@example.test",
           purpose: "register",
-          turnstileToken: "valid-register-unique",
+          captchaToken: "valid-register-unique",
         })
       ).status,
     ).toBe(200);
