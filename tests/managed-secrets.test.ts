@@ -255,7 +255,7 @@ it("seals bound credential values and only grants them to the effective provider
         flow: {
           entry: "start",
           nodes: [
-            { id: "start", type: "start", next: "call" },
+            { id: "start", type: "start", next: ["call"] },
             {
               id: "call",
               type: "provider",

@@ -128,7 +128,7 @@ it("meters a System One platform fallback only after an explicit personal reject
         flow: {
           entry: "start",
           nodes: [
-            { id: "start", type: "start", next: "provider" },
+            { id: "start", type: "start", next: ["provider"] },
             { id: "provider", type: "provider", fallback: "group" },
             {
               id: "group",

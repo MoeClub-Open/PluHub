@@ -207,7 +207,7 @@ const plugins = await Promise.all(
                                   {
                                     id: "start",
                                     type: "start",
-                                    next: "prompt",
+                                    next: ["prompt"],
                                   },
                                   {
                                     id: "prompt",

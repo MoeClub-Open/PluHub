@@ -296,7 +296,7 @@ it("uses the channel's final cap instead of the larger client cap", async () => 
     f.router.upstreams.primary.flow = {
       entry: "start",
       nodes: [
-        { id: "start", type: "start", next: "limit" },
+        { id: "start", type: "start", next: ["limit"] },
         { id: "limit", type: "maxTokens", limit: 8, next: "provider" },
         { id: "provider", type: "provider" },
       ],

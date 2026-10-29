@@ -12,7 +12,7 @@ it("uses payment history rather than gifts for HTTP model listings while retaini
             flow: {
               entry: "s",
               nodes: [
-                { id: "s", type: "start", next: "answer" },
+                { id: "s", type: "start", next: ["answer"] },
                 { id: "answer", type: "response", text: "ok" },
               ],
             },

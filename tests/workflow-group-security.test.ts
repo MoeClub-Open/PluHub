@@ -73,7 +73,7 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
         flow: {
           entry: "start",
           nodes: [
-            { id: "start", type: "start", next: "call" },
+            { id: "start", type: "start", next: ["call"] },
             {
               id: "call",
               type: "provider",
@@ -125,7 +125,7 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
         flow: {
           entry: "s",
           nodes: [
-            { id: "s", type: "start", next: "p" },
+            { id: "s", type: "start", next: ["p"] },
             { id: "p", type: "provider", fallback: "g" },
             { id: "g", type: "platform", groupId: "team", model: "paid-model" },
           ],
@@ -148,7 +148,7 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
       flow: {
         entry: "s",
         nodes: [
-          { id: "s", type: "start", next: "result" },
+          { id: "s", type: "start", next: ["result"] },
           {
             id: "personal-call",
             type: "llm",

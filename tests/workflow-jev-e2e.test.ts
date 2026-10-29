@@ -78,7 +78,7 @@ it("routes via a metered Jev node and settles at the reservation when usage is a
       flow: {
         entry: "start",
         nodes: [
-          { id: "start", type: "start", next: "call" },
+          { id: "start", type: "start", next: ["call"] },
           {
             id: "call",
             type: "provider",
@@ -98,7 +98,7 @@ it("routes via a metered Jev node and settles at the reservation when usage is a
         flow: {
           entry: "start",
           nodes: [
-            { id: "start", type: "start", next: "branch" },
+            { id: "start", type: "start", next: ["branch"] },
             {
               id: "decision",
               type: "jev",

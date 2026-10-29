@@ -16,7 +16,7 @@ it("persists implicit provider targets without expanding an explicit node mappin
               flow: {
                 entry: "start",
                 nodes: [
-                  { id: "start", type: "start", next: "legacy" },
+                  { id: "start", type: "start", next: ["legacy"] },
                   { id: "legacy", type: "provider", model: "original-target" },
                   {
                     id: "explicit",
@@ -129,7 +129,7 @@ it("migrates multi-profile legacy channels without changing aliases, pricing or 
   const flow = (target: string) => ({
     entry: "s",
     nodes: [
-      { id: "s", type: "start", next: "u" },
+      { id: "s", type: "start", next: ["u"] },
       { id: "u", type: "upstream", target, mode: "implicit" },
     ],
   });
@@ -231,7 +231,7 @@ it("moves provider settings into graph nodes without changing secret grants", ()
     flow: {
       entry: "start",
       nodes: [
-        { id: "start", type: "start", next: "provider" },
+        { id: "start", type: "start", next: ["provider"] },
         {
           id: "provider",
           type: "provider",

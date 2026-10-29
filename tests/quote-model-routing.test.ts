@@ -12,7 +12,7 @@ it("quotes the selected route using its public model name even when IDs collide"
             flow: {
               entry: "start",
               nodes: [
-                { id: "start", type: "start", next: "condition" },
+                { id: "start", type: "start", next: ["condition"] },
                 {
                   id: "condition",
                   type: "branch",

@@ -48,13 +48,6 @@ export function migrateModelRedirects(router: {
     router.models[source] = { ...model, publicModel: source, model: mapped };
     flow.nodes.push(
       {
-        id,
-        type: "branch",
-        condition: false,
-        yes: id + "-target",
-        no: start.next,
-      },
-      {
         id: id + "-test",
         type: "compare",
         valueType: "string",
@@ -69,21 +62,31 @@ export function migrateModelRedirects(router: {
         mode: explicit ? "explicit" : "implicit",
       },
     );
-    (flow.bindings ??= []).push(
-      {
-        source: start.id,
-        output: "mappedModel",
-        target: id + "-test",
-        input: "left",
-      },
-      {
+    (flow.bindings ??= []).push({
+      source: start.id,
+      output: "mappedModel",
+      target: id + "-test",
+      input: "left",
+    });
+    start.next = start.next.map((target, index) => {
+      let branchId = index ? `${id}-path-${index}` : id;
+      while (used.has(branchId)) branchId = `${id}-path-${suffix++}`;
+      used.add(branchId);
+      flow.nodes.push({
+        id: branchId,
+        type: "branch",
+        condition: false,
+        yes: id + "-target",
+        no: target,
+      });
+      flow.bindings!.push({
         source: id + "-test",
         output: "result",
-        target: id,
+        target: branchId,
         input: "condition",
-      },
-    );
-    start.next = id;
+      });
+      return branchId;
+    });
   }
   delete router.redirects;
   return true;

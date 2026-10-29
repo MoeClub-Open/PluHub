@@ -75,7 +75,7 @@ it("preserves the full conversation when discussing or polishing a response", as
           flow: {
             entry: "start",
             nodes: [
-              { id: "start", type: "start", next: "call" },
+              { id: "start", type: "start", next: ["call"] },
               {
                 id: "call",
                 type: "provider",

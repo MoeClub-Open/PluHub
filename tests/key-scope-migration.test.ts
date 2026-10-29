@@ -43,7 +43,7 @@ async function setup(mixed = false) {
                 flow: {
                   entry: "s",
                   nodes: [
-                    { id: "s", type: "start", next: "p" },
+                    { id: "s", type: "start", next: ["p"] },
                     { id: "p", type: "provider" },
                   ],
                 },

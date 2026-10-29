@@ -35,7 +35,7 @@ async function setup(rule: any = { rpm: 1 }) {
   const flow: any = {
     entry: "s",
     nodes: [
-      { id: "s", type: "start", next: "branch" },
+      { id: "s", type: "start", next: ["branch"] },
       {
         id: "branch",
         type: "branch",
@@ -198,7 +198,7 @@ it("supports personal channel limit nodes while preventing bypass of platform pa
     const flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "limit" },
+        { id: "s", type: "start", next: ["limit"] },
         { id: "limit", type: "rateLimit", rule: { rpm: 1 }, next: "p" },
         { id: "p", type: "provider" },
       ],
@@ -238,7 +238,7 @@ it("supports personal channel limit nodes while preventing bypass of platform pa
       flow: {
         entry: "s",
         nodes: [
-          { id: "s", type: "start", next: "pace" },
+          { id: "s", type: "start", next: ["pace"] },
           {
             id: "pace",
             type: "tps",
@@ -271,7 +271,7 @@ it("reserves the graph's effective output budget, refunds actual usage and relea
       (node) => !["branch", "branch-predicate"].includes(node.id),
     );
     f.router.upstreams.c.flow.bindings = [];
-    f.router.upstreams.c.flow.nodes[0].next = "budget";
+    f.router.upstreams.c.flow.nodes[0].next = ["budget"];
     f.router.upstreams.c.flow.nodes.push({
       id: "budget",
       type: "maxTokens",
@@ -351,7 +351,7 @@ it("carries redirect limits and resolves model-specific migrated pacing against 
         flow: {
           entry: "s",
           nodes: [
-            { id: "s", type: "start", next: "limit" },
+            { id: "s", type: "start", next: ["limit"] },
             {
               id: "limit",
               type: "rateLimit",
@@ -372,7 +372,7 @@ it("carries redirect limits and resolves model-specific migrated pacing against 
         flow: {
           entry: "s",
           nodes: [
-            { id: "s", type: "start", next: "pace" },
+            { id: "s", type: "start", next: ["pace"] },
             {
               id: "pace",
               type: "tps",

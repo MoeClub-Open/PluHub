@@ -42,7 +42,7 @@ try {
                   flow: {
                     entry: "start",
                     nodes: [
-                      { id: "start", type: "start", next: "prompt" },
+                      { id: "start", type: "start", next: ["prompt"] },
                       {
                         id: "prompt",
                         type: "prompt",

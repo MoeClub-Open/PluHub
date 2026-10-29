@@ -25,7 +25,7 @@ it("enforces personal-channel permissions after resolving typed inputs", async (
     const flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "condition" },
+        { id: "s", type: "start", next: ["condition"] },
         {
           id: "condition",
           type: "branch",
@@ -119,7 +119,7 @@ it("enforces personal-channel permissions after resolving typed inputs", async (
     invalidGroup.flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "group" },
+        { id: "s", type: "start", next: ["group"] },
         { id: "group", type: "platform", groupId: "default" },
         {
           id: "group-value",
@@ -156,7 +156,7 @@ it("enforces personal-channel permissions after resolving typed inputs", async (
     invalidInterface.flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "call" },
+        { id: "s", type: "start", next: ["call"] },
         { id: "call", type: "provider" },
         {
           id: "path",
@@ -459,7 +459,7 @@ it("applies personal channel protocol gates to bound API keys and validates prev
     const flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "gate" },
+        { id: "s", type: "start", next: ["gate"] },
         {
           id: "gate",
           type: "protocol",
@@ -803,7 +803,7 @@ it("runs personal channel graphs, enforces platform bindings and cancels an upst
     const flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "p" },
+        { id: "s", type: "start", next: ["p"] },
         { id: "p", type: "prompt", text: "Be concise", next: "budget" },
         { id: "budget", type: "maxTokens", limit: 10, next: "provider" },
         { id: "provider", type: "provider" },

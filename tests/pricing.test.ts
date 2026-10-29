@@ -140,7 +140,7 @@ it("resolves quotes and execution through the same conditional route and entry/g
             flow: {
               entry: "s",
               nodes: [
-                { id: "s", type: "start", next: "branch" },
+                { id: "s", type: "start", next: ["branch"] },
                 {
                   id: "branch",
                   type: "branch",
@@ -368,7 +368,7 @@ it("reserves the effective channel output budget and includes inserted prompts i
     next.upstreams.primary.flow = {
       entry: "start",
       nodes: [
-        { id: "start", type: "start", next: "budget" },
+        { id: "start", type: "start", next: ["budget"] },
         { id: "budget", type: "maxTokens", limit: 8, next: "provider" },
         { id: "provider", type: "provider" },
       ],
@@ -387,7 +387,7 @@ it("reserves the effective channel output budget and includes inserted prompts i
     expect(response.status).toBe(200);
     await response.json();
     expect((await f.balance()).held).toBe(0);
-    next.upstreams.primary.flow.nodes[0].next = "prompt";
+    next.upstreams.primary.flow.nodes[0].next = ["prompt"];
     next.upstreams.primary.flow.nodes.push({
       id: "prompt",
       type: "prompt",

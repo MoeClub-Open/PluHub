@@ -152,7 +152,7 @@ it("filters automatic routing candidates by trusted protocol admission", async (
     f.routing.upstreams.primary.flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "gate" },
+        { id: "s", type: "start", next: ["gate"] },
         {
           id: "gate",
           type: "protocol",

@@ -122,7 +122,7 @@ async function setup(credit = 1_000_000) {
     flow: {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "p" },
+        { id: "s", type: "start", next: ["p"] },
         { id: "p", type: "provider", fallback: "g" },
         { id: "g", type: "platform", groupId: "team", model: "paid-model" },
       ],
@@ -207,7 +207,7 @@ it("falls back from a personal key to its authorized paid group exactly once and
         flow: {
           entry: "s",
           nodes: [
-            { id: "s", type: "start", next: "g" },
+            { id: "s", type: "start", next: ["g"] },
             {
               id: "g",
               type: "platform",
@@ -237,7 +237,7 @@ it("falls back from a personal key to its authorized paid group exactly once and
         flow: {
           entry: "s",
           nodes: [
-            { id: "s", type: "start", next: "g" },
+            { id: "s", type: "start", next: ["g"] },
             { id: "g", type: "platform", groupId: "team", model: "paid-model" },
           ],
         },

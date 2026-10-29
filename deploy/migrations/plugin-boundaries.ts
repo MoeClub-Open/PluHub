@@ -67,7 +67,7 @@ export async function migratePluginBoundaries(file: string, write = true) {
   const router = config.plugins.find(
     (plugin) => identities.get(plugin.path) === "official.ai-router",
   );
-  // Convert legacy condition nodes before the new plugin validates its config.
+  // Migrate request-entry connections and legacy conditions before validating the config.
   for (const channel of Object.values(
     (router?.config?.upstreams ?? {}) as Record<
       string,

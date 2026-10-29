@@ -62,7 +62,7 @@ async function setup(
       flow: {
         entry: "start",
         nodes: [
-          { id: "start", type: "start", next: "call" },
+          { id: "start", type: "start", next: ["call"] },
           {
             id: "call",
             type: "provider",
@@ -203,7 +203,7 @@ it.each(["llm", "jev"] as const)(
           flow: {
             entry: "start",
             nodes: [
-              { id: "start", type: "start", next: "response" },
+              { id: "start", type: "start", next: ["response"] },
               ...(kind === "llm"
                 ? [
                     {
@@ -346,7 +346,7 @@ it("rejects a reached channel limit before starting paid workflow nodes", async 
       )
     ).json();
     const flow = config.config.upstreams.workflow.flow;
-    flow.nodes.find((node: any) => node.id === "start").next = "limit";
+    flow.nodes.find((node: any) => node.id === "start").next = ["limit"];
     flow.nodes.push({
       id: "limit",
       type: "rateLimit",

@@ -65,7 +65,7 @@ it("records only explicitly enabled upstream response model IDs for both respons
           flow: {
             entry: "start",
             nodes: [
-              { id: "start", type: "start", next: "call" },
+              { id: "start", type: "start", next: ["call"] },
               {
                 id: "call",
                 type: "provider",

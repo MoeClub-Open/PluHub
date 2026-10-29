@@ -74,7 +74,7 @@ it("rewrites the normal answer with a style prompt and routes a specific questio
           flow: {
             entry: "start",
             nodes: [
-              { id: "start", type: "start", next: "call" },
+              { id: "start", type: "start", next: ["call"] },
               {
                 id: "call",
                 type: "provider",
@@ -101,7 +101,7 @@ it("rewrites the normal answer with a style prompt and routes a specific questio
       flow: {
         entry: "start",
         nodes: [
-          { id: "start", type: "start", next: "branch" },
+          { id: "start", type: "start", next: ["branch"] },
           {
             id: "match",
             type: "compare",

@@ -4,11 +4,12 @@ import type {
   ProviderConnection,
 } from "@pluhub/contracts/ai";
 import type { ChannelWorkflow } from "@pluhub/contracts/workflow";
+import { migrateWorkflowConditions } from "@pluhub/contracts/workflow-migration";
 import { migrateModelRedirects } from "./model-redirects.ts";
 export const defaultChannelFlow = (): ChannelWorkflow => ({
   entry: "start",
   nodes: [
-    { id: "start", type: "start", next: "provider" },
+    { id: "start", type: "start", next: ["provider"] },
     { id: "provider", type: "provider" },
   ],
 });
@@ -102,6 +103,14 @@ export function migrateLegacyChannels(config: {
     channel.flow = next;
     changed = true;
   }
+  for (const channel of Object.values(upstreams)) {
+    if (!channel.flow) continue;
+    const migrated = migrateWorkflowConditions(channel.flow);
+    if (migrated !== channel.flow) {
+      channel.flow = migrated;
+      changed = true;
+    }
+  }
   // Keep orphan rules for repair instead of silently discarding them.
   const append = (channel: Upstream, node: Record<string, unknown>) => {
     const flow = (channel.flow ??= defaultChannelFlow());
@@ -109,15 +118,17 @@ export function migrateLegacyChannels(config: {
     if (start?.type !== "start") throw new Error("渠道流程入口无效");
     if (flow.nodes.length >= 64)
       throw new Error("请先精简渠道流程，再迁移旧规则");
-    let id = String(node.type),
-      i = 1;
-    while (flow.nodes.some((n) => n.id === id)) id = String(node.type) + i++;
-    flow.nodes.push({
-      ...node,
-      id,
-      next: start.next,
-    } as ChannelWorkflow["nodes"][number]);
-    start.next = id;
+    start.next = start.next.map((target) => {
+      let id = String(node.type),
+        i = 1;
+      while (flow.nodes.some((n) => n.id === id)) id = String(node.type) + i++;
+      flow.nodes.push({
+        ...node,
+        id,
+        next: target,
+      } as ChannelWorkflow["nodes"][number]);
+      return id;
+    });
     changed = true;
   };
   const limiter = find("rate-limit");

@@ -987,7 +987,7 @@ it("retries one 401 on the same subscription account, holds the stream lease and
             flow: {
               entry: "start",
               nodes: [
-                { id: "start", type: "start", next: "provider" },
+                { id: "start", type: "start", next: ["provider"] },
                 {
                   id: "provider",
                   type: "provider",

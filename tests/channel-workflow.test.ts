@@ -83,7 +83,7 @@ async function setup() {
       standard: {
         entry: "start",
         nodes: [
-          { id: "start", type: "start", next: "prompt" },
+          { id: "start", type: "start", next: ["prompt"] },
           {
             id: "prompt",
             type: "prompt",
@@ -133,7 +133,7 @@ it("uses the same requested/mapped model conditions for preview, execution and q
     f.router.upstreams.p.flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "requested" },
+        { id: "s", type: "start", next: ["requested"] },
         {
           id: "requested",
           type: "branch",
@@ -255,7 +255,7 @@ it("enforces trusted protocol admission before the upstream and keeps JSON/SSE c
     f.router.upstreams.p.flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "gate" },
+        { id: "s", type: "start", next: ["gate"] },
         {
           id: "gate",
           type: "protocol",
@@ -340,7 +340,7 @@ it("keeps same-protocol restrictions across redirects and lets branches select b
     f.router.upstreams.composed.flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "gate" },
+        { id: "s", type: "start", next: ["gate"] },
         {
           id: "gate",
           type: "protocol",
@@ -379,7 +379,7 @@ it("keeps same-protocol restrictions across redirects and lets branches select b
     f.router.upstreams.p.flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "branch" },
+        { id: "s", type: "start", next: ["branch"] },
         { id: "branch", type: "branch", condition: false, yes: "a", no: "b" },
         {
           id: "branch-predicate",
@@ -619,7 +619,7 @@ it("rejects channel recursion and invalid graph updates while preserving the pre
       }),
     ).toThrow();
     const invalid = structuredClone(f.workflow);
-    invalid.flows.standard.nodes[0].next = "absent";
+    invalid.flows.standard.nodes[0].next = ["absent"];
     expect(() =>
       f.kernel.configure({
         "official.ai-router": {
@@ -795,7 +795,7 @@ it("executes a physical channel's graph for every mapped model and checks the fi
         });
       }
     const invalid = structuredClone(router);
-    invalid.upstreams.p.flow.nodes[0].next = "missing";
+    invalid.upstreams.p.flow.nodes[0].next = ["missing"];
     expect(() => f.kernel.configure({ "official.ai-router": invalid })).toThrow(
       /missing/,
     );
@@ -826,7 +826,7 @@ it("uses graphs on all provider protocols and auto-router selections", async () 
     const graph = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: "p" },
+        { id: "s", type: "start", next: ["p"] },
         { id: "p", type: "prompt", text: "channel policy", next: "call" },
         { id: "call", type: "provider" },
       ],
@@ -991,7 +991,7 @@ it("migrates legacy graphs equivalently and rejects cyclic routes", async () => 
       /provider/,
     );
     invalid.upstreams.composed.flow.nodes = [
-      { id: "s", type: "start", next: "x" },
+      { id: "s", type: "start", next: ["x"] },
       { id: "x", type: "upstream", target: "missing", mode: "implicit" },
     ];
     invalid.upstreams.composed.flow.entry = "s";
@@ -1015,7 +1015,7 @@ it("persists one untyped channel with multiple provider branches, validates prev
           flow: {
             entry: "s",
             nodes: [
-              { id: "s", type: "start", next: "condition" },
+              { id: "s", type: "start", next: ["condition"] },
               {
                 id: "condition",
                 type: "branch",
@@ -1137,7 +1137,7 @@ it("persists one untyped channel with multiple provider branches, validates prev
     const invalid = structuredClone(updated);
     invalid.plugins.find((p: any) =>
       /[\\/]ai-router$/.test(p.path),
-    ).config.upstreams.unified.flow.nodes[0].next = "absent";
+    ).config.upstreams.unified.flow.nodes[0].next = ["absent"];
     const rejected = await f.request(
       "/api/host/config",
       "PUT",

@@ -253,7 +253,7 @@ it("authorizes, records and settles each Jev workflow request independently", as
       flow: {
         entry: "start",
         nodes: [
-          { id: "start", type: "start", next: "provider" },
+          { id: "start", type: "start", next: ["provider"] },
           { id: "provider", type: "provider" },
         ],
       },
@@ -281,7 +281,7 @@ it("authorizes, records and settles each Jev workflow request independently", as
         flow: {
           entry: "start",
           nodes: [
-            { id: "start", type: "start", next: "provider" },
+            { id: "start", type: "start", next: ["provider"] },
             {
               id: "provider",
               type: "provider",
