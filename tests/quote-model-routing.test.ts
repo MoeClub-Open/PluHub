@@ -22,9 +22,11 @@ it("quotes the selected route using its public model name even when IDs collide"
                 },
                 {
                   id: "condition-predicate",
-                  type: "predicate",
-                  test: "model",
-                  models: ["assistant"],
+                  type: "compare",
+                  valueType: "string",
+                  operator: "matches",
+                  left: "",
+                  right: ["assistant"],
                 },
                 {
                   id: "matched",
@@ -40,6 +42,12 @@ it("quotes the selected route using its public model name even when IDs collide"
                 },
               ],
               bindings: [
+                {
+                  source: "start",
+                  output: "requestedModel",
+                  target: "condition-predicate",
+                  input: "left",
+                },
                 {
                   source: "condition-predicate",
                   output: "result",

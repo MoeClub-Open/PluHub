@@ -34,7 +34,7 @@ it("persists condition node migration without losing connections or unrelated ch
                     no: "b",
                   },
                   {
-                    id: "check-predicate",
+                    id: "check-compare",
                     type: "value",
                     valueType: "string[]",
                     value: ["other"],
@@ -44,7 +44,7 @@ it("persists condition node migration without losing connections or unrelated ch
                 ],
                 bindings: [
                   {
-                    source: "check-predicate",
+                    source: "check-compare",
                     output: "value",
                     target: "check",
                     input: "models",
@@ -76,31 +76,38 @@ it("persists condition node migration without losing connections or unrelated ch
       expect.arrayContaining([
         { id: "check", type: "branch", condition: false, yes: "a", no: "b" },
         {
-          id: "check-predicate-1",
-          type: "predicate",
-          test: "model",
-          models: ["gpt-*"],
-          modelSource: "requested",
+          id: "check-compare-1",
+          type: "compare",
+          valueType: "string",
+          operator: "matches",
+          left: "",
+          right: ["gpt-*"],
         },
       ]),
     );
     expect(flow.bindings).toEqual([
       {
-        source: "check-predicate",
+        source: "check-compare",
         output: "value",
-        target: "check-predicate-1",
-        input: "models",
+        target: "check-compare-1",
+        input: "right",
       },
       {
-        source: "check-predicate-1",
+        source: "check-compare-1",
         output: "result",
         target: "check",
         input: "condition",
       },
+      {
+        source: "start",
+        output: "requestedModel",
+        target: "check-compare-1",
+        input: "left",
+      },
     ]);
     expect(flow.layout).toEqual({
       check: { x: 500, y: 200 },
-      "check-predicate-1": { x: 130, y: 200 },
+      "check-compare-1": { x: 130, y: 200 },
     });
     const backup = (await readdir(directory)).find((name) =>
       name.startsWith("pluhub.json.pre-plugin-boundaries-"),

@@ -143,9 +143,11 @@ it("uses the same requested/mapped model conditions for preview, execution and q
         },
         {
           id: "requested-predicate",
-          type: "predicate",
-          test: "model",
-          models: ["assistant"],
+          type: "compare",
+          valueType: "string",
+          operator: "matches",
+          left: "",
+          right: ["assistant"],
         },
         {
           id: "mapped",
@@ -156,15 +158,28 @@ it("uses the same requested/mapped model conditions for preview, execution and q
         },
         {
           id: "mapped-predicate",
-          type: "predicate",
-          test: "model",
-          modelSource: "mapped",
-          models: ["vendor-*"],
+          type: "compare",
+          valueType: "string",
+          operator: "matches",
+          left: "",
+          right: ["vendor-*"],
         },
         { id: "match", type: "provider", model: "vendor-selected" },
         { id: "other", type: "provider", model: "vendor-other" },
       ],
       bindings: [
+        {
+          source: "s",
+          output: "requestedModel",
+          target: "requested-predicate",
+          input: "left",
+        },
+        {
+          source: "s",
+          output: "mappedModel",
+          target: "mapped-predicate",
+          input: "left",
+        },
         {
           source: "requested-predicate",
           output: "result",
@@ -368,14 +383,22 @@ it("keeps same-protocol restrictions across redirects and lets branches select b
         { id: "branch", type: "branch", condition: false, yes: "a", no: "b" },
         {
           id: "branch-predicate",
-          type: "predicate",
-          test: "protocol",
-          protocol: "anthropic",
+          type: "compare",
+          valueType: "string",
+          operator: "eq",
+          left: "",
+          right: "anthropic",
         },
         { id: "a", type: "provider", model: "vendor-anthropic" },
         { id: "b", type: "provider", model: "vendor-other" },
       ],
       bindings: [
+        {
+          source: "s",
+          output: "ingressProtocol",
+          target: "branch-predicate",
+          input: "left",
+        },
         {
           source: "branch-predicate",
           output: "result",
@@ -1000,7 +1023,14 @@ it("persists one untyped channel with multiple provider branches, validates prev
                 yes: "budget",
                 no: "short",
               },
-              { id: "condition-predicate", type: "predicate", test: "stream" },
+              {
+                id: "condition-predicate",
+                type: "compare",
+                valueType: "boolean",
+                operator: "eq",
+                left: false,
+                right: true,
+              },
               { id: "budget", type: "maxTokens", limit: 20, next: "stream" },
               {
                 id: "stream",
@@ -1016,6 +1046,12 @@ it("persists one untyped channel with multiple provider branches, validates prev
               },
             ],
             bindings: [
+              {
+                source: "s",
+                output: "stream",
+                target: "condition-predicate",
+                input: "left",
+              },
               {
                 source: "condition-predicate",
                 output: "result",

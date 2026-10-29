@@ -217,8 +217,8 @@ const plugins = await Promise.all(
                                   },
                                   {
                                     id: "branch",
-                                    type: "condition",
-                                    test: "hasTools",
+                                    type: "branch",
+                                    condition: false,
                                     yes: "smart",
                                     no: "pace",
                                   },
@@ -240,6 +240,14 @@ const plugins = await Promise.all(
                                     type: "upstream",
                                     target: "demo/chat",
                                     mode: "implicit",
+                                  },
+                                ],
+                                bindings: [
+                                  {
+                                    source: "start",
+                                    output: "hasTools",
+                                    target: "branch",
+                                    input: "condition",
                                   },
                                 ],
                               },

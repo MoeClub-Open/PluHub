@@ -43,11 +43,24 @@ async function setup(rule: any = { rpm: 1 }) {
         yes: "limit",
         no: "provider",
       },
-      { id: "branch-predicate", type: "predicate", test: "stream" },
+      {
+        id: "branch-predicate",
+        type: "compare",
+        valueType: "boolean",
+        operator: "eq",
+        left: false,
+        right: true,
+      },
       { id: "limit", type: "rateLimit", rule, next: "provider" },
       { id: "provider", type: "provider" },
     ],
     bindings: [
+      {
+        source: "s",
+        output: "stream",
+        target: "branch-predicate",
+        input: "left",
+      },
       {
         source: "branch-predicate",
         output: "result",

@@ -35,9 +35,11 @@ it("enforces personal-channel permissions after resolving typed inputs", async (
         },
         {
           id: "condition-predicate",
-          type: "predicate",
-          test: "model",
-          models: ["demo"],
+          type: "compare",
+          valueType: "string",
+          operator: "matches",
+          left: "",
+          right: ["demo"],
         },
         { id: "limit", type: "rateLimit", rule: {}, next: "call" },
         { id: "call", type: "provider" },
@@ -50,6 +52,12 @@ it("enforces personal-channel permissions after resolving typed inputs", async (
         },
       ],
       bindings: [
+        {
+          source: "s",
+          output: "requestedModel",
+          target: "condition-predicate",
+          input: "left",
+        },
         { source: "rpm", output: "value", target: "limit", input: "rule.rpm" },
         { source: "model", output: "value", target: "call", input: "model" },
         {

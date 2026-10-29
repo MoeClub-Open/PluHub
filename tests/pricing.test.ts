@@ -150,9 +150,11 @@ it("resolves quotes and execution through the same conditional route and entry/g
                 },
                 {
                   id: "branch-predicate",
-                  type: "predicate",
-                  test: "textLengthAbove",
-                  value: 0,
+                  type: "compare",
+                  valueType: "number",
+                  operator: "gt",
+                  left: 0,
+                  right: 0,
                 },
                 {
                   id: "fixed",
@@ -168,6 +170,12 @@ it("resolves quotes and execution through the same conditional route and entry/g
                 },
               ],
               bindings: [
+                {
+                  source: "s",
+                  output: "textLength",
+                  target: "branch-predicate",
+                  input: "left",
+                },
                 {
                   source: "branch-predicate",
                   output: "result",
