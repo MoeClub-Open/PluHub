@@ -104,6 +104,7 @@ async function setup() {
     },
   };
   router.upstreams.composed = { flow: workflow.flows.standard };
+  migrateLegacyChannels({ plugins: [{ path: "/ai-router", config: router }] });
   f.kernel.configure({ "official.ai-router": router });
   const admin = await f.admin();
   return {

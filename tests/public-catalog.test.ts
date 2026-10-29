@@ -1,3 +1,4 @@
+import { migrateLegacyChannels } from "../deploy/migrations/channel-graphs.ts";
 import { it, expect } from "vitest";
 import { fixture } from "./helpers.js";
 
@@ -32,6 +33,8 @@ const config = {
   },
   redirects: { alias: { target: "standard", mode: "implicit" } },
 };
+
+migrateLegacyChannels({ plugins: [{ path: "/ai-router", config: config }] });
 
 it("publishes active platform model aliases and original prices without credentials or private bindings", async () => {
   const f = await fixture(

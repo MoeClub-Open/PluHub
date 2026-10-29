@@ -116,17 +116,24 @@ it("migrates multi-profile legacy channels without changing aliases, pricing or 
   const original = structuredClone(config);
   expect(migrateLegacyChannels(config)).toBe(true);
   const router = config.plugins[0].config;
-  expect(router.upstreams.c).toEqual({
-    name: "Legacy",
-    flow: flow("physical"),
-  });
+  expect(router.upstreams.c.name).toBe("Legacy");
+  expect(
+    router.upstreams.c.flow.nodes.find((node: any) => node.id === "u"),
+  ).toEqual(flow("physical").nodes[1]);
+  expect(() => compileWorkflow(router.upstreams.c.flow)).not.toThrow();
   expect(router.models.a).toEqual(original.plugins[0].config.models.a);
   expect(router.models.x.upstream).toBe("c");
   expect(router.models.b.upstream).toBe("c-graph-2");
   expect(router.upstreams[router.models.b.upstream].flow).toEqual(
     flow("smart"),
   );
-  expect(router.redirects).toEqual(original.plugins[0].config.redirects);
+  expect(router.redirects).toBeUndefined();
+  expect(router.models.alias).toMatchObject({
+    upstream: "c",
+    publicModel: "alias",
+    inputPrice: 2,
+    outputPrice: 4,
+  });
   expect(config.plugins[1]).toEqual(original.plugins[1]);
   expect(migrateLegacyChannels(config)).toBe(false);
   expect(compileWorkflow(defaultChannelFlow()).nodes.size).toBe(2);

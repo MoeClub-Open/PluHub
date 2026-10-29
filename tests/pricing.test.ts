@@ -1,3 +1,4 @@
+import { migrateLegacyChannels } from "../deploy/migrations/channel-graphs.ts";
 import { it, expect } from "vitest";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -58,6 +59,8 @@ const router = {
   },
   redirects: { alias: { target: "demo", mode: "implicit" } },
 };
+migrateLegacyChannels({ plugins: [{ path: "/ai-router", config: router }] });
+
 const usage = {
   prompt_tokens: 1000,
   completion_tokens: 100,

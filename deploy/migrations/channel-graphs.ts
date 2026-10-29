@@ -4,6 +4,7 @@ import type {
   ProviderConnection,
 } from "@pluhub/contracts/ai";
 import type { ChannelWorkflow } from "@pluhub/contracts/workflow";
+import { migrateModelRedirects } from "./model-redirects.ts";
 export const defaultChannelFlow = (): ChannelWorkflow => ({
   entry: "start",
   nodes: [
@@ -142,5 +143,5 @@ export function migrateLegacyChannels(config: {
       return false;
     });
   }
-  return changed;
+  return migrateModelRedirects(router) || changed;
 }
