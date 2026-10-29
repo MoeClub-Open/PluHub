@@ -165,4 +165,4 @@ pnpm test:docker
 
 恢复后停机运行 `docker compose run --rm -T gateway verify-data`，检查配置、插件依赖图、所有 SQLite 的 `quick_check` 及 Linux 数据文件权限。命令拒绝符号链接，不修复损坏数据；SQLite 和密钥文件应为 0600。Docker 验收包含独立卷恢复后的这项检查。镜像制备只复制 `RELEASE_LOCK.json` 列出的当前公共包，避免混入旧产物。
 
-主仓 Linux CI 已加入镜像构建和该验收；远端执行仍需提交代码后触发。本地已在 WSL2 Docker Engine 验证，不代表已完成生产服务器、TLS 或负载验收。
+镜像检查由 [持续集成](CICD.md) 执行；生产服务器的 TLS、真实服务和负载仍需按部署环境核对。

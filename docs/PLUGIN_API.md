@@ -14,21 +14,22 @@ Manifest 可填写 `name`（最多 80 字符）和 `description`（最多 400 �
 
 验证、启动或持久化失败保留旧实例；新包目录不覆盖旧包。已退休的旧目录保留供维护回退，不自动逆转数据库迁移，不提供跨进程掉电事务或任意有状态插件的无损升级保证。Native ESM 模块不能完全从加载缓存中卸载，持续升级较大的原生模块后可通过维护重启回收缓存。更新包需自包含依赖；Docker 部署时将插件包目录挂载到容器后填写容器内路径。
 
-| API                                   | 约定                                                                                          |
-| ------------------------------------- | --------------------------------------------------------------------------------------------- |
-| host.provide(name, handler, options?) | 只能提供 Manifest.provides 中的能力；可通过 options.callers 限定调用方插件                    |
-| host.call(name, input, signal)        | 只能调用自身提供或 requires / optionalRequires 声明的能力                                     |
-| host.hasCapability(name)              | 查询已声明的可选依赖是否可用                                                                  |
-| host.api(route)                       | 挂载在 /api/plugins/插件ID 下，需要 api.register 权限                                         |
-| host.route(route)                     | 注册业务 HTTP 路由，需要 http.route 权限，不得占用管理命名空间                                |
-| host.hook(hook)                       | 注册具名阶段 Hook，需要 hooks.register 权限                                                   |
-| host.config()                         | 请求中读取对应图版本的配置快照                                                                |
-| host.validateConfig(check)            | 在启动和配置切换前检查跨字段约束                                                              |
-| host.secret(reference)                | 读取 secrets.read 授权且列入 secretRefs 的托管凭据                                            |
-| host.cleanup(callback)                | 停止时逆序释放资源                                                                            |
-| host.publish / subscribe              | 诊断通知；不用于资金事实交付                                                                  |
-| host.dispatchChild(request, options)  | 使用当前身份和配置快照执行子请求，需要 http.dispatch.child 权限及目标路由的 childCallers 授权 |
-| host.requestContext(options?)         | 获取当前已认证的数据面请求；options.callers 限定入口及完整调用链，默认仅允许本插件            |
+| API                                         | 约定                                                                                          |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| host.provide(name, handler, options?)       | 只能提供 Manifest.provides 中的能力；可通过 options.callers 限定调用方插件                    |
+| host.call(name, input, signal, providerId?) | 调用自身或已声明依赖的能力；可显式选择当前快照内的实现                                        |
+| host.providers(name)                        | 列出当前快照中已声明依赖能力的可用实现                                                        |
+| host.hasCapability(name)                    | 查询已声明的可选依赖是否可用                                                                  |
+| host.api(route)                             | 挂载在 /api/plugins/插件ID 下，需要 api.register 权限                                         |
+| host.route(route)                           | 注册业务 HTTP 路由，需要 http.route 权限，不得占用管理命名空间                                |
+| host.hook(hook)                             | 注册具名阶段 Hook，需要 hooks.register 权限                                                   |
+| host.config()                               | 请求中读取对应图版本的配置快照                                                                |
+| host.validateConfig(check)                  | 在启动和配置切换前检查跨字段约束                                                              |
+| host.secret(reference)                      | 读取 secrets.read 授权且列入 secretRefs 的托管凭据                                            |
+| host.cleanup(callback)                      | 停止时逆序释放资源                                                                            |
+| host.publish / subscribe                    | 诊断通知；不用于资金事实交付                                                                  |
+| host.dispatchChild(request, options)        | 使用当前身份和配置快照执行子请求，需要 http.dispatch.child 权限及目标路由的 childCallers 授权 |
+| host.requestContext(options?)               | 获取当前已认证的数据面请求；options.callers 限定入口及完整调用链，默认仅允许本插件            |
 
 route 包含 method、path、access、handle，可选 prepare 与 error。prepare 位于 Planning Hook 之前，用于解码和生成计划；handle 在 Execution 阶段执行。管理 API 不进入数据面 Hook。
 
@@ -58,6 +59,7 @@ Manifest 的 ui 声明入口、标题、页面路径；可选 slots 声明命名
       { "name": "dashboard.top", "entry": "dist/widget.js" }
     ]
   }
+}
 ```
 
 入口模块导出 mount(element, host)，返回注销函数。UIHost 提供 request、navigate、refresh；在插槽中还提供 slot 名称。页面与 Widget 的资源放在同一个 Bundle 目录。

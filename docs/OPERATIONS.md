@@ -19,7 +19,7 @@ curl --fail http://127.0.0.1:18100/readyz
 
 ## HTTPS 与访问来源
 
-配置域名和证书，反代至本机端口，参考 `nginx.conf.example` 保留 WebSocket 升级并关闭 SSE 缓冲。Listener 的 `publicOrigin` 与 Auth 的 `secureCookie` 必须匹配外部 HTTPS 入口；已有实例以数据卷配置为准，修改命令见 [Docker 部署](DOCKER.md)。
+配置域名和证书，反代至本机端口，参考 [Nginx 示例](../deploy/nginx.conf.example) 保留 WebSocket 升级并关闭 SSE 缓冲。Listener 的 `publicOrigin` 与 Auth 的 `secureCookie` 必须匹配外部 HTTPS 入口；已有实例以数据卷配置为准，修改命令见 [Docker 部署](DOCKER.md)。
 
 `trustedProxies` 仅包含已确认的直接代理及必要上级代理地址。Cloudflare 网段以官方 [IPv4](https://www.cloudflare.com/ips-v4)、[IPv6](https://www.cloudflare.com/ips-v6) 清单为准。不能信任所有公网或整个容器网段，否则伪造来源会影响登录保护和配额判断。
 

@@ -62,23 +62,23 @@ Chat 入口接受 `web_search_options`，也可接收上述搜索工具声明并
 
 `official.ingress-openai-media` 和 `official.upstream-openai-media` 独立安装与启停；新站点预装但默认停用。媒体上游复用 OpenAI Chat / Responses 连接的凭证、认证及公网上游策略。Codex 图片通过其订阅插件声明的 `ai.media.codex@1` 调用；Claude 与 Antigravity 当前不提供媒体生成端点。
 
-| 入口                            | 请求                                 | 响应                                  |
-| ------------------------------- | ------------------------------------ | ------------------------------------- |
-| `POST /v1/embeddings`           | 文本、文本批次、Token 数组           | JSON 向量 / base64、输入 Token 用量   |
-| `POST /v1/images/generations`   | JSON                                 | JSON 图片或图片 SSE                   |
-| `POST /v1/images/edits`         | JSON 图片引用或 multipart 文件、遮罩 | JSON 图片或图片 SSE                   |
+| 入口                            | 请求                                   | 响应                                   |
+| ------------------------------- | -------------------------------------- | -------------------------------------- |
+| `POST /v1/embeddings`           | 文本、文本批次、Token 数组             | JSON 向量 / base64、输入 Token 用量    |
+| `POST /v1/images/generations`   | JSON                                   | JSON 图片或图片 SSE                    |
+| `POST /v1/images/edits`         | JSON 图片引用或 multipart 文件、遮罩   | JSON 图片或图片 SSE                    |
 | `POST /v1/videos/generations`   | JSON 或 multipart 提示词、可选参考图片 | 完成后的视频二进制或含结果 URL 的 JSON |
-| `POST /v1/audio/speech`         | JSON 文本与音色                      | 音频二进制流或 `stream_format: "sse"` |
-| `POST /v1/audio/transcriptions` | multipart 音频文件                   | JSON、文本、字幕或转写 SSE            |
-| `POST /v1/audio/translations`   | multipart 音频文件                   | JSON、文本或字幕                      |
+| `POST /v1/audio/speech`         | JSON 文本与音色                        | 音频二进制流或 `stream_format: "sse"`  |
+| `POST /v1/audio/transcriptions` | multipart 音频文件                     | JSON、文本、字幕或转写 SSE             |
+| `POST /v1/audio/translations`   | multipart 音频文件                     | JSON、文本或字幕                       |
 
 模型配置 `operations` 选择允许的端点，例如 `["images/generations", "images/edits"]` 或 `["videos/generations"]`。省略时只允许 `chat`（四类会话协议）。Playground 按模式分别显示对话、图片和视频模型；音频和向量仍通过对应 API 调用。公开及个人目录保留各自模型端点和渠道价格，媒体模型的接入示例使用对应接口。个人模型仍按所属用户隔离，API Key 的渠道及模型限制同样生效。
 
 渠道流程继续提供渠道/模型选择、重定向、请求限流与 OpenAI 协议准入。媒体请求不能执行文本提示词、思考强度、输出 Token 上限、TPS 或任务分类节点，防止配置静默失效。高级接口组合的 `mediaPaths` 按操作名配置相对路径，例如 `{ "embeddings": "/v1/vector" }`，不会误用会话的 `path`。
 
-媒体请求体最多 32 MiB，JSON 响应及单个媒体 SSE 事件最多 64 MiB；Listener 的请求体上限也需满足实际上传大小。重复文件和表单字段保持顺序，模型选择字段不得重复。音频采用拉取和背压，取消会中断上游连接；SSE 必须出现对应完成事件，中断、错误和取消不产生成功结算。请求日志保留操作、状态、耗时及可核实用量，不保存图片、音频、提示词或搜索正文。
+媒体请求体最多 32 MiB，JSON 响应及单个媒体 SSE 事件最多 64 MiB；Listener 的请求体上限也需满足实际上传大小。重复文件和表单字段保持顺序，模型选择字段不得重复。音频采用拉取和背压，取消会中断上游连接；SSE 必须出现对应完成事件。中断、错误和取消不记为成功调用，已经派发的请求仍按 [结算规则](PRICING.md#取消中断与重启结算) 收费。请求日志保留操作、状态、耗时及可核实用量，不保存图片、音频、提示词或搜索正文。
 
-Embeddings 以提供商输入 Token 计费。图片和音频首期使用明确的按次价格或固定金额表达式，不把媒体 Token 当作普通文本 Token，也不根据文件体积猜测音频时长；上游提供的 Token 总量仍可记录。计费未启用或个人渠道不扣平台钱包；平台计费启用时，媒体未配置固定价格会在调用前拒绝。
+Embeddings 以提供商输入 Token 计费。图片和音频使用明确的按次价格或固定金额表达式，不把媒体 Token 当作普通文本 Token，也不根据文件体积猜测音频时长；上游提供的 Token 总量仍可记录。平台计费启用时，媒体未配置固定价格会在调用前拒绝；个人上游成本与平台请求手续费按 [个人渠道规则](PERSONAL_CHANNELS.md#原价与消耗倍率) 分开处理。
 
 ### Codex 图片
 
