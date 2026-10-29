@@ -310,10 +310,10 @@ it("settles the successful concurrent call when another discussion call fails", 
     ]);
     const reservations = f.reservations();
     expect(reservations.map((row) => row.status).sort()).toEqual([
-      "review",
+      "settled",
       "settled",
     ]);
-    const settled = reservations.find((row) => row.status === "settled");
+    const settled = reservations.find((row) => row.actual === 5);
     expect(settled.actual).toBe(5);
     expect(
       children.find((row) => row.id === settled.id)?.workflow_node_id,
@@ -321,7 +321,7 @@ it("settles the successful concurrent call when another discussion call fails", 
     expect(
       (await f.kernel.invoke<any>("billing.balance@1", { userId: f.me.id }))
         .balance,
-    ).toBe(999995);
+    ).toBe(1_000_000 - reservations.reduce((sum, row) => sum + row.actual, 0));
   } finally {
     await f.cleanup();
   }
@@ -432,7 +432,7 @@ it("records and retains reservations for canceled in-flight workflow calls", asy
     await vi.waitFor(() => {
       const reservations = f.reservations();
       expect(reservations).toHaveLength(2);
-      expect(reservations.every((row) => row.status === "review")).toBe(true);
+      expect(reservations.every((row) => row.status === "settled")).toBe(true);
     });
     const children = await f.children(requestId);
     expect(children.map((row) => row.workflow_node_id).sort()).toEqual([

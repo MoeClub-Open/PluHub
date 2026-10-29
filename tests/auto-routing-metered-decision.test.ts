@@ -234,12 +234,13 @@ it("meters each remote automatic routing decision without bypassing key channel 
         expect(decision).toMatchObject({
           model: `classifier-${kind}`,
           protocol: kind,
-          billing_status: withUsage ? "settled" : "review",
+          billing_status: "settled",
           input_tokens: withUsage ? 5 : null,
           output_tokens: withUsage ? 3 : null,
         });
         if (withUsage) expect(decision.charged_micro_usd).toBe(19);
-        else expect(decision.held_micro_usd).toBeGreaterThan(0);
+        else expect(decision.charged_micro_usd).toBeGreaterThan(0);
+        expect(decision.held_micro_usd).toBe(0);
         childIds.push(decision.id);
       }
     }
@@ -264,8 +265,18 @@ it("meters each remote automatic routing decision without bypassing key channel 
     const balance = await f.kernel.invoke<any>("billing.balance@1", {
       userId: me.id,
     });
-    expect(balance.balance).toBe(before - 3 * 19 - 6 * 6);
-    expect(balance.held).toBeGreaterThan(0);
+    const decisionCharges = await f.kernel.invoke<any[]>(
+      "billing.request-charges@1",
+      {
+        requests: childIds.map((id) => ({ id, userId: me.id })),
+      },
+    );
+    expect(balance.balance).toBe(
+      before -
+        decisionCharges.reduce((sum, row) => sum + row.charged, 0) -
+        6 * 6,
+    );
+    expect(balance.held).toBe(0);
     const logs = new DatabaseSync(
       join(f.config.dataDir, "official.observability", "requests.sqlite"),
     );

@@ -197,9 +197,9 @@ it("authorizes, records and settles each Jev workflow request independently", as
       );
       expect(reservations.map((r) => r.status)).toEqual([
         "settled",
-        "review",
+        "settled",
         "released",
-        "review",
+        "settled",
       ]);
       expect(reservations[0].actual).toBe(19);
       expect(JSON.parse(reservations[0].budget).mode).toBe("estimate");

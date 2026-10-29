@@ -267,14 +267,17 @@ it("routes via a metered Jev node and retains a reservation when usage is absent
     expect(unknown).toMatchObject({
       input_tokens: null,
       output_tokens: null,
-      billing_status: "review",
+      billing_status: "settled",
     });
-    expect(unknown.held_micro_usd).toBeGreaterThan(0);
+    expect(unknown.charged_micro_usd).toBeGreaterThan(0);
+    expect(unknown.held_micro_usd).toBe(0);
     const balance = await f.kernel.invoke<any>("billing.balance@1", {
       userId: me.id,
     });
-    expect(balance.balance).toBe(1_000_000 - 45 - 29);
-    expect(balance.held).toBeGreaterThan(0);
+    expect(balance.balance).toBe(
+      1_000_000 - 45 - 29 - unknown.charged_micro_usd,
+    );
+    expect(balance.held).toBe(0);
   } finally {
     await f.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));

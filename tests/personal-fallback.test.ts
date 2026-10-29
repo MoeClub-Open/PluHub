@@ -285,7 +285,7 @@ it("does not require platform funds for the personal primary and stops a paid fa
     delete (globalThis as any).__fallbackTransport;
   }
 });
-it("releases definite upstream refusals but retains uncertain transport failures for reconciliation", async () => {
+it("releases definite upstream refusals but settles uncertain transport failures at the reserved amount", async () => {
   const f = await setup();
   try {
     const rejected = await f.invoke("reject", true);
@@ -301,16 +301,8 @@ it("releases definite upstream refusals but retains uncertain transport failures
     const unknown = await f.invoke("unknown", true);
     expect(unknown.status).toBeGreaterThanOrEqual(500);
     await unknown.text();
-    expect((await f.balance()).held).toBeGreaterThan(0);
-    const reviews = await (
-      await f.request(
-        "/api/plugins/official.billing/review",
-        "GET",
-        undefined,
-        f.admin,
-      )
-    ).json();
-    expect(reviews).toHaveLength(1);
+    expect((await f.balance()).held).toBe(0);
+    expect((await f.balance()).balance).toBeLessThan(1_000_000);
   } finally {
     await f.close();
     delete (globalThis as any).__fallbackTransport;

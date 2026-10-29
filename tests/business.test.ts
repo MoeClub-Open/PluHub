@@ -442,7 +442,7 @@ it("supports all Epay version/signature combinations with signed V2 responses an
   delete process.env.PLUHUB_EPAY_PUBLIC;
   delete (globalThis as any).__pluhubBusinessTransport;
 });
-it("reserves and settles usage, enforces limits and keeps unknown usage for review", async () => {
+it("settles known usage and charges unknown usage at the reserved amount while enforcing limits", async () => {
   let calls = 0;
   let lastKey = "";
   transport = (i) => {
@@ -528,25 +528,16 @@ it("reserves and settles usage, enforces limits and keeps unknown usage for revi
     const wallet = await f.kernel.invoke<any>("billing.balance@1", {
       userId: me.id,
     });
-    expect(wallet.balance).toBe(99989);
-    expect(wallet.held).toBeGreaterThan(0);
-    const review = await (
-      await f.request(
-        "/api/plugins/official.billing/review",
-        "GET",
-        undefined,
-        admin,
-      )
-    ).json();
-    expect(review).toHaveLength(1);
-    const reconciled = await f.request(
-      "/api/plugins/official.billing/reconcile",
-      "POST",
-      { id: review[0].id, amount: 7, reason: "provider confirmed" },
-      admin,
-    );
-    expect(reconciled.status).toBe(200);
-    await reconciled.json();
+    const [charge] = await f.kernel.invoke<any[]>("billing.request-charges@1", {
+      requests: [
+        { id: unknown.headers.get("x-pluhub-request-id"), userId: me.id },
+      ],
+    });
+    expect(charge.status).toBe("settled");
+    expect(charge.charged).toBeGreaterThan(0);
+    expect(charge.receipt.mode).toBe("reserved");
+    expect(wallet.balance).toBe(99989 - charge.charged);
+    expect(wallet.held).toBe(0);
     f.kernel.configure({ "official.rate-limit": { user: { rpm: 1 } } });
     const first = await invoke("hi");
     await first.json();
@@ -563,7 +554,7 @@ it("reserves and settles usage, enforces limits and keeps unknown usage for revi
   }
 });
 
-it("recovers payment delivery across restarts without crediting twice and preserves unresolved reservations", async () => {
+it("recovers payment delivery across restarts without crediting twice and settles interrupted reservations once", async () => {
   const f = await fixture(["users", "auth", "billing", "commerce"]);
   let fresh: any;
   try {
@@ -612,16 +603,16 @@ it("recovers payment delivery across restarts without crediting twice and preser
     await response.json();
     expect(
       await fresh.invoke("billing.balance@1", { userId: user.id }),
-    ).toMatchObject({ balance: 300, held: 10, available: 290 });
+    ).toMatchObject({ balance: 290, held: 0, available: 290 });
     const ledger = new DatabaseSync(
       join(f.config.dataDir, "official.billing", "billing.sqlite"),
     );
     expect(
       (ledger.prepare("SELECT COUNT(*) n FROM ledger").get() as any).n,
-    ).toBe(2);
+    ).toBe(3);
     expect(
       (ledger.prepare("SELECT status FROM reservations").get() as any).status,
-    ).toBe("review");
+    ).toBe("settled");
     ledger.close();
   } finally {
     await fresh?.shutdown();
@@ -629,7 +620,7 @@ it("recovers payment delivery across restarts without crediting twice and preser
   }
 });
 
-it("releases concurrency on early stream cancellation and holds partial usage for reconciliation", async () => {
+it("releases concurrency and settles partial usage on stream cancellation", async () => {
   let aborted = 0;
   transport = (i, signal) => {
     const source = new ReadableStream<Uint8Array>({
@@ -724,8 +715,8 @@ it("releases concurrency on early stream cancellation and holds partial usage fo
     const wallet = await f.kernel.invoke<any>("billing.balance@1", {
       userId: user.id,
     });
-    expect(wallet.balance).toBe(1000000);
-    expect(wallet.held).toBeGreaterThan(0);
+    expect(wallet.balance).toBe(999997);
+    expect(wallet.held).toBe(0);
     const next = await invoke();
     expect(next.status).toBe(200);
     await next.body!.cancel();
@@ -747,17 +738,16 @@ it("releases concurrency on early stream cancellation and holds partial usage fo
     const overflow = await invoke();
     expect(overflow.status).toBe(200);
     await overflow.text();
-    const reviews = await (
-      await f.request(
-        "/api/plugins/official.billing/review",
-        "GET",
-        undefined,
-        admin,
-      )
-    ).json();
-    expect(reviews.some((r: any) => r.note.includes("integer range"))).toBe(
-      true,
-    );
+    const [charge] = await f.kernel.invoke<any[]>("billing.request-charges@1", {
+      requests: [
+        { id: overflow.headers.get("x-pluhub-request-id"), userId: user.id },
+      ],
+    });
+    expect(charge).toMatchObject({
+      status: "settled",
+      held: 0,
+      receipt: { mode: "reserved" },
+    });
   } finally {
     await f.close();
     delete process.env.PLUHUB_TEST_UPSTREAM_KEY;

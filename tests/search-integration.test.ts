@@ -54,16 +54,6 @@ it("rejects unsupported Codex CLI tool-call bounds before reserving funds or con
     expect(
       await (
         await f.request(
-          "/api/plugins/official.billing/review",
-          "GET",
-          undefined,
-          admin,
-        )
-      ).json(),
-    ).toEqual([]);
-    expect(
-      await (
-        await f.request(
           "/api/plugins/official.billing/wallet",
           "GET",
           undefined,

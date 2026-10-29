@@ -233,7 +233,7 @@ async function budgetFixture(
       try {
         return db
           .prepare(
-            "SELECT id,status,amount,actual,budget,reported_usage FROM reservations ORDER BY rowid",
+            "SELECT id,status,amount,actual,budget,reported_usage,receipt FROM reservations ORDER BY rowid",
           )
           .all() as any[];
       } finally {
@@ -422,8 +422,10 @@ it("rejects an unframed Codex response without Content-Type", async () => {
     const response = await f.send();
     expect(response.status).toBe(502);
     expect((await response.json()).error.code).toBe("upstream_truncated");
-    expect(f.reservations()[0].status).toBe("review");
-    expect((await f.balance()).balance).toBe(1_000_000);
+    expect(f.reservations()[0].status).toBe("settled");
+    expect((await f.balance()).balance).toBe(
+      1_000_000 - f.reservations()[0].amount,
+    );
   } finally {
     await f.close();
   }
@@ -559,7 +561,7 @@ it.each([false, true])(
 );
 
 it.each([false, true])(
-  "holds a provider output-limit violation for review without silently billing extra (stream=%s)",
+  "settles an output-limit violation at the reservation instead of charging invalid excess (stream=%s)",
   async (stream) => {
     const f = await budgetFixture();
     try {
@@ -574,10 +576,12 @@ it.each([false, true])(
       const response = await f.send(undefined, stream);
       expect(response.status).toBe(stream ? 200 : 502);
       expect(await response.text()).toContain("upstream_budget_exceeded");
-      expect(f.reservations()[0].status).toBe("review");
+      expect(f.reservations()[0].status).toBe("settled");
       expect(JSON.parse(f.reservations()[0].reported_usage).output).toBe(65);
-      expect((await f.balance()).balance).toBe(1_000_000);
-      expect((await f.balance()).held).toBeGreaterThan(0);
+      expect((await f.balance()).balance).toBe(
+        1_000_000 - f.reservations()[0].amount,
+      );
+      expect((await f.balance()).held).toBe(0);
       expect((await f.logs())[0].error_code).toBe("upstream_budget_exceeded");
     } finally {
       await f.close();
@@ -585,7 +589,7 @@ it.each([false, true])(
   },
 );
 
-it("retains the budget on stream cancellation and restart and allows only one audited reconciliation", async () => {
+it("settles cancellation at the reservation and does not charge again after restart", async () => {
   const f = await budgetFixture();
   let cancelled = false;
   try {
@@ -614,35 +618,19 @@ it("retains the budget on stream cancellation and restart and allows only one au
     await reader.cancel();
     expect(cancelled).toBe(true);
     let row = f.reservations()[0];
-    expect(row.status).toBe("review");
+    expect(row.status).toBe("settled");
     expect(JSON.parse(row.budget).limit).toBe(64);
     await f.kernel.shutdown();
     await f.kernel.start();
     row = f.reservations()[0];
-    expect(row.status).toBe("review");
+    expect(row.status).toBe("settled");
     expect(JSON.parse(row.budget).limit).toBe(64);
-    const body = {
-      id: row.id,
-      amount: 0,
-      reason: "Local fixture cancellation reconciliation",
-    };
-    const settled = await f.request(
-      "/api/plugins/official.billing/reconcile",
-      "POST",
-      body,
-      f.session,
-    );
-    expect(settled.status).toBe(200);
-    await settled.json();
-    const repeated = await f.request(
-      "/api/plugins/official.billing/reconcile",
-      "POST",
-      body,
-      f.session,
-    );
-    expect(repeated.status).toBe(404);
-    await repeated.json();
-    expect(await f.balance()).toMatchObject({ balance: 1_000_000, held: 0 });
+    expect(await f.balance()).toMatchObject({
+      balance: 1_000_000 - row.amount,
+      held: 0,
+    });
+    expect(row.actual).toBe(row.amount);
+    expect(JSON.parse(row.receipt).mode).toBe("reserved");
   } finally {
     await f.close();
   }
@@ -671,22 +659,22 @@ it("migrates previous reservations without losing money or inventing historical 
       db.close();
     }
     await f.kernel.start();
-    expect(await f.balance()).toMatchObject({ balance: 1_000_000, held: 100 });
+    expect(await f.balance()).toMatchObject({ balance: 999900, held: 0 });
     const row = f.reservations()[0];
-    expect(row.status).toBe("review");
+    expect(row.status).toBe("settled");
     expect(row.budget).toBeNull();
     expect(row.reported_usage).toBeNull();
     const response = await f.send();
     expect(response.status).toBe(200);
     await response.json();
     expect(JSON.parse(f.reservations()[1].budget).limit).toBe(64);
-    expect(await f.balance()).toMatchObject({ balance: 999960, held: 100 });
+    expect(await f.balance()).toMatchObject({ balance: 999860, held: 0 });
   } finally {
     await f.close();
   }
 });
 
-it("keeps the full hold when financial usage storage fails and preserves an audited recovery after restart", async () => {
+it("retains the actual usage in its final receipt when optional usage-copy storage fails", async () => {
   const f = await budgetFixture();
   const db = new DatabaseSync(
     join(f.config.dataDir, "official.billing/billing.sqlite"),
@@ -699,28 +687,16 @@ it("keeps the full hold when financial usage storage fails and preserves an audi
     expect(response.status).toBe(200);
     await response.json();
     const row = f.reservations()[0];
-    expect(row.status).toBe("reserved");
+    expect(row.status).toBe("settled");
     expect(row.reported_usage).toBeNull();
-    expect(await f.balance()).toMatchObject({
-      balance: 1_000_000,
-      held: row.amount,
+    expect(JSON.parse(row.receipt).usage).toMatchObject({
+      input: 20,
+      output: 10,
     });
+    expect(await f.balance()).toMatchObject({ balance: 999960, held: 0 });
     db.exec("DROP TRIGGER deny_usage_storage");
     await f.kernel.shutdown();
     await f.kernel.start();
-    expect(f.reservations()[0].status).toBe("review");
-    const settled = await f.request(
-      "/api/plugins/official.billing/reconcile",
-      "POST",
-      {
-        id: row.id,
-        amount: 40,
-        reason: "Verified against local mock usage after storage recovery",
-      },
-      f.session,
-    );
-    expect(settled.status).toBe(200);
-    await settled.json();
     expect(await f.balance()).toMatchObject({ balance: 999960, held: 0 });
   } finally {
     db.close();
@@ -747,8 +723,10 @@ it.each(protocols)(
       expect(text.toLowerCase()).toContain("upstream_budget_exceeded");
       expect(text).not.toContain('"type":"response.completed"');
       expect(text).not.toContain('"type":"message_stop"');
-      expect(f.reservations()[0].status).toBe("review");
-      expect((await f.balance()).balance).toBe(1_000_000);
+      expect(f.reservations()[0].status).toBe("settled");
+      expect((await f.balance()).balance).toBe(
+        1_000_000 - f.reservations()[0].amount,
+      );
     } finally {
       await f.close();
     }

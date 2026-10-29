@@ -390,7 +390,7 @@ it("reserves the effective channel output budget and includes inserted prompts i
     await f.close();
   }
 });
-it("settles request prices without usage or output limits and leaves token-priced unknown usage for review", async () => {
+it("settles request prices without usage or output limits and settles unknown token usage at the reserved amount", async () => {
   const f = await setup();
   try {
     respond = () =>
@@ -404,17 +404,30 @@ it("settles request prices without usage or output limits and leaves token-price
     const unknown = await f.invoke();
     expect(unknown.status).toBe(200);
     await unknown.json();
-    expect(await f.balance()).toMatchObject({ balance: 999000 });
-    expect((await f.balance()).held).toBeGreaterThan(0);
-    const review = await (
-      await f.request(
-        "/api/plugins/official.billing/review",
-        "GET",
-        undefined,
-        f.admin,
-      )
-    ).json();
-    expect(review).toHaveLength(1);
+    expect((await f.balance()).balance).toBeLessThan(999000);
+    expect((await f.balance()).held).toBe(0);
+    const [charge] = await f.kernel.invoke<any[]>("billing.request-charges@1", {
+      requests: [
+        {
+          id: unknown.headers.get("x-pluhub-request-id"),
+          userId: (
+            await (
+              await f.request(
+                "/api/plugins/official.auth/me",
+                "GET",
+                undefined,
+                f.admin,
+              )
+            ).json()
+          ).id,
+        },
+      ],
+    });
+    expect(charge).toMatchObject({
+      status: "settled",
+      held: 0,
+      receipt: { mode: "reserved" },
+    });
   } finally {
     await f.close();
   }
@@ -471,7 +484,7 @@ it("rejects invalid pricing tiers without changing balances", async () => {
     await f.close();
   }
 });
-it("rejects malformed usage without creating a successful settlement", async () => {
+it("rejects malformed usage and settles its reservation without trusting the invalid report", async () => {
   const f = await setup();
   try {
     respond = () =>
@@ -482,8 +495,8 @@ it("rejects malformed usage without creating a successful settlement", async () 
     const response = await f.invoke();
     expect(response.status).toBe(502);
     await response.text();
-    expect(await f.balance()).toMatchObject({ balance: 1000000 });
-    expect((await f.balance()).held).toBeGreaterThan(0);
+    expect((await f.balance()).balance).toBeLessThan(1000000);
+    expect((await f.balance()).held).toBe(0);
   } finally {
     await f.close();
   }

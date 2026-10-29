@@ -187,7 +187,7 @@ it("keeps internal provider calls private and settles each child independently",
         expect.objectContaining({ status: "settled", actual: 19 }),
         expect.objectContaining({ status: "settled", actual: 19 }),
       ]);
-      expect(rows[2].status).toBe("review");
+      expect(rows[2].status).toBe("settled");
     } finally {
       db.close();
     }
