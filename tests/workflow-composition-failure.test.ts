@@ -386,7 +386,7 @@ it("rejects a reached channel limit before starting paid workflow nodes", async 
   }
 });
 
-it("records and retains reservations for canceled in-flight workflow calls", async () => {
+it("records and settles canceled in-flight workflow calls", async () => {
   let started!: () => void;
   const bothStarted = new Promise<void>((resolve) => {
     started = resolve;

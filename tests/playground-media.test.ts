@@ -199,7 +199,7 @@ it("keeps media selection scoped and settles Codex images and completed video jo
           admin,
         )
       ).json(),
-    ).toMatchObject({ balance: 920000, held: 40000 });
+    ).toMatchObject({ balance: 880000, held: 0 });
   } finally {
     await f.close();
     server.closeAllConnections();

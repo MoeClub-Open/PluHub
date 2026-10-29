@@ -306,7 +306,7 @@ it("routes media JSON, multipart and binary through auth, channel bindings, logs
     ]);
     expect(
       await f.kernel.invoke("billing.balance@1", { userId: me.id }),
-    ).toMatchObject({ balance: 951996, held: 16000 });
+    ).toMatchObject({ balance: 935996, held: 0 });
   } finally {
     await f.close();
     await new Promise<void>((resolve, reject) =>

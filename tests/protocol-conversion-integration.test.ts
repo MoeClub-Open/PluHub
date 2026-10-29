@@ -287,7 +287,7 @@ it("runs image + schema + signed reasoning conversion over all HTTP entry/provid
   }
 });
 
-it("records encoder failure after upstream finish and holds settlement for review", async () => {
+it("records encoder failure after upstream finish and settles the completed provider call", async () => {
   const f = await fixture(
     [
       "users",
@@ -367,8 +367,8 @@ it("records encoder failure after upstream finish and holds settlement for revie
     const balance = await f.kernel.invoke<any>("billing.balance@1", {
       userId: me.id,
     });
-    expect(balance.balance).toBe(1000000);
-    expect(balance.held).toBe(2000);
+    expect(balance.balance).toBe(998000);
+    expect(balance.held).toBe(0);
     const requests = await (
       await f.request(
         "/api/plugins/official.observability/requests",

@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { expect, it } from "vitest";
 import { fixture } from "./helpers.js";
 
-it("routes via a metered Jev node and retains a reservation when usage is absent", async () => {
+it("routes via a metered Jev node and settles at the reservation when usage is absent", async () => {
   const received: { path: string; body: any; authorization?: string }[] = [];
   let reportUsage = true;
   const server = createServer(async (request, response) => {
