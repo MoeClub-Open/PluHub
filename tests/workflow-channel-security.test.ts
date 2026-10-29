@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { expect, it } from "vitest";
 import { fixture } from "./helpers.js";
 
-it("keeps a group key out of a personal workflow target while retaining authorized personal fallback", async () => {
+it("keeps a channel-bound key out of a personal workflow target while retaining authorized personal fallback", async () => {
   const calls: { path: string; model: string }[] = [];
   const server = createServer(async (request, response) => {
     const chunks: Uint8Array[] = [];
@@ -46,7 +46,7 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
     const admin = await f.admin();
     const user = await f.kernel.invoke<any>("users.manage@1", {
       action: "create",
-      username: "group-workflow-user",
+      username: "channel-workflow-user",
       role: "user",
     });
     await f.kernel.invoke("auth.bootstrap@1", {
@@ -54,7 +54,7 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
       password: "workflow-user-password",
     });
     const login = await f.request("/api/plugins/official.auth/login", "POST", {
-      username: "group-workflow-user",
+      username: "channel-workflow-user",
       password: "workflow-user-password",
     });
     const session = { cookie: login.headers.get("set-cookie")!.split(";")[0]! };
@@ -96,14 +96,6 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
         outputPrice: 10,
       },
     };
-    config.config.groups = {
-      team: {
-        name: "Team",
-        channelIds: ["paid"],
-        multiplier: 1,
-        userIds: [user.id],
-      },
-    };
     let saved = await f.request(
       "/api/plugins/official.ai-router/configuration",
       "PUT",
@@ -127,7 +119,12 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
           nodes: [
             { id: "s", type: "start", next: ["p"] },
             { id: "p", type: "provider", fallback: "g" },
-            { id: "g", type: "platform", groupId: "team", model: "paid-model" },
+            {
+              id: "g",
+              type: "platform",
+              channelId: "paid",
+              model: "paid-model",
+            },
           ],
         },
       },
@@ -174,7 +171,6 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
       inputPrice: 1,
       outputPrice: 1,
     };
-    updated.config.groups.team.channelIds.push("workflow");
     saved = await f.request(
       "/api/plugins/official.ai-router/configuration",
       "PUT",
@@ -186,22 +182,23 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
     await f.kernel.invoke("billing.credit@1", {
       userId: user.id,
       amount: 1_000_000,
-      source: "group-workflow-test",
+      source: "channel-workflow-test",
     });
 
-    const groupResponse = await f.request(
+    const platformResponse = await f.request(
       "/api/plugins/official.auth/keys",
       "POST",
       {
-        name: "Group key",
-        groupId: "team",
-        channelIds: [],
+        name: "Platform key",
+        channelIds: ["paid", "workflow"],
         models: ["workflow", "personal-model"],
       },
       session,
     );
-    expect(groupResponse.status, await groupResponse.clone().text()).toBe(201);
-    const groupKey = await groupResponse.json();
+    expect(platformResponse.status, await platformResponse.clone().text()).toBe(
+      201,
+    );
+    const platformKey = await platformResponse.json();
     const blocked = await f.request(
       "/v1/chat/completions",
       "POST",
@@ -210,7 +207,7 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
         messages: [{ role: "user", content: "hello" }],
         max_tokens: 16,
       },
-      { authorization: `Bearer ${groupKey.token}` },
+      { authorization: `Bearer ${platformKey.token}` },
     );
     expect(blocked.status, await blocked.clone().text()).toBe(403);
     expect((await blocked.json()).error.code).toBe("channel_forbidden");
@@ -224,7 +221,6 @@ it("keeps a group key out of a personal workflow target while retaining authoriz
       "POST",
       {
         name: "Personal key",
-        groupId: null,
         channelIds: [channel.id],
         models: ["personal-model"],
       },

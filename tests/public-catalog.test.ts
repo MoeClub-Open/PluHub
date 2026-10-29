@@ -69,8 +69,6 @@ it("publishes active platform model aliases and original prices without credenti
       billing: {
         input: 2,
         output: 4,
-        multiplier: 1,
-        serviceGroup: { id: "default", name: "默认分组", multiplier: 1 },
       },
       features: ["text", "tools", "stream", "usage"],
     });

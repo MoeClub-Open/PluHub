@@ -115,35 +115,35 @@ it("enforces personal-channel permissions after resolving typed inputs", async (
     );
     expect(deniedModel.status, await deniedModel.clone().text()).toBe(400);
 
-    const invalidGroup = structuredClone(channel);
-    invalidGroup.flow = {
+    const invalidChannel = structuredClone(channel);
+    invalidChannel.flow = {
       entry: "s",
       nodes: [
-        { id: "s", type: "start", next: ["group"] },
-        { id: "group", type: "platform", groupId: "default" },
+        { id: "s", type: "start", next: ["backup"] },
+        { id: "backup", type: "platform", channelId: "preset" },
         {
-          id: "group-value",
+          id: "channel-value",
           type: "value",
           valueType: "string",
-          value: "unavailable-group",
+          value: "unavailable-channel",
         },
       ],
       bindings: [
         {
-          source: "group-value",
+          source: "channel-value",
           output: "value",
-          target: "group",
-          input: "groupId",
+          target: "backup",
+          input: "channelId",
         },
       ],
     };
-    const deniedGroup = await f.request(
+    const deniedChannel = await f.request(
       api + "/personal-channels",
       "PUT",
-      invalidGroup,
+      invalidChannel,
       admin,
     );
-    expect(deniedGroup.status, await deniedGroup.clone().text()).toBe(403);
+    expect(deniedChannel.status, await deniedChannel.clone().text()).toBe(403);
 
     const invalidInterface = structuredClone(channel);
     invalidInterface.interfaces = [
@@ -333,13 +333,6 @@ async function setup() {
     byok: { allowedPrivateOrigins: [origin] },
     billing: { enabled: true },
     "ai-router": {
-      groups: {
-        presetOnly: {
-          name: "Preset only",
-          multiplier: 1,
-          channelIds: ["preset"],
-        },
-      },
       upstreams: {
         preset: {
           protocol: "openai-chat",
@@ -821,7 +814,7 @@ it("runs personal channel graphs, enforces platform bindings and cancels an upst
         { role: "user", content: "hello" },
       ],
     });
-    const platformKey = await f.key(f.alice, { groupId: "presetOnly" });
+    const platformKey = await f.key(f.alice, { channelIds: ["preset"] });
     const forbidden = await f.invoke(platformKey.token, false, {}, "second");
     expect(forbidden.status).toBe(404);
     await forbidden.text();
@@ -881,7 +874,7 @@ it("calculates input/output consumption from original prices, keeps catalog orig
       tools: [],
     };
     expect(
-      await f.kernel.invoke("ai.routing@2", {
+      await f.kernel.invoke("ai.routing@3", {
         channelId: channel.id,
         principalId: f.alice.id,
         model: "demo",
@@ -917,7 +910,7 @@ it("calculates input/output consumption from original prices, keeps catalog orig
       upstreamOutputPrice: 12,
     });
     expect(
-      await f.kernel.invoke("ai.routing@2", {
+      await f.kernel.invoke("ai.routing@3", {
         channelId: channel.id,
         principalId: f.alice.id,
         model: "demo",

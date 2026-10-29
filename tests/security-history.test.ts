@@ -680,7 +680,7 @@ it("prunes expired and excess events, persists history on restart and migrates t
       await restarted.shutdown();
     }
     db.exec(
-      "DROP TABLE security_events; ALTER TABLE api_keys ADD COLUMN channel_id TEXT; ALTER TABLE api_keys ADD COLUMN credential_id TEXT; ALTER TABLE api_keys DROP COLUMN channel_ids_json; ALTER TABLE api_keys DROP COLUMN group_id; ALTER TABLE api_keys DROP COLUMN secret; PRAGMA user_version=6;",
+      "DROP TABLE security_events; ALTER TABLE api_keys ADD COLUMN channel_id TEXT; ALTER TABLE api_keys ADD COLUMN credential_id TEXT; ALTER TABLE api_keys DROP COLUMN channel_ids_json; ALTER TABLE api_keys DROP COLUMN secret; PRAGMA user_version=6;",
     );
     restarted = await createKernel(f.config);
     attachManagement(restarted, f.file, f.config);
@@ -688,7 +688,7 @@ it("prunes expired and excess events, persists history on restart and migrates t
     try {
       expect(
         (db.prepare("PRAGMA user_version").get() as any).user_version,
-      ).toBe(12);
+      ).toBe(11);
       const r = await restarted.fetch(
         new Request("http://localhost" + auth + "/security/history", {
           headers: admin,

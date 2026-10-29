@@ -100,9 +100,6 @@ it("routes media JSON, multipart and binary through auth, channel bindings, logs
     {
       billing: { enabled: true },
       "ai-router": {
-        groups: {
-          default: { name: "Media", channelIds: ["1"], multiplier: 1 },
-        },
         upstreams: {
           "1": {
             protocol: "openai-chat",
@@ -148,7 +145,7 @@ it("routes media JSON, multipart and binary through auth, channel bindings, logs
     const keyResponse = await f.request(
       "/api/plugins/official.auth/keys",
       "POST",
-      { name: "media", groupId: "default" },
+      { name: "media", channelIds: ["1"] },
       admin,
     );
     expect(keyResponse.status).toBe(201);

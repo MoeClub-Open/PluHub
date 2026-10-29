@@ -88,20 +88,6 @@ async function setup(credit = 1_000_000) {
         outputPrice: 10,
       },
     },
-    groups: {
-      team: {
-        name: "Team",
-        channelIds: ["paid"],
-        multiplier: 2,
-        userIds: [me.id],
-      },
-      hidden: {
-        name: "Hidden",
-        channelIds: ["paid"],
-        multiplier: 1,
-        userIds: [],
-      },
-    },
   };
   f.kernel.configure({ "official.ai-router": config });
   if (credit)
@@ -124,7 +110,7 @@ async function setup(credit = 1_000_000) {
       nodes: [
         { id: "s", type: "start", next: ["p"] },
         { id: "p", type: "provider", fallback: "g" },
-        { id: "g", type: "platform", groupId: "team", model: "paid-model" },
+        { id: "g", type: "platform", channelId: "paid", model: "paid-model" },
       ],
     },
   };
@@ -143,7 +129,6 @@ async function setup(credit = 1_000_000) {
       {
         name: "Personal scope",
         channelIds: [saved.id],
-        groupId: null,
         models: ["my-model"],
         requestsPerMinute: 1,
       },
@@ -180,7 +165,7 @@ async function setup(credit = 1_000_000) {
   };
 }
 
-it("falls back from a personal key to its authorized paid group exactly once and bills the selected route", async () => {
+it("falls back from a personal key to its configured paid channel exactly once and bills the selected route", async () => {
   const f = await setup();
   let now = Date.now();
   const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
@@ -193,7 +178,7 @@ it("falls back from a personal key to its authorized paid group exactly once and
     const fallback = await f.invoke("fallback");
     expect(fallback.status).toBe(200);
     expect((await fallback.json()).choices[0].message.content).toBe("paid");
-    expect(await f.balance()).toMatchObject({ balance: 999965, held: 0 });
+    expect(await f.balance()).toMatchObject({ balance: 999982, held: 0 });
     expect(f.calls()).toEqual({ personalCalls: 2, paidCalls: 1 });
     const limited = await f.invoke("fallback");
     expect(limited.status).toBe(429);
@@ -211,7 +196,7 @@ it("falls back from a personal key to its authorized paid group exactly once and
             {
               id: "g",
               type: "platform",
-              groupId: "hidden",
+              channelId: "unavailable",
               model: "paid-model",
             },
           ],
@@ -238,7 +223,12 @@ it("falls back from a personal key to its authorized paid group exactly once and
           entry: "s",
           nodes: [
             { id: "s", type: "start", next: ["g"] },
-            { id: "g", type: "platform", groupId: "team", model: "paid-model" },
+            {
+              id: "g",
+              type: "platform",
+              channelId: "paid",
+              model: "paid-model",
+            },
           ],
         },
       },
@@ -249,7 +239,7 @@ it("falls back from a personal key to its authorized paid group exactly once and
     const direct = await f.invoke("ok");
     expect(direct.status).toBe(200);
     await direct.json();
-    expect(await f.balance()).toMatchObject({ balance: 999930, held: 0 });
+    expect(await f.balance()).toMatchObject({ balance: 999964, held: 0 });
     const test = await f.request(
       "/api/plugins/official.byok/personal-channels/test",
       "POST",
@@ -258,7 +248,7 @@ it("falls back from a personal key to its authorized paid group exactly once and
     );
     expect(test.status).toBe(200);
     await test.json();
-    expect(await f.balance()).toMatchObject({ balance: 999895, held: 0 });
+    expect(await f.balance()).toMatchObject({ balance: 999946, held: 0 });
   } finally {
     clock.mockRestore();
     await f.close();

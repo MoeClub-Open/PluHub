@@ -3,7 +3,6 @@ import { dirname, resolve } from "node:path";
 import { writeConfig } from "@pluhub/control";
 import type { HostConfig } from "@pluhub/sdk";
 import { migrateLegacyChannels } from "./channel-graphs.ts";
-import { prepareKeyScopes } from "./key-scopes.ts";
 import { migrateWorkflowConditions } from "@pluhub/contracts/workflow-migration";
 import type { ChannelWorkflow } from "@pluhub/contracts/workflow";
 
@@ -108,22 +107,6 @@ export async function migratePluginBoundaries(file: string, write = true) {
     !byok.grants.includes("http.dispatch")
   )
     byok.grants.push("http.dispatch");
-  const keyScopes = prepareKeyScopes(file, config, router?.config);
-  for (const [id, group] of Object.entries(
-    (router?.config?.groups ?? {}) as Record<string, any>,
-  ))
-    if (
-      id.startsWith("migrated-key-scope-") &&
-      group.name.startsWith("原渠道授权 · ")
-    )
-      group.name =
-        group.channelIds
-          .map(
-            (channel: string) =>
-              router!.config!.upstreams[channel]?.name ?? channel,
-          )
-          .join(" / ") + " · 指定用户";
-
   if (
     !applied &&
     router &&
@@ -150,12 +133,10 @@ export async function migratePluginBoundaries(file: string, write = true) {
     );
     await writeConfig(file, config);
   }
-  if (write) keyScopes.apply();
   if (write && !workflowGrantsApplied)
     await writeConfig(marker, { version: 3 });
   return {
-    changed: changed || keyScopes.count > 0,
-    written: write && (changed || keyScopes.count > 0),
-    migratedKeys: keyScopes.count,
+    changed,
+    written: write && changed,
   };
 }

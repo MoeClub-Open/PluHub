@@ -226,7 +226,7 @@ it("uses the same requested/mapped model conditions for preview, execution and q
       providerId: "match",
       trace: { nodes: ["s", "requested", "mapped", "match"] },
     });
-    const quoted = await f.kernel.invoke<any>("ai.routing@2", {
+    const quoted = await f.kernel.invoke<any>("ai.routing@3", {
       model: "assistant",
       purpose: "quote",
       ingressProtocol: "openai-chat",
@@ -362,7 +362,7 @@ it("keeps same-protocol restrictions across redirects and lets branches select b
     expect(await denied.text()).toContain("protocol_conversion_forbidden");
     expect(f.sent).toHaveLength(0);
     await expect(
-      f.kernel.invoke("ai.routing@2", {
+      f.kernel.invoke("ai.routing@3", {
         model: "flow",
         features: [],
         request: { model: "flow", messages: [], tools: [], stream: false },
@@ -639,7 +639,7 @@ it("rejects channel recursion and invalid graph updates while preserving the pre
     };
     expect(
       (
-        await f.kernel.invoke<any>("ai.routing@2", {
+        await f.kernel.invoke<any>("ai.routing@3", {
           model: "flow",
           request,
           features: ["text"],
@@ -658,7 +658,7 @@ it("rejects channel recursion and invalid graph updates while preserving the pre
       },
     });
     await expect(
-      f.kernel.invoke("ai.routing@2", {
+      f.kernel.invoke("ai.routing@3", {
         model: "flow",
         request,
         features: ["text"],
@@ -717,7 +717,7 @@ it("composes an automatic-router channel and keeps previously prepared workflow 
       tools: [],
       stream: true,
     };
-    const old = await f.kernel.invoke<any>("ai.routing@2", {
+    const old = await f.kernel.invoke<any>("ai.routing@3", {
       model: "flow",
       request,
       features: ["text", "stream"],
@@ -735,7 +735,7 @@ it("composes an automatic-router channel and keeps previously prepared workflow 
         },
       },
     });
-    const next = await f.kernel.invoke<any>("ai.routing@2", {
+    const next = await f.kernel.invoke<any>("ai.routing@3", {
       model: "flow",
       request,
       features: ["text"],
@@ -896,7 +896,7 @@ it("uses graphs on all provider protocols and auto-router selections", async () 
       tools: [],
       stream: false,
     };
-    const plan = await f.kernel.invoke<any>("ai.routing@2", {
+    const plan = await f.kernel.invoke<any>("ai.routing@3", {
       model: "smart",
       request,
       features: ["text"],
@@ -915,7 +915,7 @@ it("uses graphs on all provider protocols and auto-router selections", async () 
       "claude-subscription",
       "antigravity",
     ]) {
-      const p = await f.kernel.invoke<any>("ai.routing@2", {
+      const p = await f.kernel.invoke<any>("ai.routing@3", {
         model: protocol,
         request: { ...request, model: protocol },
         features: ["text"],
@@ -924,7 +924,7 @@ it("uses graphs on all provider protocols and auto-router selections", async () 
       expect(p.preparedRequest.messages[0].text).toBe("channel policy");
     }
     await expect(
-      f.kernel.invoke("ai.routing@2", {
+      f.kernel.invoke("ai.routing@3", {
         model: "codex",
         request,
         features: ["text"],
@@ -936,7 +936,7 @@ it("uses graphs on all provider protocols and auto-router selections", async () 
     controller.abort();
     await expect(
       f.kernel.invoke(
-        "ai.routing@2",
+        "ai.routing@3",
         { model: "smart", request, features: ["text"] },
         controller.signal,
       ),
@@ -966,11 +966,11 @@ it("migrates legacy graphs equivalently and rejects cyclic routes", async () => 
         stream: false,
       },
     };
-    const before = await f.kernel.invoke<any>("ai.routing@2", input);
+    const before = await f.kernel.invoke<any>("ai.routing@3", input);
     expect(migrateLegacyChannels(config)).toBe(true);
     const router = config.plugins[0]!.config;
     f.kernel.configure({ "official.ai-router": router });
-    const after = await f.kernel.invoke<any>("ai.routing@2", input);
+    const after = await f.kernel.invoke<any>("ai.routing@3", input);
     for (const field of [
       "model",
       "pricing",
@@ -982,7 +982,7 @@ it("migrates legacy graphs equivalently and rejects cyclic routes", async () => 
       expect(after[field]).toEqual(before[field]);
     router.upstreams.composed.flow.nodes.at(-1).target = "flow";
     f.kernel.configure({ "official.ai-router": router });
-    await expect(f.kernel.invoke("ai.routing@2", input)).rejects.toMatchObject({
+    await expect(f.kernel.invoke("ai.routing@3", input)).rejects.toMatchObject({
       code: "routing_cycle",
     });
     const invalid = structuredClone(router);
@@ -1113,7 +1113,7 @@ it("persists one untyped channel with multiple provider branches, validates prev
     expect(probe.status).toBe(200);
     await probe.text();
     expect(f.sent.at(-1).model).toBe("short-model");
-    const oldPlan = await f.kernel.invoke<any>("ai.routing@2", {
+    const oldPlan = await f.kernel.invoke<any>("ai.routing@3", {
       model: "unified",
       request,
       features: ["text", "stream"],
@@ -1150,7 +1150,7 @@ it("persists one untyped channel with multiple provider branches, validates prev
     restarted = await createKernel(await readConfig(f.file));
     await restarted.start();
     for (const stream of [false, true]) {
-      const plan = await restarted.invoke<any>("ai.routing@2", {
+      const plan = await restarted.invoke<any>("ai.routing@3", {
         model: "unified",
         request: { ...request, stream },
         features: ["text"],

@@ -35,7 +35,7 @@ it("keeps internal provider calls private and settles each child independently",
           host.route({method:'POST',path:'/v1/test-workflow-parent',access:'authenticated',async handle(req,ctx) {
             const {stream=false,cancel=false} = await req.json();
             const task = {model:'public',messages:[{role:'user',text:cancel?'cancel':'hello'}],tools:[],stream,maxTokens:16};
-            const plan = await host.call('ai.routing@2', {model:task.model,request:task,
+            const plan = await host.call('ai.routing@3', {model:task.model,request:task,
               ingressProtocol:'openai-chat',features:['text','usage'],principalId:ctx.principal.id}, ctx.signal);
             const child = await host.dispatchChild(new Request('http://localhost/internal/workflow/provider', {
               method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({request:task,protocol:'openai-chat'})

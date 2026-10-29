@@ -645,7 +645,7 @@ it("migrates previous reservations without losing money or inventing historical 
     );
     try {
       db.exec(
-        "ALTER TABLE reservations DROP COLUMN budget; ALTER TABLE reservations DROP COLUMN reported_usage; CREATE TABLE pricing_users(user_id TEXT PRIMARY KEY,group_id TEXT NOT NULL,user_multiplier REAL NOT NULL); PRAGMA user_version=5;",
+        "ALTER TABLE reservations DROP COLUMN budget; ALTER TABLE reservations DROP COLUMN reported_usage; PRAGMA user_version=5;",
       );
       db.prepare(
         "INSERT INTO reservations(id,user_id,amount,status,created_at,pricing) VALUES(?,?,100,'reserved',?,?)",

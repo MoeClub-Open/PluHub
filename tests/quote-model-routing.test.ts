@@ -118,7 +118,7 @@ it("quotes the selected route using its public model name even when IDs collide"
     );
     expect(other.status).toBe(200);
     expect((await other.json()).amount).toBe(9000);
-    const plan = await f.kernel.invoke<any>("ai.routing@2", {
+    const plan = await f.kernel.invoke<any>("ai.routing@3", {
       model: "assistant",
       channelId: "entry",
       ingressProtocol: "openai-chat",
@@ -127,7 +127,7 @@ it("quotes the selected route using its public model name even when IDs collide"
     });
     expect(plan.model).toBe("cheap");
     expect(plan.pricing.input).toBe(2);
-    const otherPlan = await f.kernel.invoke<any>("ai.routing@2", {
+    const otherPlan = await f.kernel.invoke<any>("ai.routing@3", {
       model: "internal-a",
       channelId: "entry",
       ingressProtocol: "openai-chat",
@@ -137,7 +137,7 @@ it("quotes the selected route using its public model name even when IDs collide"
     expect(otherPlan.model).toBe("expensive");
     expect(otherPlan.pricing.input).toBe(9);
     await expect(
-      f.kernel.invoke("ai.routing@2", {
+      f.kernel.invoke("ai.routing@3", {
         model: "internal-a",
         channelId: "entry",
         purpose: "quote",

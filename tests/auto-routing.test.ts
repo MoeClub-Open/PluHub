@@ -171,7 +171,7 @@ it("filters automatic routing candidates by trusted protocol admission", async (
       stream: false,
     };
     await expect(
-      f.kernel.invoke("ai.routing@2", {
+      f.kernel.invoke("ai.routing@3", {
         model: "auto",
         request,
         features: [],
@@ -180,7 +180,7 @@ it("filters automatic routing candidates by trusted protocol admission", async (
     ).rejects.toMatchObject({ code: "no_route" });
     expect(f.answers()).toBe(0);
     expect(f.decisions()).toBe(0);
-    const plan = await f.kernel.invoke<any>("ai.routing@2", {
+    const plan = await f.kernel.invoke<any>("ai.routing@3", {
       model: "auto",
       request,
       features: [],
@@ -288,7 +288,7 @@ it("applies mode and strength snapshots, rejects recursion and preserves the pre
       "official.auto-router": { profiles: { smart: f.profile } },
     });
     const resolve = () =>
-      f.kernel.invoke<any>("ai.routing@2", {
+      f.kernel.invoke<any>("ai.routing@3", {
         model: "auto",
         features: ["text"],
         request: {

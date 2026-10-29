@@ -66,9 +66,8 @@ it("uses payment history rather than gifts for HTTP model listings while retaini
       "open",
       "signed",
     ]);
-    const plan = await f.kernel.invoke<any>("ai.routing@2", {
+    const plan = await f.kernel.invoke<any>("ai.routing@3", {
       model: "gpt-test",
-      groupId: "default",
       principalId: user.id,
       request: { model: "gpt-test", messages: [], tools: [], stream: false },
       features: ["text"],

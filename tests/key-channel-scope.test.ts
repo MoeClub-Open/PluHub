@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { fixture } from "./helpers.js";
 
-it("keeps group keys and personal-channel keys in separate scopes", async () => {
+it("keeps default platform keys out of personal channels and allows explicit owned-channel bindings", async () => {
   const f = await fixture(
     [
       "users",
@@ -31,34 +31,30 @@ it("keeps group keys and personal-channel keys in separate scopes", async () => 
       admin,
     );
     expect(created.status, await created.clone().text()).toBe(201);
-    const channel = (await created.json()) as { id: string };
-
-    const mixed = await f.request(
+    const channel = await created.json();
+    const invalid = await f.request(
       "/api/plugins/official.auth/keys",
       "POST",
       {
-        name: "Invalid mixed scope",
-        groupId: "default",
-        channelIds: [channel.id],
+        name: "Invalid scope",
+        unsupportedScope: "anything",
       },
       admin,
     );
-    expect(mixed.status).toBe(400);
-    await mixed.text();
-
-    const keyResponse = await f.request(
+    expect(invalid.status).toBe(400);
+    await invalid.text();
+    const defaultResponse = await f.request(
       "/api/plugins/official.auth/keys",
       "POST",
-      {
-        name: "Group scope",
-        groupId: "default",
-      },
+      { name: "Platform scope" },
       admin,
     );
-    expect(keyResponse.status, await keyResponse.clone().text()).toBe(201);
-    const key = (await keyResponse.json()) as { token: string };
+    expect(defaultResponse.status, await defaultResponse.clone().text()).toBe(
+      201,
+    );
+    const platform = await defaultResponse.json();
     const headers = {
-      authorization: "Bearer " + key.token,
+      authorization: "Bearer " + platform.token,
       "x-pluhub-channel": channel.id,
     };
     const list = await f.request("/v1/models", "GET", undefined, headers);
@@ -75,6 +71,32 @@ it("keeps group keys and personal-channel keys in separate scopes", async () => 
     );
     expect(call.status).toBe(403);
     expect((await call.json()).error.code).toBe("channel_forbidden");
+    const scopedResponse = await f.request(
+      "/api/plugins/official.auth/keys",
+      "POST",
+      {
+        name: "Personal scope",
+        channelIds: [channel.id],
+      },
+      admin,
+    );
+    expect(scopedResponse.status, await scopedResponse.clone().text()).toBe(
+      201,
+    );
+    const scoped = await scopedResponse.json();
+    const own = await f.request("/v1/models", "GET", undefined, {
+      authorization: "Bearer " + scoped.token,
+    });
+    expect(own.status).toBe(200);
+    expect((await own.json()).data.map((model: any) => model.id)).toEqual([
+      "personal",
+    ]);
+    const outside = await f.request("/v1/models", "GET", undefined, {
+      authorization: "Bearer " + scoped.token,
+      "x-pluhub-channel": "outside",
+    });
+    expect(outside.status).toBe(403);
+    await outside.text();
   } finally {
     await f.close();
   }

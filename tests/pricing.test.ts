@@ -118,7 +118,7 @@ async function setup(enabled = true) {
     f.kernel.invoke<any>("billing.balance@1", { userId: me.id });
   return { ...f, admin, me, invoke, balance };
 }
-it("resolves quotes and execution through the same conditional route and entry/group multipliers", async () => {
+it("resolves quotes and execution through the same conditional route and entry channel multiplier", async () => {
   const f = await setup();
   let calls = 0;
   respond = () => {
@@ -132,7 +132,6 @@ it("resolves quotes and execution through the same conditional route and entry/g
     f.kernel.configure({
       "official.ai-router": {
         ...router,
-        groups: { default: { name: "Default", multiplier: 2 } },
         upstreams: {
           primary: { ...router.upstreams.primary, consumptionMultiplier: 9 },
           entry: {
@@ -224,7 +223,7 @@ it("resolves quotes and execution through the same conditional route and entry/g
       messages: [{ role: "user", content: "hello" }],
     });
     expect(quoted.status).toBe(200);
-    expect((await quoted.json()).amount).toBe(2000);
+    expect((await quoted.json()).amount).toBe(1000);
     expect(calls).toBe(0);
     const mediaQuote = await f.request(
       "/api/plugins/official.billing/quote",
@@ -233,19 +232,19 @@ it("resolves quotes and execution through the same conditional route and entry/g
       f.admin,
     );
     expect(mediaQuote.status).toBe(200);
-    expect((await mediaQuote.json()).amount).toBe(18000);
+    expect((await mediaQuote.json()).amount).toBe(9000);
     expect(calls).toBe(0);
     const candidate = await f.kernel.invoke<any>("ai.targets@1", {
       target: "fixed",
       consumptionMultiplier: 0.5,
       request: { model: "fixed", messages: [], tools: [], stream: false },
     });
-    expect(candidate.plan.pricing.multiplier).toBe(1);
+    expect(candidate.plan.pricing.multiplier).toBe(0.5);
     const result = await f.invoke("entry");
     expect(result.status).toBe(200);
     await result.json();
     expect(calls).toBe(1);
-    expect(await f.balance()).toMatchObject({ balance: 998000, held: 0 });
+    expect(await f.balance()).toMatchObject({ balance: 999000, held: 0 });
   } finally {
     await f.close();
   }

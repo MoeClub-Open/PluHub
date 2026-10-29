@@ -100,7 +100,6 @@ it("meters a System One platform fallback only after an explicit personal reject
               outputPrice: 3,
             },
           },
-          groups: { team: { name: "Team", channelIds: ["paid"] } },
         },
       });
     },
@@ -133,7 +132,7 @@ it("meters a System One platform fallback only after an explicit personal reject
             {
               id: "group",
               type: "platform",
-              groupId: "team",
+              channelId: "paid",
               model: "paid-model",
             },
           ],

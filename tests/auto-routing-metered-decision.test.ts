@@ -172,13 +172,6 @@ it("meters each remote automatic routing decision without bypassing key channel 
       "official.ai-router": {
         upstreams,
         models,
-        groups: {
-          restricted: {
-            name: "Restricted",
-            multiplier: 1,
-            channelIds: ["virtual-luna", "text"],
-          },
-        },
         secretRefs: ["secret:DECISION_TEST", "secret:ANSWER_TEST"],
       },
       "official.auto-router": { profiles },
@@ -295,7 +288,7 @@ it("meters each remote automatic routing decision without bypassing key channel 
       {
         name: "without-decision-channel",
         models: ["smart-luna"],
-        groupId: "restricted",
+        channelIds: ["virtual-luna", "text"],
       },
       admin,
     );
