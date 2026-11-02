@@ -14,6 +14,10 @@
 
 管理员在「站点与品牌 → 品牌与外观」配置站点名称、简介、Logo、浏览器图标、主题色、登录标题/说明、页脚及联系链接。表单支持预览、放弃草稿和保存；未保存时关闭或刷新会提示。
 
+提供石墨、深海、鸢尾、松绿、琥珀、蔷薇六种颜色主题，每种均支持浅色、深色和跟随系统。站点主题通过 `branding.siteTheme` 设置，选择配色时自动填入对应主题色，也可用颜色选择器或十六进制值自定义 `accentColor`。未配置主题色时使用所选配色的默认值；品牌预览跟随当前明暗模式。
+
+访客与登录用户均可通过外观菜单切换明暗模式及颜色主题，控制台、登录页和公开门户共用该入口。个人选择保存在当前浏览器，同源标签页同步；选择「跟随站点」后使用管理员配置的配色和自定义主题色。切换外观不刷新页面，也不清空表单或当前对话。对话中的 Mermaid 图表随主题重新渲染。
+
 Logo 和图标可上传不超过 64 KiB 的 PNG/JPEG/WebP，或填写 HTTPS / 站内绝对路径。链接指向已有页面，不生成政策正文；不接受 SVG、任意 HTML、脚本地址或含凭证的 URL。
 
 配置保存在 `official.console.config.branding`，保存后按配置快照更新。`GET /console/branding` 只公开品牌字段，完整配置写入仍需管理员认证；HTML 和初始化数据经过转义。
@@ -23,6 +27,7 @@ Logo 和图标可上传不超过 64 KiB 的 PNG/JPEG/WebP，或填写 HTTPS / �
   "branding": {
     "name": "团队模型服务",
     "defaultLanguage": "zh-CN",
+    "siteTheme": "violet",
     "accentColor": "#635bff",
     "logoUrl": "https://example.com/logo.png",
     "faviconUrl": "https://example.com/icon.png",
