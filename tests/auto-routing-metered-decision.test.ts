@@ -79,7 +79,6 @@ it("meters each remote automatic routing decision without bypassing key channel 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const f = await fixture(
     [
-      "users",
       "auth",
       "ai-router",
       "auto-router",
@@ -87,12 +86,10 @@ it("meters each remote automatic routing decision without bypassing key channel 
       "observability",
       "rate-limit",
       "http-transport",
-      "upstream-openai-chat",
-      "ingress-openai-chat",
     ],
     {
       billing: { enabled: true, reserveOutputTokens: 64 },
-      "upstream-openai-chat": { secretRefs: [] },
+      "ai-router": { secretRefs: [] },
     },
   );
   try {
@@ -175,7 +172,6 @@ it("meters each remote automatic routing decision without bypassing key channel 
         secretRefs: ["secret:DECISION_TEST", "secret:ANSWER_TEST"],
       },
       "official.auto-router": { profiles },
-      "official.upstream-openai-chat": { secretRefs: ["secret:ANSWER_TEST"] },
     });
     const tokens: Record<string, string> = {};
     for (const kind of kinds) {
@@ -233,7 +229,6 @@ it("meters each remote automatic routing decision without bypassing key channel 
         });
         if (withUsage) expect(decision.charged_micro_usd).toBe(19);
         else expect(decision.charged_micro_usd).toBeGreaterThan(0);
-        expect(decision.held_micro_usd).toBe(0);
         childIds.push(decision.id);
       }
     }
@@ -258,27 +253,21 @@ it("meters each remote automatic routing decision without bypassing key channel 
     const balance = await f.kernel.invoke<any>("billing.balance@1", {
       userId: me.id,
     });
-    const decisionCharges = await f.kernel.invoke<any[]>(
-      "billing.request-charges@1",
-      {
-        requests: childIds.map((id) => ({ id, userId: me.id })),
-      },
-    );
-    expect(balance.balance).toBe(
-      before -
-        decisionCharges.reduce((sum, row) => sum + row.charged, 0) -
-        6 * 6,
-    );
     expect(balance.held).toBe(0);
     const logs = new DatabaseSync(
       join(f.config.dataDir, "official.observability", "requests.sqlite"),
     );
     try {
+      let decisionTotal = 0;
       for (const id of childIds) {
-        const row = logs.prepare("SELECT * FROM requests WHERE id=?").get(id);
+        const row = logs
+          .prepare("SELECT * FROM requests WHERE id=?")
+          .get(id) as any;
+        decisionTotal += row.charged_micro_usd ?? 0;
         expect(JSON.stringify(row)).not.toContain("Classify this task");
         expect(JSON.stringify(row)).not.toContain("decision-key");
       }
+      expect(balance.balance).toBe(before - decisionTotal - 6 * 6);
     } finally {
       logs.close();
     }

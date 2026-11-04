@@ -14,7 +14,6 @@ for (const pkg of release.packages)
   if (pkg.id.startsWith("@pluhub/"))
     await cp("output/packages/" + pkg.file, out + "/packages/" + pkg.file);
 for (const name of await readdir("../PluHub-Plugins/plugins")) {
-  if (name === "subscription-accounts") continue;
   const source = "../PluHub-Plugins/plugins/" + name;
   if (!existsSync(source + "/manifest.json")) continue;
   const target = out + "/plugins/" + name;
@@ -35,13 +34,6 @@ await writeFile(
   out + "/deploy/docker/bundled-plugins.json",
   JSON.stringify(catalog) + "\n",
 );
-await mkdir(out + "/scripts", { recursive: true });
-await cp("deploy/migrations", out + "/deploy/migrations", { recursive: true });
-for (const name of [
-  "migrate-plugin-boundaries.ts",
-  "migrate-managed-secrets.ts",
-])
-  await cp("scripts/" + name, out + "/scripts/" + name);
 await cp("LICENSE", out + "/LICENSE");
 await writeFile(
   out + "/package.json",
@@ -51,9 +43,4 @@ await writeFile(
     private: true,
     type: "module",
   }),
-);
-await mkdir(out + "/tools", { recursive: true });
-await cp(
-  "../PluHub-Plugins/tools/migrate-subscriptions.mjs",
-  out + "/tools/migrate-subscriptions.mjs",
 );

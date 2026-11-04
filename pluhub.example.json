@@ -25,12 +25,6 @@
       "enabled": true
     },
     {
-      "path": "../PluHub-Plugins/plugins/users",
-      "grants": ["api.register"],
-      "config": {},
-      "enabled": true
-    },
-    {
       "path": "../PluHub-Plugins/plugins/auth",
       "grants": ["api.register", "identity.provide", "hooks.register"],
       "config": {},
@@ -42,62 +36,6 @@
       "config": {
         "upstreams": {},
         "models": {}
-      },
-      "enabled": true
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/ingress-openai-chat",
-      "grants": ["http.route"],
-      "config": {},
-      "enabled": true
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/upstream-openai-chat",
-      "grants": ["secrets.read"],
-      "config": {
-        "secretRefs": []
-      },
-      "enabled": true
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/ingress-openai-responses",
-      "grants": ["http.route"],
-      "config": {},
-      "enabled": true
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/upstream-openai-responses",
-      "grants": ["secrets.read"],
-      "config": {
-        "secretRefs": []
-      },
-      "enabled": true
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/ingress-anthropic",
-      "grants": ["http.route"],
-      "config": {},
-      "enabled": true
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/upstream-anthropic",
-      "grants": ["secrets.read"],
-      "config": {
-        "secretRefs": []
-      },
-      "enabled": true
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/ingress-gemini",
-      "grants": ["http.route"],
-      "config": {},
-      "enabled": true
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/upstream-gemini",
-      "grants": ["secrets.read"],
-      "config": {
-        "secretRefs": []
       },
       "enabled": true
     },
@@ -167,25 +105,7 @@
       "config": {}
     },
     {
-      "path": "../PluHub-Plugins/plugins/upstream-codex",
-      "grants": ["secrets.read", "api.register"],
-      "config": {},
-      "enabled": false
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/upstream-claude-subscription",
-      "grants": ["secrets.read", "api.register"],
-      "config": {},
-      "enabled": false
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/upstream-antigravity",
-      "grants": ["secrets.read", "api.register"],
-      "config": {},
-      "enabled": false
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/upstream-grok",
+      "path": "../PluHub-Plugins/plugins/subscriptions",
       "grants": ["secrets.read", "api.register"],
       "config": {},
       "enabled": false
@@ -218,20 +138,6 @@
       "path": "../PluHub-Plugins/plugins/tickets",
       "grants": ["api.register"],
       "config": {},
-      "enabled": false
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/ingress-openai-media",
-      "grants": ["http.route"],
-      "config": {},
-      "enabled": false
-    },
-    {
-      "path": "../PluHub-Plugins/plugins/upstream-openai-media",
-      "grants": ["secrets.read"],
-      "config": {
-        "secretRefs": []
-      },
       "enabled": false
     }
   ]

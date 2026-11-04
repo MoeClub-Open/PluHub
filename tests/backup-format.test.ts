@@ -5,11 +5,11 @@ import {
   readdir,
   readFile,
   writeFile,
-  rm,
   chmod,
   symlink,
   stat,
 } from "node:fs/promises";
+import { removeTempDir } from "./helpers.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -18,7 +18,7 @@ import {
   decryptBackup,
   parseBackupKey,
   readBackupKey,
-} from "../deploy/docker/backup-format.mjs";
+} from "../deploy/docker/backup-format.ts";
 
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), "pluhub-backup-format-"));
@@ -26,7 +26,7 @@ async function fixture() {
     directory,
     key: randomBytes(32),
     file: (name: string) => join(directory, name),
-    close: () => rm(directory, { recursive: true, force: true }),
+    close: () => removeTempDir(directory),
   };
 }
 it("round-trips encrypted streaming archives through arbitrary chunk boundaries with fresh nonces and private outputs", async () => {

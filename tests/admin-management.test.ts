@@ -288,7 +288,7 @@ it("enforces administrator channel blocks independently of user settings, creden
 });
 
 it("exposes safe account facts and supports password, sessions, factors and roles without removing the last administrator", async () => {
-  const f = await fixture(["users", "auth", "ai-router"]);
+  const f = await fixture(["auth", "ai-router"]);
   try {
     const admin = await f.admin(),
       alice = await account(f, admin, "recover-user");
@@ -384,7 +384,7 @@ it("exposes safe account facts and supports password, sessions, factors and role
       await f.request(auth + "/me", "GET", undefined, admin)
     ).json();
     const last = await f.request(
-      "/api/plugins/official.users/users",
+      "/api/plugins/official.auth/users",
       "PATCH",
       { id: me.id, role: "user" },
       admin,
@@ -392,7 +392,7 @@ it("exposes safe account facts and supports password, sessions, factors and role
     expect(last.status).toBe(409);
     expect(await last.json()).toMatchObject({ error: { code: "last_admin" } });
     const promoted = await f.request(
-      "/api/plugins/official.users/users",
+      "/api/plugins/official.auth/users",
       "PATCH",
       { id: alice.id, role: "admin", reason: "Delegated administrator" },
       admin,
@@ -411,7 +411,7 @@ it("exposes safe account facts and supports password, sessions, factors and role
       (await f.request("/api/host/audit", "GET", undefined, newCookie)).status,
     ).toBe(200);
     const demoted = await f.request(
-      "/api/plugins/official.users/users",
+      "/api/plugins/official.auth/users",
       "PATCH",
       { id: alice.id, role: "user" },
       admin,
@@ -427,12 +427,12 @@ it("exposes safe account facts and supports password, sessions, factors and role
 });
 
 it("records successful and failed management actions durably without bodies, credentials or duplicate audit rows", async () => {
-  const f = await fixture(["users", "auth", "ai-router"]);
+  const f = await fixture(["auth", "ai-router"]);
   try {
     const admin = await f.admin(),
       alice = await account(f, admin, "audited-user");
     const bad = await f.request(
-      "/api/plugins/official.users/users",
+      "/api/plugins/official.auth/users",
       "PATCH",
       {
         id: alice.id,
@@ -620,7 +620,7 @@ it("queries all financial facts, retries verified credits once and serializes ow
     interval: "month",
   };
   const f = await fixture(
-    ["users", "auth", "billing", "commerce", "payments-stripe"],
+    ["auth", "billing", "commerce", "payments-stripe"],
     {
       commerce: { publicUrl: "http://localhost", products: [product] },
       "payments-stripe": {

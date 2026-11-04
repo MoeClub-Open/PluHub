@@ -10,7 +10,7 @@ it("meters a System One platform fallback only after an explicit personal reject
   let platformCalls = 0;
   let behavior: "reject" | "unknown" = "reject";
   const f = await fixture(
-    ["users", "auth", "billing", "rate-limit", "observability", "byok"],
+    ["auth", "billing", "rate-limit", "observability", "byok"],
     { billing: { enabled: true, reserveOutputTokens: 64 } },
     async (kernel, directory) => {
       (globalThis as any).__jevFallbackTransport = (input: any) => {

@@ -12,7 +12,7 @@ it("does not advertise readiness before the startup graph is published", async (
     release = resolve;
   });
   const pending = fixture(
-    ["listener", "users", "auth", "ai-router"],
+    ["listener", "auth", "ai-router"],
     {},
     async (kernel, directory) => {
       const plugin = join(directory, "example.startup");
@@ -57,7 +57,7 @@ it("does not advertise readiness before the startup graph is published", async (
 });
 
 it("fails readiness during drain while allowing an existing stream to finish", async () => {
-  const f = await fixture(["listener", "users", "auth", "ai-router"]);
+  const f = await fixture(["listener", "auth", "ai-router"]);
   try {
     const directory = join(f.directory, "example.drain");
     await mkdir(directory);
@@ -215,7 +215,7 @@ it("proxies HTTP/SSE and WebSocket with native transforms and cancellation", asy
 });
 
 it("honors an explicit public origin behind TLS termination for authenticated mutations", async () => {
-  const f = await fixture(["listener", "users", "auth", "ai-router"]);
+  const f = await fixture(["listener", "auth", "ai-router"]);
   try {
     await f.admin();
     await f.kernel.shutdown();

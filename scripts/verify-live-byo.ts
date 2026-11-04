@@ -4,8 +4,9 @@ import { readFile, mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { resolve, join, dirname, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { createKernel } from "../packages/control/dist/index.js";
-const key = process.env.PLUHUB_LIVE_KEY,
-  model = process.env.PLUHUB_LIVE_MODEL;
+
+const key = process.env.PLUHUB_LIVE_KEY;
+const model = process.env.PLUHUB_LIVE_MODEL;
 if (!key || !model)
   throw Error("Set PLUHUB_LIVE_KEY and PLUHUB_LIVE_MODEL explicitly");
 const base = new URL(
@@ -18,9 +19,12 @@ assert.ok(
     !base.search &&
     !base.hash,
 );
-const temp = resolve(tmpdir()),
-  directory = await mkdtemp(join(temp, "pluhub-live-byo-"));
-const report = {
+const temp = resolve(tmpdir());
+const directory = await mkdtemp(join(temp, "pluhub-live-byo-"));
+const report: Record<string, unknown> & {
+  checks: Array<Record<string, unknown>>;
+  passed: boolean;
+} = {
   at: new Date().toISOString(),
   origin: base.origin,
   model,
@@ -28,24 +32,21 @@ const report = {
   checks: [],
   passed: false,
 };
-let kernel;
+let kernel: Awaited<ReturnType<typeof createKernel>> | undefined;
 try {
   const plugins = [];
   for (const name of [
     "http-transport",
-    "users",
     "auth",
     "billing",
     "ai-router",
     "byok",
     "rate-limit",
-    "ingress-openai-chat",
-    "upstream-openai-chat",
   ]) {
-    const path = resolve("../PluHub-Plugins/plugins", name),
-      manifest = JSON.parse(
-        await readFile(join(path, "manifest.json"), "utf8"),
-      );
+    const path = resolve("../PluHub-Plugins/plugins", name);
+    const manifest = JSON.parse(
+      await readFile(join(path, "manifest.json"), "utf8"),
+    );
     plugins.push({
       path,
       grants: manifest.permissions,
@@ -61,9 +62,14 @@ try {
   await kernel.start();
   const password = "ephemeral-byo-validation-password";
   await kernel.invoke("auth.bootstrap@1", { username: "live", password });
-  let cookie, token;
-  async function call(path, body, extra = {}) {
-    return kernel.fetch(
+  let cookie = "";
+  let token = "";
+  async function call(
+    path: string,
+    body?: unknown,
+    extra: Record<string, string> = {},
+  ) {
+    return kernel!.fetch(
       new Request("http://localhost" + path, {
         method: body ? "POST" : "GET",
         headers: {
@@ -81,7 +87,7 @@ try {
     password,
   });
   assert.equal(login.status, 200);
-  cookie = login.headers.get("set-cookie").split(";")[0];
+  cookie = login.headers.get("set-cookie")!.split(";")[0]!;
   await login.json();
   const me = await (await call("/api/plugins/official.auth/me")).json();
   const discovered = await call(
@@ -89,7 +95,7 @@ try {
     { protocol: "openai-chat", baseUrl: base.href, key },
   );
   assert.equal(discovered.status, 200);
-  const catalog = await discovered.json();
+  const catalog = (await discovered.json()) as { models: string[] };
   assert.ok(catalog.models.includes(model));
   report.checks.push({
     operation: "unsaved-model-discovery",
@@ -125,13 +131,13 @@ try {
       { authorization: "Bearer " + token },
     );
     assert.equal(response.status, 200);
-    const text = await response.text(),
-      frames = stream
-        ? text
-            .split(/\r?\n/)
-            .filter((s) => s.startsWith("data: ") && s !== "data: [DONE]")
-            .map((s) => JSON.parse(s.slice(6)))
-        : [JSON.parse(text)];
+    const text = await response.text();
+    const frames = stream
+      ? text
+          .split(/\r?\n/)
+          .filter((s) => s.startsWith("data: ") && s !== "data: [DONE]")
+          .map((s) => JSON.parse(s.slice(6)))
+      : [JSON.parse(text)];
     assert.ok(!frames.some((f) => f.error));
     const answer = frames
       .map((f) =>
@@ -152,15 +158,17 @@ try {
       passed: true,
     });
   }
-  const wallet = await kernel.invoke("billing.balance@1", { userId: me.id });
+  const wallet = (await kernel.invoke("billing.balance@1", {
+    userId: me.id,
+  })) as { enabled: boolean; balance: number; held: number };
   assert.ok(wallet.enabled);
   assert.equal(wallet.balance, 0);
   assert.equal(wallet.held, 0);
   report.checks.push({ operation: "platform-wallet-unchanged", passed: true });
   report.passed = true;
 } catch (error) {
-  report.error =
-    typeof error?.code === "string" ? error.code : "validation_failed";
+  const code = (error as { code?: unknown } | null)?.code;
+  report.error = typeof code === "string" ? code : "validation_failed";
   process.exitCode = 1;
 } finally {
   await kernel?.shutdown();

@@ -70,6 +70,7 @@ async function setup(rule: any = { rpm: 1 }) {
     ],
   };
   const router: any = {
+    secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
     upstreams: {
       c: {
         protocol: "openai-chat",
@@ -333,7 +334,7 @@ it("rejects missing limit capabilities and malformed rules before applying confi
       ).toThrow();
     }
     await expect(f.kernel.stop("official.rate-limit")).rejects.toThrow(
-      /Required by enabled plugins/,
+      /请求限流节点需要安装请求限流插件/,
     );
     const response = await f.invoke(true);
     expect(response.status).toBe(200);

@@ -44,7 +44,6 @@ it("authorizes, records and settles each Jev workflow request independently", as
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const f = await fixture(
     [
-      "users",
       "auth",
       "billing",
       "rate-limit",

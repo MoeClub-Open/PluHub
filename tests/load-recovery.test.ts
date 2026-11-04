@@ -42,13 +42,10 @@ it("releases request slots after repeated HTTP stream cancellation and serves co
     [
       "listener",
       "http-transport",
-      "users",
       "auth",
       "ai-router",
       "observability",
       "rate-limit",
-      "ingress-openai-chat",
-      "upstream-openai-chat",
     ],
     {
       "ai-router": {

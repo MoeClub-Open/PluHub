@@ -1,12 +1,10 @@
-import { readFile, mkdir, realpath } from "node:fs/promises";
-import { resolve, relative, isAbsolute, sep, dirname } from "node:path";
+import { readFile, mkdir } from "node:fs/promises";
+import { resolve, dirname } from "node:path";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import Ajv from "ajv";
 import semver from "semver";
-import schema from "@pluhub/contracts/manifest.schema.json" with { type: "json" };
-import { HOST_VERSION, type PluginConfig } from "@pluhub/contracts";
+import type { PluginConfig } from "@pluhub/contracts";
 import {
   HostError,
   json,
@@ -23,7 +21,14 @@ import { loadNative, loadProcess, type LoadedRuntime } from "@pluhub/runtime";
 import { compileGraph, type CompiledGraph } from "@pluhub/engine";
 import { createLogSanitizer, newLog, type RuntimeLog } from "./logging.js";
 import { SecretVault } from "./secrets.js";
+import {
+  manifestAjv as ajv,
+  validateManifest,
+  safeEntry,
+  frozen,
+} from "./manifest.js";
 export { SecretVault } from "./secrets.js";
+export { validateManifest, safeEntry } from "./manifest.js";
 export type { RuntimeLog, LogLevel } from "./logging.js";
 export { createLogSanitizer } from "./logging.js";
 import {
@@ -31,60 +36,6 @@ import {
   serveAsset,
   slotContributions,
 } from "@pluhub/frontend-host";
-const ajv = new Ajv.default({ allErrors: true });
-const manifestValidator = ajv.compile(schema);
-export function validateManifest(value: unknown): Manifest {
-  if (!manifestValidator(value))
-    throw new HostError(
-      "invalid_manifest",
-      ajv.errorsText(manifestValidator.errors),
-    );
-  const m = value as unknown as Manifest;
-  if (
-    !semver.valid(m.version) ||
-    !semver.validRange(m.host) ||
-    !semver.satisfies(HOST_VERSION, m.host, { includePrerelease: true })
-  )
-    throw new HostError("host_version", "Incompatible plugin version");
-  for (const [id, range] of Object.entries(m.dependencies ?? {})) {
-    if (id === m.id || !range.trim() || !semver.validRange(range))
-      throw new HostError(
-        "invalid_dependency",
-        "Invalid dependency " + id + " for " + m.id,
-      );
-  }
-  if (m.requires.some((name) => m.optionalRequires?.includes(name)))
-    throw new HostError(
-      "invalid_dependency",
-      "A capability cannot be both required and optional",
-    );
-  if (m.ui) {
-    const paths = [m.ui.path, ...(m.ui.pages ?? []).map((page) => page.path)];
-    if (new Set(paths).size !== paths.length)
-      throw new HostError(
-        "invalid_ui",
-        "UI page paths must be unique within a plugin",
-      );
-  }
-  return m;
-}
-export async function safeEntry(base: string, entry: string): Promise<string> {
-  if (isAbsolute(entry))
-    throw new HostError("unsafe_path", "Entry must be relative");
-  const root = await realpath(base);
-  const file = await realpath(resolve(base, entry));
-  const rel = relative(root, file);
-  if (rel === ".." || rel.startsWith(".." + sep) || isAbsolute(rel))
-    throw new HostError("unsafe_path", "Entry escapes plugin directory");
-  return file;
-}
-const frozen = <T>(value: T): T => {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const v of Object.values(value)) frozen(v);
-  }
-  return value;
-};
 type Capability = {
   handle: (input: any, signal: AbortSignal) => any;
   callers?: readonly string[];
@@ -772,6 +723,27 @@ export class Kernel {
     for (const s of this.snapshots)
       if (s !== next && s.refs === 0) this.snapshots.delete(s);
   }
+  /** Retain credentials until every request using their configuration has finished. */
+  pruneSecrets() {
+    const keep = new Set<string>();
+    const visit = (value: unknown): void => {
+      if (typeof value === "string") {
+        if (value.startsWith("secret:")) keep.add(value);
+      } else if (Array.isArray(value)) {
+        for (const item of value) visit(item);
+      } else if (value && typeof value === "object") {
+        for (const item of Object.values(value)) visit(item);
+      }
+    };
+    for (const record of this.records.values()) visit(record.settings.config);
+    for (const snapshot of this.snapshots)
+      for (const config of snapshot.configs.values()) visit(config);
+    try {
+      this.secrets.prune(keep);
+    } catch {
+      this.log("host", "error", "Unused credential cleanup failed");
+    }
+  }
   private checkConfigs() {
     this.storage.exit(() => {
       for (const r of this.records.values())
@@ -1458,8 +1430,10 @@ export class Kernel {
                 }
               }
               snapshot.refs--;
-              if (snapshot !== this.current && snapshot.refs === 0)
+              if (snapshot !== this.current && snapshot.refs === 0) {
                 this.snapshots.delete(snapshot);
+                this.pruneSecrets();
+              }
             }
           });
         }
@@ -1547,8 +1521,11 @@ export class Kernel {
         const asset = /^\/extensions\/([a-z0-9.-]+)\/([^/]+)$/.exec(path);
         if (asset) {
           const r = snapshot.records.find((r) => r.manifest.id === asset[1]);
+          const immutable =
+            new URL(request.url).searchParams.has("v") ||
+            /^chunk-[a-zA-Z0-9_-]+-[a-zA-Z0-9]{6,}\.(js|css)$/.test(asset[2]!);
           const response = r
-            ? await serveAsset(r.path, r.manifest, asset[2]!)
+            ? await serveAsset(r.path, r.manifest, asset[2]!, immutable)
             : new Response("Not found", { status: 404 });
           await lease!.release();
           return response;

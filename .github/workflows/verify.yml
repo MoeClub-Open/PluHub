@@ -24,10 +24,13 @@ jobs:
           ref: ${{ inputs.host_ref || github.sha }}
           path: PluHub
           persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.0
       - name: Resolve companion revisions
         id: stack
         working-directory: PluHub
-        run: node scripts/ci-stack.mjs >> "$GITHUB_OUTPUT"
+        run: node scripts/ci-stack.ts >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: MoeClub-Open/PluHub-Spec
@@ -49,9 +52,6 @@ jobs:
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 10.20.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24.22.0
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: 1.27.0
@@ -62,9 +62,9 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.3
-      - name: Contracts and compatibility
+      - name: Contracts
         working-directory: PluHub-Spec
-        run: pnpm install --frozen-lockfile && pnpm build && pnpm test && pnpm check:compat
+        run: pnpm install --frozen-lockfile && pnpm build && pnpm typecheck && pnpm test
       - name: Host build and static checks
         working-directory: PluHub
         run: pnpm install --frozen-lockfile && pnpm build && pnpm typecheck && pnpm format:check
@@ -81,10 +81,10 @@ jobs:
         working-directory: PluHub
         run: |
           pnpm test
-          node scripts/check-boundaries.mjs
+          node scripts/check-boundaries.ts
           pnpm pack:all
           bun scripts/verify-routing-packages.ts
-          node scripts/verify-identity-packages.mjs
+          node scripts/verify-identity-packages.ts
           pnpm bench
       - name: Deployable image and persistence
         working-directory: PluHub

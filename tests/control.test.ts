@@ -37,7 +37,7 @@ it("validates dynamic configuration before persisting or changing the live graph
   }
 });
 it("roundtrips a standalone plugin archive and rejects changed installed content", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   try {
     const archive = join(f.directory, "console.tgz");
     await packPlugin(join(pluginsRoot, "console"), archive);
@@ -67,7 +67,7 @@ it("roundtrips a standalone plugin archive and rejects changed installed content
   }
 });
 it("keeps control APIs usable when a data-plane hook fails", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   try {
     const directory = join(f.directory, "example.bad-hook");
     await mkdir(directory);

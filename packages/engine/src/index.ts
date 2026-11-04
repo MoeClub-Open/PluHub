@@ -19,17 +19,28 @@ export function compileGraph(version: number, input: Hook[]): CompiledGraph {
     const hooks = input.filter((h) => h.phase === phase);
     const map = new Map(hooks.map((h) => [h.id, h]));
     const edges = new Map(hooks.map((h) => [h.id, new Set<string>()]));
-    const edge = (a: string, b: string) => {
-      if (!map.has(a) || !map.has(b))
-        throw new HostError(
-          "hook_order",
-          "Hook order target is missing or in another phase",
-        );
+    const ownerOf = (id: string) =>
+      id.includes(":") ? id.slice(0, id.indexOf(":")) : "";
+    const edge = (a: string, b: string, owner: string) => {
+      if (!map.has(a) || !map.has(b)) {
+        const missing = !map.has(a) ? a : b;
+        if (
+          ids.has(missing) ||
+          !missing.includes(":") ||
+          ownerOf(missing) === owner
+        )
+          throw new HostError(
+            "hook_order",
+            "Hook order target is missing or in another phase",
+          );
+        return;
+      }
       edges.get(a)!.add(b);
     };
     for (const h of hooks) {
-      for (const b of h.before ?? []) edge(h.id, b);
-      for (const a of h.after ?? []) edge(a, h.id);
+      const owner = ownerOf(h.id);
+      for (const b of h.before ?? []) edge(h.id, b, owner);
+      for (const a of h.after ?? []) edge(a, h.id, owner);
     }
     const ordered: Hook[] = [];
     const pending = new Set(map.keys());

@@ -32,7 +32,7 @@ async function setup() {
     return execute(input);
   };
   const f = await fixture(
-    ["users", "auth", "billing", "commerce"],
+    ["auth", "billing", "commerce"],
     {
       commerce: {
         publicUrl: "http://localhost",

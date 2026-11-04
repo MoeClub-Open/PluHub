@@ -33,7 +33,7 @@ export async function scaffold(directory: string, id = "example.hello") {
         type: "module",
         license: "Apache-2.0",
         files: ["dist", "manifest.json"],
-        scripts: { build: "node build.mjs" },
+        scripts: { build: "node build.ts" },
         dependencies: {
           "@pluhub/sdk":
             "link:" +
@@ -56,7 +56,7 @@ export async function scaffold(directory: string, id = "example.hello") {
       "import React from 'react';import { createRoot } from 'react-dom/client';export function mount(element) { const root=createRoot(element);root.render(React.createElement('h1',null,'Hello from " +
       id +
       "'));return()=>root.unmount(); }\n",
-    "build.mjs":
+    "build.ts":
       "import { build } from 'esbuild';await build({entryPoints:['src/index.ts'],outfile:'dist/index.js',platform:'node',format:'esm',bundle:true});await build({entryPoints:['src/ui.ts'],outfile:'dist/ui.js',platform:'browser',format:'esm',bundle:true});\n",
     ".gitignore": "node_modules/\ndist/\n",
     "README.md":

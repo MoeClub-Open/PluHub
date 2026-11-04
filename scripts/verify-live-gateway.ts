@@ -4,6 +4,7 @@ import { readFile, mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createKernel } from "../packages/control/dist/index.js";
+import type { Protocol } from "@pluhub/contracts/ai";
 
 const key = process.env.PLUHUB_LIVE_KEY;
 if (!key)
@@ -32,7 +33,11 @@ if (
   maxTokens > 1024
 )
   throw new Error("Budget: 1..16 calls and 32..1024 output tokens per call");
-const report = {
+const report: Record<string, unknown> & {
+  checks: Array<Record<string, unknown> & { passed: boolean }>;
+  calls: number;
+  passed: boolean;
+} = {
   at: new Date().toISOString(),
   origin: base.origin,
   model,
@@ -46,8 +51,9 @@ const report = {
   passed: false,
 };
 const directory = await mkdtemp(join(tmpdir(), "pluhub-live-matrix-"));
-let kernel;
-function path(protocol, stream) {
+let kernel: Awaited<ReturnType<typeof createKernel>> | undefined;
+
+function path(protocol: Protocol, stream: boolean) {
   return protocol === "openai-chat"
     ? "/v1/chat/completions"
     : protocol === "openai-responses"
@@ -57,17 +63,21 @@ function path(protocol, stream) {
         : "/v1beta/models/live:" +
           (stream ? "streamGenerateContent?alt=sse" : "generateContent");
 }
-function content(protocol, wire, stream) {
+
+function content(protocol: Protocol, wire: string, stream: boolean) {
   const records = stream
     ? wire
         .split(/\r?\n/)
         .filter((l) => l.startsWith("data: ") && l !== "data: [DONE]")
         .map((l) => JSON.parse(l.slice(6)))
     : [JSON.parse(wire)];
-  let text = "",
-    finished = false,
-    usage = false;
-  const tools = new Map();
+  let text = "";
+  let finished = false;
+  let usage = false;
+  const tools = new Map<
+    number,
+    { id: string; name: string; arguments: string }
+  >();
   for (const r of records) {
     if (r.error || r.type === "error") throw new Error("stream_error");
     if (protocol === "openai-chat") {
@@ -78,8 +88,8 @@ function content(protocol, wire, stream) {
       for (const t of (stream
         ? c?.delta?.tool_calls
         : c?.message?.tool_calls) ?? []) {
-        const index = t.index ?? 0,
-          old = tools.get(index) ?? { id: "", name: "", arguments: "" };
+        const index = t.index ?? 0;
+        const old = tools.get(index) ?? { id: "", name: "", arguments: "" };
         old.id ||= t.id ?? "";
         old.name += t.function?.name ?? "";
         old.arguments += t.function?.arguments ?? "";
@@ -109,6 +119,7 @@ function content(protocol, wire, stream) {
   }
   return { text, finished, usage, tools: [...tools.values()] };
 }
+
 try {
   const list = await fetch(
     new URL("v1/models", base.href.endsWith("/") ? base : base.href + "/"),
@@ -121,32 +132,21 @@ try {
     await list.body?.cancel();
     throw new Error("model_list_failed");
   }
-  const catalog = await list.json();
+  const catalog = (await list.json()) as { data?: Array<{ id: string }> };
   if (!catalog.data?.some((m) => m.id === model))
     throw new Error("model_not_available");
-  const names = [
-    "http-transport",
-    "users",
-    "auth",
-    "ai-router",
-    ...["openai-chat", "openai-responses", "anthropic", "gemini"].map(
-      (p) => "ingress-" + p,
-    ),
-    "upstream-openai-chat",
-    "upstream-openai-responses",
-  ];
+  const names = ["http-transport", "auth", "ai-router"];
   const plugins = [];
   for (const name of names) {
-    const path = resolve("../PluHub-Plugins/plugins", name),
-      manifest = JSON.parse(
-        await readFile(join(path, "manifest.json"), "utf8"),
-      );
+    const pluginPath = resolve("../PluHub-Plugins/plugins", name);
+    const manifest = JSON.parse(
+      await readFile(join(pluginPath, "manifest.json"), "utf8"),
+    );
     plugins.push({
-      path,
+      path: pluginPath,
       grants: manifest.permissions,
-      config: name.startsWith("upstream-")
-        ? { secretRefs: ["env:PLUHUB_LIVE_KEY"] }
-        : {},
+      config:
+        name === "ai-router" ? { secretRefs: ["env:PLUHUB_LIVE_KEY"] } : {},
     });
   }
   kernel = await createKernel({
@@ -171,7 +171,7 @@ try {
     }),
   );
   if (!login.ok) throw new Error("local_login_failed");
-  const cookie = login.headers.get("set-cookie").split(";")[0];
+  const cookie = login.headers.get("set-cookie")!.split(";")[0]!;
   await login.body?.cancel();
   const selected = await kernel.fetch(
     new Request("http://localhost/api/plugins/official.auth/keys", {
@@ -180,11 +180,12 @@ try {
       body: JSON.stringify({ name: "live-matrix", models: ["live"] }),
     }),
   );
-  const token = (await selected.json()).token;
+  const token = (await selected.json()).token as string;
   if (!token) throw new Error("local_key_failed");
-  function configure(protocol) {
-    kernel.configure({
+  function configure(protocol: Protocol) {
+    kernel!.configure({
       "official.ai-router": {
+        secretRefs: ["env:PLUHUB_LIVE_KEY"],
         upstreams: {
           live: { protocol, baseUrl: base.href, keyRef: "env:PLUHUB_LIVE_KEY" },
         },
@@ -192,19 +193,26 @@ try {
       },
     });
   }
-  async function call(entry, upstream, stream, request, purpose) {
+  async function call(
+    entry: Protocol,
+    upstream: Protocol,
+    stream: boolean,
+    request: Record<string, unknown>,
+    purpose: string,
+  ) {
     if (report.calls >= calls) return;
     configure(upstream);
     report.calls++;
     const body = encodeRequest(entry, {
       model: "live",
+      messages: [],
       tools: [],
       maxTokens,
       ...request,
       stream,
     });
     const started = performance.now();
-    const check = {
+    const check: Record<string, unknown> & { passed: boolean } = {
       entry,
       upstream,
       stream,
@@ -214,7 +222,7 @@ try {
     };
     report.checks.push(check);
     try {
-      const response = await kernel.fetch(
+      const response = await kernel!.fetch(
         new Request("http://localhost" + path(entry, stream), {
           method: "POST",
           headers: {
@@ -258,7 +266,10 @@ try {
   }
   const normal = {
     messages: [
-      { role: "user", text: "Reply exactly PLUHUB_OK and nothing else." },
+      {
+        role: "user" as const,
+        text: "Reply exactly PLUHUB_OK and nothing else.",
+      },
     ],
   };
   for (const entry of [
@@ -266,10 +277,10 @@ try {
     "openai-responses",
     "anthropic",
     "gemini",
-  ])
+  ] as const)
     for (const stream of [false, true])
       await call(entry, "openai-chat", stream, normal, "text");
-  for (const entry of ["openai-chat", "openai-responses"])
+  for (const entry of ["openai-chat", "openai-responses"] as const)
     for (const stream of [false, true])
       await call(entry, "openai-responses", stream, normal, "text");
   const tools = [
@@ -287,7 +298,7 @@ try {
   for (const stream of [false, true]) {
     const messages = [
       {
-        role: "user",
+        role: "user" as const,
         text: "Call get_weather for Paris. Do not answer until you receive the tool result. Then repeat its result code exactly.",
       },
     ];
@@ -307,9 +318,9 @@ try {
         {
           messages: [
             ...messages,
-            { role: "assistant", text: "", calls: first.tools },
+            { role: "assistant" as const, text: "", calls: first.tools },
             ...first.tools.map((c) => ({
-              role: "tool",
+              role: "tool" as const,
               text: '{"result":"SUNNY_42"}',
               callId: c.id,
               toolName: c.name,

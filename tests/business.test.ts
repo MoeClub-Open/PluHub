@@ -29,7 +29,6 @@ function epaySign(
     : sign("RSA-SHA256", Buffer.from(text), key).toString("base64");
 }
 const roots = [
-  "users",
   "auth",
   "billing",
   "commerce",
@@ -465,16 +464,7 @@ it("settles known usage and charges unknown usage at the reserved amount while e
   };
   process.env.PLUHUB_TEST_UPSTREAM_KEY = "platform-only";
   const f = await fixture(
-    [
-      "users",
-      "auth",
-      "ai-router",
-      "billing",
-      "byok",
-      "rate-limit",
-      "ingress-openai-chat",
-      "upstream-openai-chat",
-    ],
+    ["auth", "ai-router", "billing", "byok", "rate-limit"],
     { billing: { enabled: true } },
     mockTransport,
   );
@@ -485,6 +475,7 @@ it("settles known usage and charges unknown usage at the reserved amount while e
     ).json();
     f.kernel.configure({
       "official.ai-router": {
+        secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
         upstreams: {
           primary: {
             protocol: "openai-chat",
@@ -535,15 +526,22 @@ it("settles known usage and charges unknown usage at the reserved amount while e
     const wallet = await f.kernel.invoke<any>("billing.balance@1", {
       userId: me.id,
     });
-    const [charge] = await f.kernel.invoke<any[]>("billing.request-charges@1", {
-      requests: [
-        { id: unknown.headers.get("x-pluhub-request-id"), userId: me.id },
-      ],
-    });
-    expect(charge.status).toBe("settled");
-    expect(charge.charged).toBeGreaterThan(0);
-    expect(charge.receipt.mode).toBe("reserved");
-    expect(wallet.balance).toBe(99989 - charge.charged);
+    const ledger = await (
+      await f.request(
+        "/api/plugins/official.billing/ledger",
+        "GET",
+        undefined,
+        admin,
+      )
+    ).json();
+    const entry = ledger.find(
+      (row: any) =>
+        row.source === "request:" + unknown.headers.get("x-pluhub-request-id"),
+    );
+    expect(entry).toBeDefined();
+    expect(-entry.amount).toBeGreaterThan(0);
+    expect(JSON.parse(entry.receipt).mode).toBe("reserved");
+    expect(wallet.balance).toBe(99989 + entry.amount);
     expect(wallet.held).toBe(0);
     f.kernel.configure({ "official.rate-limit": { user: { rpm: 1 } } });
     const first = await invoke("hi");
@@ -562,7 +560,7 @@ it("settles known usage and charges unknown usage at the reserved amount while e
 });
 
 it("recovers payment delivery across restarts without crediting twice and settles interrupted reservations once", async () => {
-  const f = await fixture(["users", "auth", "billing", "commerce"]);
+  const f = await fixture(["auth", "billing", "commerce"]);
   let fresh: any;
   try {
     const admin = await f.admin();
@@ -653,15 +651,7 @@ it("releases concurrency and settles partial usage on stream cancellation", asyn
   };
   process.env.PLUHUB_TEST_UPSTREAM_KEY = "test-stream";
   const f = await fixture(
-    [
-      "users",
-      "auth",
-      "ai-router",
-      "billing",
-      "rate-limit",
-      "ingress-openai-chat",
-      "upstream-openai-chat",
-    ],
+    ["auth", "ai-router", "billing", "rate-limit"],
     {
       billing: { enabled: true },
       "rate-limit": { user: { concurrency: 1 }, bytesPerSecond: 1000000 },
@@ -675,6 +665,7 @@ it("releases concurrency and settles partial usage on stream cancellation", asyn
     ).json();
     f.kernel.configure({
       "official.ai-router": {
+        secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
         upstreams: {
           primary: {
             protocol: "openai-chat",
@@ -745,16 +736,10 @@ it("releases concurrency and settles partial usage on stream cancellation", asyn
     const overflow = await invoke();
     expect(overflow.status).toBe(200);
     await overflow.text();
-    const [charge] = await f.kernel.invoke<any[]>("billing.request-charges@1", {
-      requests: [
-        { id: overflow.headers.get("x-pluhub-request-id"), userId: user.id },
-      ],
+    const afterOverflow = await f.kernel.invoke<any>("billing.balance@1", {
+      userId: user.id,
     });
-    expect(charge).toMatchObject({
-      status: "settled",
-      held: 0,
-      receipt: { mode: "reserved" },
-    });
+    expect(afterOverflow.held).toBe(0);
   } finally {
     await f.close();
     delete process.env.PLUHUB_TEST_UPSTREAM_KEY;

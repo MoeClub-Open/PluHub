@@ -8,7 +8,7 @@ import {
 } from "../packages/control/dist/index.js";
 
 it("saves the default language during OOBE before administrator creation and restores it after restart", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   const headers = { origin: "http://localhost", "x-pluhub-setup": "1" };
   const state = async () => (await f.request("/api/host/setup")).json();
   try {
@@ -72,7 +72,7 @@ it("saves the default language during OOBE before administrator creation and res
 });
 
 it("rejects unsupported site languages atomically in OOBE and management without reopening completed setup", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     const setup = await (await f.request("/api/host/setup")).json();
     const before = await readFile(f.file, "utf8");

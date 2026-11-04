@@ -1,10 +1,8 @@
-import { migrateLegacyChannels } from "../deploy/migrations/channel-graphs.ts";
-import { migrateModelRedirects } from "../deploy/migrations/model-redirects.ts";
 import { it, expect } from "vitest";
 import { createServer } from "node:http";
 import { fixture } from "./helpers.js";
+import { createKernel, readConfig } from "../packages/control/dist/index.js";
 import { defaultChannelFlow } from "../../PluHub-Plugins/lib/ai/channel-config.js";
-import { readConfig, createKernel } from "../packages/control/dist/index.js";
 
 async function setup() {
   const prior = process.env.PLUHUB_TEST_UPSTREAM_KEY;
@@ -49,13 +47,42 @@ async function setup() {
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
   const f = await fixture();
   const router: any = {
+    secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
     upstreams: {
       p: {
         protocol: "openai-chat",
         baseUrl: "http://127.0.0.1:" + (server.address() as any).port,
         keyRef: "env:PLUHUB_TEST_UPSTREAM_KEY",
       },
-      composed: { protocol: "workflow" },
+      composed: {},
+      redirect_hidden: {
+        flow: {
+          entry: "start",
+          nodes: [
+            { id: "start", type: "start", next: ["redirect"] },
+            {
+              id: "redirect",
+              type: "upstream",
+              target: "actual",
+              mode: "implicit",
+            },
+          ],
+        },
+      },
+      redirect_visible: {
+        flow: {
+          entry: "start",
+          nodes: [
+            { id: "start", type: "start", next: ["redirect"] },
+            {
+              id: "redirect",
+              type: "upstream",
+              target: "actual",
+              mode: "explicit",
+            },
+          ],
+        },
+      },
     },
     models: {
       actual: {
@@ -71,11 +98,9 @@ async function setup() {
         inputPrice: 999,
         outputPrice: 999,
       },
-    },
-    redirects: {
-      hidden: { target: "actual", mode: "implicit" },
-      "hidden/path": { target: "actual", mode: "implicit" },
-      visible: { target: "actual", mode: "explicit" },
+      hidden: { upstream: "redirect_hidden", model: "actual" },
+      "hidden/path": { upstream: "redirect_hidden", model: "actual" },
+      visible: { upstream: "redirect_visible", model: "actual" },
     },
   };
   const workflow: any = {
@@ -107,7 +132,6 @@ async function setup() {
   const connection = structuredClone(router.upstreams.p);
   router.upstreams.composed = { flow: workflow.flows.standard };
   router.upstreams.p.flow = defaultChannelFlow();
-  migrateModelRedirects(router);
   f.kernel.configure({ "official.ai-router": router });
   const admin = await f.admin();
   return {
@@ -874,14 +898,6 @@ it("uses graphs on all provider protocols and auto-router selections", async () 
         },
       },
     });
-    const normalized = { plugins: [{ path: "/ai-router", config: router }] };
-    migrateLegacyChannels({
-      plugins: [
-        ...normalized.plugins,
-        { path: "/workflow", config: f.workflow },
-      ],
-    });
-    f.kernel.configure({ "official.ai-router": router });
     const user = await (
       await f.request(
         "/api/plugins/official.auth/me",
@@ -947,15 +963,9 @@ it("uses graphs on all provider protocols and auto-router selections", async () 
   }
 });
 
-it("migrates legacy graphs equivalently and rejects cyclic routes", async () => {
+it("rejects cyclic routes and invalid channel graphs", async () => {
   const f = await setup();
   try {
-    const config = {
-      plugins: [
-        { path: "/ai-router", config: structuredClone(f.router) },
-        { path: "/workflow", config: structuredClone(f.workflow) },
-      ],
-    };
     const input = {
       model: "flow",
       features: ["text"],
@@ -966,20 +976,7 @@ it("migrates legacy graphs equivalently and rejects cyclic routes", async () => 
         stream: false,
       },
     };
-    const before = await f.kernel.invoke<any>("ai.routing@3", input);
-    expect(migrateLegacyChannels(config)).toBe(true);
-    const router = config.plugins[0]!.config;
-    f.kernel.configure({ "official.ai-router": router });
-    const after = await f.kernel.invoke<any>("ai.routing@3", input);
-    for (const field of [
-      "model",
-      "pricing",
-      "upstreamId",
-      "preparedRequest",
-      "responseModel",
-      "outputPolicy",
-    ])
-      expect(after[field]).toEqual(before[field]);
+    const router = structuredClone(f.router);
     router.upstreams.composed.flow.nodes.at(-1).target = "flow";
     f.kernel.configure({ "official.ai-router": router });
     await expect(f.kernel.invoke("ai.routing@3", input)).rejects.toMatchObject({
@@ -1009,6 +1006,7 @@ it("persists one untyped channel with multiple provider branches, validates prev
   try {
     const config = structuredClone(f.config);
     const router = {
+      secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
       upstreams: {
         unified: {
           name: "Unified",

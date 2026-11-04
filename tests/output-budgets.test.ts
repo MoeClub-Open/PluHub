@@ -135,6 +135,7 @@ async function budgetFixture(
       : Response.json(responseBody(target));
   process.env.PLUHUB_TEST_UPSTREAM_KEY = "budget-fixture-only";
   const router: any = {
+    secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
     upstreams: {
       primary: {
         protocol: target,
@@ -159,14 +160,16 @@ async function budgetFixture(
   };
   const f = await fixture(
     [
-      "users",
       "auth",
       "billing",
       "ai-router",
       "observability",
       "rate-limit",
-      "ingress-" + ingress,
-      "upstream-" + target,
+      ...(["codex", "claude-subscription", "antigravity", "grok"].includes(
+        target,
+      )
+        ? ["subscriptions"]
+        : []),
     ],
     {
       billing,
@@ -383,7 +386,6 @@ it.each([false, true])(
   async (stream) => {
     const f = await budgetFixture({ target: "codex" });
     try {
-      f.router.upstreams.primary.consumptionMultiplier = 0.2;
       f.kernel.configure({ "official.ai-router": f.router });
       f.setResponse(
         () =>
@@ -400,12 +402,12 @@ it.each([false, true])(
       expect(text).not.toContain('"error"');
       expect(f.reservations()[0]).toMatchObject({
         status: "settled",
-        actual: 8,
+        actual: 40,
       });
-      expect(await f.balance()).toMatchObject({ balance: 999992, held: 0 });
+      expect(await f.balance()).toMatchObject({ balance: 999960, held: 0 });
       expect((await f.logs())[0]).toMatchObject({
         status: "success",
-        cost_micro_usd: 8,
+        cost_micro_usd: 40,
       });
     } finally {
       await f.close();
@@ -501,7 +503,6 @@ it.each([false, true])(
   async (stream) => {
     const f = await budgetFixture({ target: "antigravity" });
     try {
-      f.router.upstreams.primary.consumptionMultiplier = 0.2;
       f.router.upstreams.primary.projectId = "test-project";
       f.kernel.configure({ "official.ai-router": f.router });
       const frames = [
@@ -543,11 +544,11 @@ it.each([false, true])(
       expect(await response.text()).not.toContain('"error"');
       expect(f.reservations()[0]).toMatchObject({
         status: "settled",
-        actual: 17,
+        actual: 84,
       });
-      expect(await f.balance()).toMatchObject({ balance: 999983, held: 0 });
+      expect(await f.balance()).toMatchObject({ balance: 999916, held: 0 });
       const row = (await f.logs())[0]!;
-      expect(row).toMatchObject({ status: "success", cost_micro_usd: 17 });
+      expect(row).toMatchObject({ status: "success", cost_micro_usd: 84 });
       expect(JSON.parse(row.usage_json)).toEqual({
         input: 20,
         output: 32,
@@ -645,7 +646,7 @@ it("migrates previous reservations without losing money or inventing historical 
     );
     try {
       db.exec(
-        "ALTER TABLE reservations DROP COLUMN budget; ALTER TABLE reservations DROP COLUMN reported_usage; PRAGMA user_version=5;",
+        "ALTER TABLE reservations DROP COLUMN budget; ALTER TABLE reservations DROP COLUMN reported_usage; ALTER TABLE reservations DROP COLUMN started; PRAGMA user_version=5;",
       );
       db.prepare(
         "INSERT INTO reservations(id,user_id,amount,status,created_at,pricing) VALUES(?,?,100,'reserved',?,?)",

@@ -313,6 +313,7 @@ it("supports all 4×4 entry/upstream combinations for JSON, SSE, tools, usage an
     for (const upstream of protocols) {
       f.kernel.configure({
         "official.ai-router": {
+          secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
           upstreams: {
             primary: {
               protocol: upstream,

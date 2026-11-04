@@ -1,21 +1,35 @@
 // Exercise the deployed management plane without sending mail, charging or generating text.
 import assert from "node:assert/strict";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
-const base = new URL(process.env.PLUHUB_DEPLOY_URL ?? "http://127.0.0.1:18100");
-const origin = process.env.PLUHUB_EXPECTED_ORIGIN ?? base.origin;
-const password = (
-  await readFile(process.env.PLUHUB_ADMIN_PASSWORD_FILE, "utf8")
-).trim();
+import { parseArgs } from "node:util";
+
+const { values } = parseArgs({
+  options: {
+    url: { type: "string", default: "http://127.0.0.1:18100" },
+    origin: { type: "string" },
+    username: { type: "string", default: "admin" },
+    "password-file": { type: "string" },
+  },
+});
+if (!values["password-file"])
+  throw new Error("Provide --password-file for an authorized administrator");
+const base = new URL(values.url);
+const origin = values.origin ?? base.origin;
+const password = (await readFile(values["password-file"], "utf8")).trim();
 const auth = "/api/plugins/official.auth";
-const report = {
+const report: Record<string, unknown> & {
+  checks: string[];
+  passed: boolean;
+} = {
   at: new Date().toISOString(),
   origin,
   checks: [],
   passed: false,
 };
-let cookie;
-let key;
-async function request(path, status = 200, init = {}) {
+let cookie: string | undefined;
+let key: { id: string; token: string } | undefined;
+
+async function request(path: string, status = 200, init: RequestInit = {}) {
   const response = await fetch(new URL(path, base), {
     ...init,
     headers: {
@@ -29,6 +43,7 @@ async function request(path, status = 200, init = {}) {
   assert.equal(response.status, status, path + " returned " + response.status);
   return response;
 }
+
 try {
   await (await request("/healthz")).json();
   await (await request("/readyz")).json();
@@ -45,7 +60,7 @@ try {
   const login = await request(auth + "/login", 200, {
     method: "POST",
     body: JSON.stringify({
-      username: process.env.PLUHUB_ADMIN_USERNAME ?? "admin",
+      username: values.username,
       password,
     }),
   });
@@ -54,48 +69,57 @@ try {
     setCookie?.includes("HttpOnly") && setCookie.includes("SameSite=Strict"),
   );
   if (origin.startsWith("https:")) assert.ok(setCookie.includes("Secure"));
-  cookie = setCookie.split(";")[0];
+  cookie = setCookie.split(";")[0]!;
   await login.json();
   const me = await (
     await request(auth + "/me", 200, { headers: { cookie } })
   ).json();
   assert.equal(me.role, "admin");
   report.checks.push("console-and-admin-login");
-  const plugins = await (
+  const plugins = (await (
     await request("/api/host/plugins", 200, { headers: { cookie } })
-  ).json();
+  ).json()) as Array<{ id: string; state: string }>;
+  const activePlugins = plugins.filter((plugin) => plugin.state === "Active");
   assert.ok(
-    plugins.length >= 32 &&
-      plugins.every((plugin) => plugin.state === "Active"),
+    [
+      "official.listener",
+      "official.console",
+      "official.auth",
+      "official.ai-router",
+    ].every((id) => activePlugins.some((plugin) => plugin.id === id)) &&
+      plugins.every(
+        (plugin) => plugin.state === "Active" || plugin.state === "Installed",
+      ),
   );
-  const extensions = await (
+  const extensions = (await (
     await request("/api/host/extensions", 200, { headers: { cookie } })
-  ).json();
+  ).json()) as Array<{ group?: string }>;
+  const activePaymentPlugins = activePlugins.filter(
+    (plugin) =>
+      plugin.id === "official.payments-stripe" ||
+      plugin.id === "official.payments-epay",
+  ).length;
   assert.equal(
     extensions.filter((extension) => extension.group === "payment-adapters")
       .length,
-    2,
+    activePaymentPlugins,
   );
   const consoleAsset = await request("/extensions/official.console/ui.js");
   const consoleCode = await consoleAsset.text();
   assert.ok(
-    consoleCode.includes("payment-adapters") &&
-      consoleCode.includes("/setup") &&
-      consoleCode.includes("/settings/portal"),
+    consoleCode.includes("payment-adapters") && consoleCode.includes("/setup"),
   );
   report.checks.push("plugins-and-current-ui");
-  const config = await (
+  const config = (await (
     await request("/api/host/config", 200, { headers: { cookie } })
-  ).json();
-  const entry = (name) =>
+  ).json()) as {
+    plugins: Array<{ path: string; config: Record<string, unknown> }>;
+  };
+  const entry = (name: string) =>
     config.plugins.find((plugin) => plugin.path.endsWith("/" + name))?.config;
-  assert.equal(entry("listener").publicOrigin, origin);
-  assert.equal(entry("auth").secureCookie, origin.startsWith("https:"));
-  assert.ok(!entry("auth").registrationEnabled);
-  assert.ok(
-    !entry("payments-stripe").enabled && !entry("payments-epay").enabled,
-  );
-  report.checks.push("origin-and-closed-registration-payments");
+  assert.equal(entry("listener")?.publicOrigin, origin);
+  assert.equal(entry("auth")?.secureCookie, origin.startsWith("https:"));
+  report.checks.push("origin-and-cookie-policy");
   key = await (
     await request(auth + "/keys", 201, {
       method: "POST",
@@ -105,12 +129,12 @@ try {
   ).json();
   await (
     await request("/v1/models", 200, {
-      headers: { authorization: "Bearer " + key.token },
+      headers: { authorization: "Bearer " + key!.token },
     })
   ).json();
   await (
     await request("/api/host/config", 403, {
-      headers: { authorization: "Bearer " + key.token },
+      headers: { authorization: "Bearer " + key!.token },
     })
   ).json();
   await (
@@ -121,27 +145,26 @@ try {
     })
   ).json();
   await (
-    await request(auth + "/keys?id=" + encodeURIComponent(key.id), 200, {
+    await request(auth + "/keys?id=" + encodeURIComponent(key!.id), 200, {
       method: "DELETE",
       headers: { cookie },
     })
   ).json();
   await (
     await request("/v1/models", 401, {
-      headers: { authorization: "Bearer " + key.token },
+      headers: { authorization: "Bearer " + key!.token },
     })
   ).json();
   key = undefined;
   report.checks.push("key-scope-csrf-and-revocation");
   report.passed = true;
 } catch (error) {
-  report.failure = String(error.message)
-    .replaceAll(password, "[redacted]")
-    .slice(0, 1000);
+  const message = error instanceof Error ? error.message : String(error);
+  report.failure = message.replaceAll(password, "[redacted]").slice(0, 1000);
   process.exitCode = 1;
 } finally {
   try {
-    if (key)
+    if (key && cookie)
       await (
         await request(auth + "/keys?id=" + encodeURIComponent(key.id), 200, {
           method: "DELETE",

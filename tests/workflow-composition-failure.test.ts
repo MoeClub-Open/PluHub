@@ -23,7 +23,6 @@ async function setup(
   const origin = `http://127.0.0.1:${(server.address() as any).port}`;
   const f = await fixture(
     [
-      "users",
       "auth",
       "ai-router",
       "byok",
@@ -31,11 +30,9 @@ async function setup(
       "observability",
       "rate-limit",
       "http-transport",
-      "upstream-openai-chat",
-      "ingress-openai-chat",
     ],
     {
-      "upstream-openai-chat": { secretRefs: [] },
+      "ai-router": { secretRefs: [] },
       byok: { allowedPrivateOrigins: [origin] },
     },
   );

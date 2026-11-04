@@ -10,7 +10,7 @@ import {
 import { createKernel } from "../packages/control/dist/index.js";
 
 it("keeps init and example defaults aligned without redundant compatibility adapters", async () => {
-  const f = await fixture(["users"]);
+  const f = await fixture(["auth"]);
   try {
     const file = resolve(f.directory, "fresh.json");
     const result = await new Promise<number | null>((done, reject) => {
@@ -103,7 +103,7 @@ function cli(file: string, origin: string) {
 }
 
 it("changes the proxy origin and cookie policy offline without changing other settings", async () => {
-  const f = await fixture(["listener", "users", "auth", "console"]);
+  const f = await fixture(["listener", "auth", "console"]);
   try {
     await f.kernel.shutdown();
     const before = JSON.parse(await readFile(f.file, "utf8"));
@@ -129,7 +129,7 @@ it("changes the proxy origin and cookie policy offline without changing other se
 });
 
 it("rejects unsafe origins, a running host and incompatible Passkey settings without writing", async () => {
-  const f = await fixture(["listener", "users", "auth"]);
+  const f = await fixture(["listener", "auth"]);
   try {
     await f.kernel.shutdown();
     const before = await readFile(f.file, "utf8");

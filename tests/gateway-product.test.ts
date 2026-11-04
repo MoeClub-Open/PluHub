@@ -51,18 +51,16 @@ async function gateway() {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const f = await fixture([
     "http-transport",
-    "users",
     "auth",
     "ai-router",
     "observability",
     "model-catalog",
     "playground",
     "rate-limit",
-    "ingress-openai-chat",
-    "upstream-openai-chat",
   ]);
   process.env.PLUHUB_TEST_UPSTREAM_KEY = "upstream-only-secret";
   const router = {
+    secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
     upstreams: {
       primary: {
         protocol: "openai-chat",

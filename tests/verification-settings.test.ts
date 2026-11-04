@@ -69,7 +69,7 @@ it("validates and persists verification services and policies in one transaction
 });
 
 it("protects system metrics from anonymous and ordinary users and returns no config, paths or credentials", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   try {
     const anonymous = await f.request("/api/host/status");
     expect(anonymous.status).toBe(401);
@@ -84,7 +84,7 @@ it("protects system metrics from anonymous and ordinary users and returns no con
     expect(response.status).toBe(200);
     const status = await response.json();
     expect(status).toMatchObject({
-      plugins: { total: 2, active: 2, failed: 0 },
+      plugins: { total: 1, active: 1, failed: 0 },
     });
     expect(status.runtime.uptimeSeconds).toBeGreaterThanOrEqual(0);
     expect(status.memory.rss).toBeGreaterThan(0);

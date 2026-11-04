@@ -15,7 +15,7 @@ let transport: (
   throw new Error("Unexpected network request");
 };
 const providerApi = (provider: string) =>
-  "/api/plugins/official.upstream-" + provider;
+  "/api/plugins/official.subscriptions/" + provider;
 const api = providerApi("codex");
 function accountDiscovery(input: any) {
   if (input.url === "https://www.googleapis.com/oauth2/v2/userinfo?alt=json")
@@ -35,33 +35,8 @@ async function setup(extra: string[] = [], configs: any = {}) {
     s: AbortSignal,
   ) => transport(i, s);
   const f = await fixture(
-    [
-      ...new Set([
-        "users",
-        "auth",
-        "ai-router",
-        ...["codex", "claude-subscription", "antigravity"].map(
-          (p) => "upstream-" + p,
-        ),
-        ...extra,
-      ]),
-    ],
-    Object.fromEntries([
-      ...Object.entries(configs).filter(
-        ([key]) => key !== "subscription-accounts",
-      ),
-      ...["codex", "claude-subscription", "antigravity"].map((provider) => [
-        "upstream-" + provider,
-        {
-          ...(configs["subscription-accounts"] ?? {}),
-          oauth: {
-            ...(configs["subscription-accounts"]?.oauth?.[provider]
-              ? { [provider]: configs["subscription-accounts"].oauth[provider] }
-              : {}),
-          },
-        },
-      ]),
-    ]),
+    [...new Set(["auth", "ai-router", "subscriptions", ...extra])],
+    configs,
     async (kernel, dir) => {
       const path = join(dir, "transport");
       transportPath = path;
@@ -177,7 +152,7 @@ it("keeps subscription administration session-only, encrypts tokens and survives
       /subscription-secret|refresh-secret|cipher/,
     );
     const db = await readFile(
-      join(f.config.dataDir, "official.upstream-codex/accounts.sqlite"),
+      join(f.config.dataDir, "official.subscriptions/accounts.sqlite"),
     );
     expect(db.includes(Buffer.from("subscription-secret"))).toBe(false);
     const keyResponse = await f.request(
@@ -222,7 +197,7 @@ it.each(["codex", "claude-subscription", "antigravity"])(
     const api = providerApi(provider);
     process.env.PLUHUB_SUBSCRIPTION_OAUTH_SECRET = "mock-client-secret";
     const f = await setup([], {
-      "subscription-accounts": {
+      subscriptions: {
         secretRefs: ["env:PLUHUB_SUBSCRIPTION_OAUTH_SECRET"],
         oauth: {
           antigravity: {
@@ -319,7 +294,7 @@ it.each(["codex", "claude-subscription", "antigravity"])(
     const api = providerApi(provider);
     process.env.PLUHUB_SUBSCRIPTION_OAUTH_SECRET = "mock-client-secret";
     const f = await setup([], {
-      "subscription-accounts": {
+      subscriptions: {
         secretRefs: ["env:PLUHUB_SUBSCRIPTION_OAUTH_SECRET"],
         oauth: {
           [provider]: {
@@ -562,7 +537,7 @@ it("backs off device polling and expires or cancels authorization without saving
 });
 it("prevents a cancelled in-flight OAuth exchange from saving credentials", async () => {
   const f = await setup([], {
-    "subscription-accounts": {
+    subscriptions: {
       oauth: {
         codex: { redirectUri: "http://localhost" + api + "/oauth/callback" },
       },
@@ -616,7 +591,7 @@ it("prevents a cancelled in-flight OAuth exchange from saving credentials", asyn
 });
 it("keeps provider denial and unsupported device flows out of stored accounts", async () => {
   const f = await setup([], {
-    "subscription-accounts": {
+    subscriptions: {
       oauth: {
         codex: { redirectUri: "http://localhost" + api + "/oauth/callback" },
       },
@@ -911,7 +886,7 @@ it("does not send expired unrefreshable credentials and cools a fully used quota
   }
 });
 it("retries a rejected authorization once, stops after a second 401 and releases failed stream leases", async () => {
-  const f = await setup(["upstream-codex"]);
+  const f = await setup();
   try {
     const a = await f.create();
     let calls = 0,
@@ -968,14 +943,7 @@ it("retries a rejected authorization once, stops after a second 401 and releases
 });
 it("retries one 401 on the same subscription account, holds the stream lease and preserves platform billing", async () => {
   const f = await setup(
-    [
-      "billing",
-      "observability",
-      "ai-router",
-      "rate-limit",
-      "ingress-openai-chat",
-      "upstream-codex",
-    ],
+    ["billing", "observability", "ai-router", "rate-limit"],
     { billing: { enabled: true } },
   );
   try {
@@ -1074,7 +1042,7 @@ it.each(["codex", "claude-subscription", "antigravity"])(
   "releases %s stream leases on early return and never retries after output",
   async (provider) => {
     const api = providerApi(provider);
-    const f = await setup(["upstream-" + provider]);
+    const f = await setup();
     try {
       const a = await f.create(provider, {
         access_token: "a",

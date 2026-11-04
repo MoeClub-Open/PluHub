@@ -5,11 +5,11 @@ import {
   writeFile,
   readFile,
   readdir,
-  rm,
   symlink,
   unlink,
 } from "node:fs/promises";
 import { join } from "node:path";
+import { removeTempDir } from "./helpers.js";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -17,8 +17,8 @@ import {
   createBackupBundle,
   backupPacket,
   sourceVerification,
-} from "../deploy/docker/backup-bundle.mjs";
-import { decryptBackupFile } from "../deploy/docker/backup-format.mjs";
+} from "../deploy/docker/backup-bundle.ts";
+import { decryptBackupFile } from "../deploy/docker/backup-format.ts";
 
 const imageId = "sha256:" + "1".repeat(64);
 it("binds an optional stopped-data validation record to the exact source image", async () => {
@@ -44,7 +44,7 @@ it("binds an optional stopped-data validation record to the exact source image",
       await expect(sourceVerification(directory, imageId)).rejects.toThrow();
     }
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    await removeTempDir(directory);
   }
 });
 async function fixture() {
@@ -90,7 +90,7 @@ async function fixture() {
     output,
     key,
     options,
-    close: () => rm(directory, { recursive: true, force: true }),
+    close: () => removeTempDir(directory),
   };
 }
 

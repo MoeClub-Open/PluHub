@@ -64,10 +64,10 @@ CLI 安装需停止宿主，再启动加载插件。模板使用公开 SDK，包
 | `pnpm typecheck`、`pnpm -C ../PluHub-Plugins typecheck` | 宿主及插件类型检查        |
 | `pnpm format:check`                                     | 源码格式检查              |
 | `pnpm test:all`                                         | 跨仓测试，包含 Go SDK     |
-| `node scripts/check-boundaries.mjs`                     | 检查公开包和插件依赖边界  |
-| `pnpm -C ../PluHub-Spec check:compat`                   | 检查契约兼容性            |
+| `bun scripts/check-boundaries.ts`                       | 检查公开包和插件依赖边界  |
+| `pnpm -C ../PluHub-Spec test`                           | 检查契约与共享样例        |
 | `pnpm bench`                                            | 生成本地性能记录          |
 
-`pnpm pack:all` 生成公开包；`bun scripts/verify-routing-packages.ts` 和 `node scripts/verify-identity-packages.mjs` 检查打包后安装。`pnpm test:docker` 检查容器初始化和持久化。真实模型、邮件或支付的调用须单独按 [联调说明](docs/LIVE_TESTING.md) 确定范围和预算。
+`pnpm pack:all` 生成公开包；`bun scripts/verify-routing-packages.ts` 和 `node scripts/verify-identity-packages.ts` 检查打包后安装。`pnpm test:docker` 检查容器初始化和持久化。真实模型、邮件或支付的调用须单独按 [联调说明](docs/LIVE_TESTING.md) 确定范围和预算。
 
 文档介绍当前行为和可复用操作；详细规则在所属专题维护，其他页面链接引用。现场发布记录、截图和开发过程保存在仓库外或忽略的输出目录，凭据和运行数据不提交。

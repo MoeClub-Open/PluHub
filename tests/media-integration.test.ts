@@ -86,16 +86,12 @@ it("routes media JSON, multipart and binary through auth, channel bindings, logs
   ];
   const f = await fixture(
     [
-      "users",
       "auth",
       "billing",
       "ai-router",
       "observability",
       "http-transport",
-      "upstream-openai-chat",
-      "upstream-openai-media",
       "rate-limit",
-      "ingress-openai-media",
     ],
     {
       billing: { enabled: true },
@@ -105,7 +101,6 @@ it("routes media JSON, multipart and binary through auth, channel bindings, logs
             protocol: "openai-chat",
             baseUrl: `http://127.0.0.1:${(server.address() as any).port}/v1`,
             keyRef: "env:PLUHUB_TEST_UPSTREAM_KEY",
-            consumptionMultiplier: 0.2,
             interfaces: [
               {
                 incoming: ["openai-chat"],
@@ -124,8 +119,8 @@ it("routes media JSON, multipart and binary through auth, channel bindings, logs
               model: "actual" + i,
               operations: [op],
               ...(i === 0
-                ? { inputPrice: 2, outputPrice: 0 }
-                : { pricing: { mode: "request", request: 0.04 } }),
+                ? { inputPrice: 0.4, outputPrice: 0 }
+                : { pricing: { mode: "request", request: 0.008 } }),
             },
           ]),
         ),

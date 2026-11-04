@@ -1,25 +1,21 @@
-# 订阅上游插件
+# 订阅上游接入
 
-订阅账号分别由以下独立插件提供：
+订阅账号与上游调用统一由 `official.subscriptions` 插件提供，支持以下四类提供商：
 
-- official.upstream-codex
-- official.upstream-claude-subscription
-- official.upstream-antigravity
-- official.upstream-grok
-
-每个插件包含自己的授权页面、账号管理、刷新、并发租约和协议适配，独立安装、启停、更新。公共实现只在构建时复用，不需要运行时聚合账号插件。
+- `codex`（Codex CLI / SIWC 及 Codex 图片工具）
+- `claude-subscription`
+- `antigravity`
+- `grok`
 
 ## 能力与授权
 
-各插件分别提供 ai.subscription.<provider>@1 和 ai.upstream.<provider>@1。AI Router 与 BYOSUB 按渠道协议调用相应账号能力。用户授权操作位于各插件 /personal/* API，所有者由会话身份确定。平台账号由管理员管理。
-
-管理入口为 `/settings/subscriptions/<provider>`，提供商标识为 `codex`、`claude-subscription`、`antigravity` 或 `grok`。个人 BYOSUB 仅显示已安装且运行的提供商。
+`official.subscriptions` 统一提供 `ai.subscription.<provider>@1`、`ai.upstream.<provider>@1` 及 `ai.media.codex@1`。AI Router 与 BYOSUB 按渠道协议调用相应账号能力。用户授权操作位于 `/api/plugins/official.subscriptions/personal/*`，所有者由会话身份确定；平台账号由管理员在 `/settings/subscriptions` 管理。个人 BYOSUB 仅在该插件已安装且运行时显示。
 
 平台与个人订阅采用相同的手动回调流程：复制授权链接或在新标签页打开提供商登录，登录后将完整回调链接粘贴回原页面，完成授权。回调指向本机地址，不需要网关服务器监听对应端口；本地页面无法打开时，仍可复制地址栏中的完整链接。也可导入已有单账号授权 JSON。
 
 提供商原生客户端参数内置，与 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 的接入方式一致，无需在后台配置 OAuth 应用。Codex、Claude 使用 PKCE，Antigravity 使用原生安装应用公开客户端凭据；所有提供商均校验一次性 state、会话归属及有效期。底层保留已有自定义客户端配置和设备授权 API 的兼容能力。密钥、刷新令牌和上游返回的敏感内容不出现在列表或日志中。
 
-凭证分别保存在各插件的数据目录，以 AES-256-GCM 加密。每个目录拥有自己的 vault.key；也可设置 masterKeyRef 引用宿主托管凭据。修改解密主密钥必须离线迁移。账号禁用、授权失效、冷却和配额状态分别维护；租约在请求完成或取消后释放。
+凭证保存在 `official.subscriptions` 数据目录中并按提供商隔离，以 AES-256-GCM 加密。目录拥有独立的 `vault.key`，也可设置 `masterKeyRef` 引用宿主托管凭据。账号禁用、授权失效、冷却和配额状态分别维护；租约在请求完成或取消后释放。
 
 账号名称可留空，OAuth 完成后优先使用授权返回的邮箱；Claude、Antigravity 在授权信息缺少邮箱时查询提供商账号资料。导入授权同样读取邮箱字段与身份令牌的展示信息。手动指定的名称保持不变，邮箱仅用于账号展示，不用于认证 PluHub 用户。
 
@@ -52,15 +48,3 @@ Codex CLI 强制流式上游，非流式客户端由入口收集后返回；该�
 入口从客户端会话 Header、Claude 会话元数据、会话字段或 `prompt_cache_key` 派生会话标识；没有显式标识时使用首轮用户消息摘要。标识按用户、API Key、渠道和上游节点隔离，不保存原始消息作为绑定键。客户端改写或截断首轮消息后，摘要可能变化。
 
 绑定持久保存，闲置一小时过期，使用时续期。绑定账号并发已满时最多等待 15 秒，超时返回 429；账号停用、删除、授权失效、冷却或移出渠道后，在当前允许的账号池中重新选择。安全切号后的账号成为新绑定，不在后台重试已经结束的失败请求。
-
-## 从旧聚合插件迁移
-
-此迁移仅适用于仍使用旧聚合插件的 Codex、Claude 和 Antigravity 账号。先备份并停止宿主，安装对应提供商包，再运行官方插件工具：
-
-    node tools/migrate-subscriptions.mjs /data/pluhub.json /opt/pluhub/plugins
-
-Docker 镜像内工具位于 /opt/pluhub/tools/migrate-subscriptions.mjs。该工具由官方插件仓发布，Kernel 不依赖订阅私有实现。
-
-迁移保留账号 ID、个人所有权、状态、并发、配额、版本及渠道引用，按提供商拆分 OAuth 设置，分别生成加密密钥并重新加密。旧数据和迁移前配置保留在 .pluhub/migrations 内。目标数据已存在、旧数据无法验证或 schema 不兼容时拒绝覆盖；配置最后提交，失败时撤回本次写入的目标文件。成功后可重复执行，无需再次迁移。
-
-尚未完成的 OAuth 流程和内存租约不迁移，停机前应排空请求；用户可重新发起授权。真实账号的可用性和服务商策略仍取决于对应账号，自动化验收使用模拟服务。

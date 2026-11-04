@@ -4,7 +4,7 @@ import { fixture } from "./helpers.js";
 import { readConfig, createKernel } from "../packages/control/dist/index.js";
 
 it("publishes only public content and preserves portal and onboarding across restart", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     const admin = await f.admin();
     const extensions = await (
@@ -94,7 +94,7 @@ it("publishes only public content and preserves portal and onboarding across res
 });
 
 it("rejects anonymous, ordinary-user and unsafe portal writes without changing the graph or config", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     const admin = await f.admin();
     const user: any = await f.kernel.invoke("users.manage@1", {

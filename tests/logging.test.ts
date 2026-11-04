@@ -1,8 +1,9 @@
 import { it, expect } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { removeTempDir } from "./helpers.js";
 import {
   createLogSanitizer,
   newLog,
@@ -96,7 +97,7 @@ it("persists, filters and bounds runtime logs, prunes idle data and closes the d
     db.close();
   } finally {
     store.close();
-    await rm(directory, { recursive: true, force: true });
+    await removeTempDir(directory);
   }
 });
 
@@ -111,7 +112,7 @@ it("counts unavailable log storage without throwing from writes or leaking the u
     );
   } finally {
     store.close();
-    await rm(directory, { recursive: true, force: true });
+    await removeTempDir(directory);
   }
 });
 
@@ -221,7 +222,7 @@ it("associates native logs and completed, failed and cancelled streams with one 
 });
 
 it("allows only administrator sessions to query persisted runtime logs and avoids logging log queries", async () => {
-  const f = await fixture(["users", "auth", "ai-router"]);
+  const f = await fixture(["auth", "ai-router"]);
   try {
     const admin = await f.admin();
     await (await f.request("/missing")).text();

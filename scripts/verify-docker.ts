@@ -3,8 +3,9 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
-import { verifyBackupBundle } from "./verify-backup-bundle.mjs";
+import { verifyBackupBundle } from "./verify-backup-bundle.ts";
 import { defaultEnabledPluginNames } from "../apps/cli/dist/presets.js";
+
 const docker = process.env.PLUHUB_DOCKER ?? "docker";
 const image = process.env.PLUHUB_DOCKER_IMAGE ?? "pluhub:local";
 const name = "pluhub-verify-" + Date.now();
@@ -12,13 +13,16 @@ const volume = name + "-data";
 const restoredVolume = name + "-restored-data";
 const restoredName = name + "-restored";
 const password = randomBytes(24).toString("base64url");
-const report = {
+const report: Record<string, unknown> & {
+  checks: string[];
+  passed: boolean;
+} = {
   at: new Date().toISOString(),
   image,
   checks: [],
   passed: false,
 };
-const run = (args, env = process.env) =>
+const run = (args: string[], env = process.env) =>
   execFileSync(docker, args, {
     encoding: "utf8",
     env,
@@ -31,7 +35,8 @@ const security = [
   "--security-opt=no-new-privileges",
   "--tmpfs=/tmp:rw,noexec,nosuid,size=64m,uid=1000,gid=1000",
 ];
-let address;
+let address = "";
+
 async function ready() {
   for (let i = 0; i < 80; i++) {
     try {
@@ -46,7 +51,8 @@ async function ready() {
   }
   throw new Error("Container did not become ready");
 }
-async function request(path, options = {}) {
+
+async function request(path: string, options: RequestInit = {}) {
   const r = await fetch(address + path, {
     ...options,
     signal: AbortSignal.timeout(10000),
@@ -54,6 +60,7 @@ async function request(path, options = {}) {
   assert.equal(r.ok, true, "Unexpected status " + r.status + " for " + path);
   return r;
 }
+
 try {
   report.imageId = run(["image", "inspect", "--format", "{{.Id}}", image]);
   run(["volume", "create", volume]);
@@ -131,16 +138,16 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ username: "admin", password }),
   });
-  const cookie = login.headers.get("set-cookie").split(";")[0];
+  const cookie = login.headers.get("set-cookie")!.split(";")[0]!;
   await login.body?.cancel();
   const system = await (
     await request("/api/host/status", { headers: { cookie } })
   ).json();
   assert.equal(system.runtime.name, "Bun");
   assert.equal(system.runtime.version, "1.4.3");
-  const installed = await (
+  const installed = (await (
     await request("/api/host/plugins", { headers: { cookie } })
-  ).json();
+  ).json()) as Array<{ id: string; state: string }>;
   const activePlugins = installed.filter((p) => p.state === "Active");
   assert.deepEqual(
     activePlugins.map((p) => p.id).sort(),
@@ -158,10 +165,7 @@ try {
     "turnstile",
     "auto-router",
     "token-speed",
-    "upstream-codex",
-    "upstream-claude-subscription",
-    "upstream-antigravity",
-    "upstream-grok",
+    "subscriptions",
   ])
     assert.notEqual(
       installed.find((p) => p.id === "official." + id)?.state,
@@ -203,7 +207,7 @@ try {
       "backup-data",
     ]);
   } catch (error) {
-    lockRefused = error.status === 75;
+    lockRefused = (error as { status?: number }).status === 75;
   }
   assert.ok(
     lockRefused,
@@ -339,7 +343,7 @@ try {
       image,
       "verify-data",
     ]),
-  );
+  ) as { passed: boolean; databases: Array<{ path: string }> };
   assert.equal(verifiedData.passed, true);
   assert.ok(
     verifiedData.databases.some((row) => row.path.endsWith("auth.sqlite")),
@@ -366,23 +370,23 @@ try {
       image,
       "/data/pluhub.json",
     ]),
-  );
+  ) as { plugins: Array<{ path: string; config: Record<string, unknown> }> };
   assert.equal(
-    changedConfig.plugins.find((p) => p.path.endsWith("/listener")).config
+    changedConfig.plugins.find((p) => p.path.endsWith("/listener"))?.config
       .publicOrigin,
     "https://gateway.example",
   );
   assert.equal(
-    changedConfig.plugins.find((p) => p.path.endsWith("/auth")).config
+    changedConfig.plugins.find((p) => p.path.endsWith("/auth"))?.config
       .secureCookie,
     true,
   );
   report.checks.push("offline-proxy-origin-and-secure-cookie");
   report.passed = true;
 } catch (error) {
-  report.failure = String(error.message ?? "Docker verification failed")
-    .replaceAll(password, "[redacted]")
-    .slice(0, 1500);
+  const message =
+    error instanceof Error ? error.message : "Docker verification failed";
+  report.failure = message.replaceAll(password, "[redacted]").slice(0, 1500);
   try {
     const logs = spawnSync(docker, ["logs", "--tail", "15", name], {
       encoding: "utf8",

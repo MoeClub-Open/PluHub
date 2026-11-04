@@ -28,17 +28,17 @@ for (const entry of (await readdir(directory, { withFileTypes: true }))
     ts.ScriptTarget.Latest,
     true,
   );
-  const calls = new Set(),
-    provisions = new Set();
-  function visit(node) {
+  const calls = new Set<string>();
+  const provisions = new Set<string>();
+  function visit(node: ts.Node) {
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
       node.arguments[0] &&
       ts.isStringLiteral(node.arguments[0])
     ) {
-      const method = node.expression.name.text,
-        capability = node.arguments[0].text;
+      const method = node.expression.name.text;
+      const capability = node.arguments[0].text;
       if (/^[a-z][a-z0-9.-]*@[1-9][0-9]*$/.test(capability)) {
         if (["call", "hasCapability"].includes(method)) calls.add(capability);
         if (method === "provide") provisions.add(capability);
@@ -78,7 +78,7 @@ for (const entry of (await readdir(directory, { withFileTypes: true }))
 const output = process.argv.indexOf("--output");
 if (output >= 0)
   await writeFile(
-    resolve(process.argv[output + 1]),
+    resolve(process.argv[output + 1]!),
     JSON.stringify({ passed: true, plugins: report }, null, 2) + "\n",
   );
 console.log(

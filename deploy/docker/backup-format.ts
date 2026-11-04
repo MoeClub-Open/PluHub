@@ -1,15 +1,20 @@
-import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
+import {
+  randomBytes,
+  createCipheriv,
+  createDecipheriv,
+  type DecipherGCM,
+} from "node:crypto";
 import { createReadStream, constants } from "node:fs";
-import { open, link, unlink, lstat } from "node:fs/promises";
+import { open, link, unlink, lstat, type FileHandle } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { Transform } from "node:stream";
+import { Transform, type Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 const magic = Buffer.from("PluHubBackup\x00\x01", "binary");
 const headerLength = magic.length + 12;
 const invalid = () => new Error("Invalid backup or backup key");
 
-export function parseBackupKey(value) {
+export function parseBackupKey(value: unknown): Buffer {
   if (!Buffer.isBuffer(value)) throw invalid();
   if (value.length === 32) return Buffer.from(value);
   if (
@@ -20,7 +25,7 @@ export function parseBackupKey(value) {
   throw invalid();
 }
 
-export async function readBackupKey(file) {
+export async function readBackupKey(file: string): Promise<Buffer> {
   const info = await lstat(file);
   if (!info.isFile() || (process.platform !== "win32" && info.mode & 0o077))
     throw new Error("Backup key must be a private regular file");
@@ -49,7 +54,7 @@ export async function readBackupKey(file) {
   }
 }
 
-function encryption(key) {
+function encryption(key: Buffer) {
   const header = Buffer.concat([magic, randomBytes(12)]);
   const cipher = createCipheriv(
     "aes-256-gcm",
@@ -84,9 +89,9 @@ function encryption(key) {
   });
 }
 
-function decryption(key) {
-  let pending = Buffer.alloc(0),
-    decipher;
+function decryption(key: Buffer) {
+  let pending: Buffer = Buffer.alloc(0);
+  let decipher: DecipherGCM | undefined;
   return new Transform({
     transform(chunk, _encoding, done) {
       try {
@@ -126,14 +131,20 @@ function decryption(key) {
 }
 
 // Authenticate completely before publishing plaintext. Existing files are never replaced.
-async function transformFile(input, output, key, decrypt, signal) {
+async function transformFile(
+  input: Readable,
+  output: string,
+  key: Buffer,
+  decrypt: boolean,
+  signal?: AbortSignal,
+) {
   const owned = parseBackupKey(key);
   const partial = join(
     dirname(output),
     ".pluhub-backup-" + randomBytes(16).toString("hex"),
   );
-  let handle,
-    created = false;
+  let handle: FileHandle | undefined;
+  let created = false;
   try {
     handle = await open(partial, "wx", 0o600);
     created = true;
@@ -159,15 +170,29 @@ async function transformFile(input, output, key, decrypt, signal) {
     owned.fill(0);
     await handle?.close();
     if (created)
-      await unlink(partial).catch((error) => {
+      await unlink(partial).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== "ENOENT") throw error;
       });
   }
 }
 
-export const encryptBackup = (input, output, key, signal) =>
-  transformFile(input, output, key, false, signal);
-export const decryptBackup = (input, output, key, signal) =>
-  transformFile(input, output, key, true, signal);
-export const decryptBackupFile = (input, output, key, signal) =>
-  decryptBackup(createReadStream(input), output, key, signal);
+export const encryptBackup = (
+  input: Readable,
+  output: string,
+  key: Buffer,
+  signal?: AbortSignal,
+) => transformFile(input, output, key, false, signal);
+
+export const decryptBackup = (
+  input: Readable,
+  output: string,
+  key: Buffer,
+  signal?: AbortSignal,
+) => transformFile(input, output, key, true, signal);
+
+export const decryptBackupFile = (
+  input: string,
+  output: string,
+  key: Buffer,
+  signal?: AbortSignal,
+) => decryptBackup(createReadStream(input), output, key, signal);

@@ -9,16 +9,8 @@ const api = "/api/plugins/official.byok",
 
 it("enforces personal-channel permissions after resolving typed inputs", async () => {
   const f = await fixture(
-    [
-      "users",
-      "auth",
-      "ai-router",
-      "byok",
-      "rate-limit",
-      "http-transport",
-      "upstream-openai-chat",
-    ],
-    { "upstream-openai-chat": { secretRefs: [] } },
+    ["auth", "ai-router", "byok", "rate-limit", "http-transport"],
+    { "ai-router": { secretRefs: [] } },
   );
   try {
     const admin = await f.admin();
@@ -836,25 +828,21 @@ it("runs personal channel graphs, enforces platform bindings and cancels an upst
   }
 });
 
-it("calculates input/output consumption from original prices, keeps catalog originals and records effective costs", async () => {
+it("calculates input/output consumption from channel prices, publishes catalog prices and records costs", async () => {
   const f = await setup();
   try {
     const channel = await f.channel(f.alice, {
       models: {
         demo: {
           model: "provider-model",
-          inputPrice: 10,
-          outputPrice: 40,
-          upstreamInputPrice: 2.5,
-          upstreamOutputPrice: 8,
+          inputPrice: 2.5,
+          outputPrice: 8,
         },
       },
     });
     expect(channel.models.demo).toMatchObject({
-      inputPrice: 10,
-      outputPrice: 40,
-      upstreamInputPrice: 2.5,
-      upstreamOutputPrice: 8,
+      inputPrice: 2.5,
+      outputPrice: 8,
     });
     const key = await f.key(f.alice, { channelIds: [channel.id] });
     const catalog = await (
@@ -866,7 +854,7 @@ it("calculates input/output consumption from original prices, keeps catalog orig
         f.alice.cookie,
       )
     ).json();
-    expect(catalog[0]).toMatchObject({ inputPrice: 10, outputPrice: 40 });
+    expect(catalog[0]).toMatchObject({ inputPrice: 2.5, outputPrice: 8 });
     const task = {
       model: "demo",
       messages: [{ role: "user", text: "hello" }],
@@ -894,8 +882,8 @@ it("calculates input/output consumption from original prices, keeps catalog orig
           ...channel.models,
           demo: {
             ...channel.models.demo,
-            upstreamInputPrice: 3,
-            upstreamOutputPrice: 12,
+            inputPrice: 3,
+            outputPrice: 12,
           },
         },
       },
@@ -904,10 +892,8 @@ it("calculates input/output consumption from original prices, keeps catalog orig
     expect(manual.status).toBe(200);
     const updated = await manual.json();
     expect(updated.models.demo).toMatchObject({
-      inputPrice: 10,
-      outputPrice: 40,
-      upstreamInputPrice: 3,
-      upstreamOutputPrice: 12,
+      inputPrice: 3,
+      outputPrice: 12,
     });
     expect(
       await f.kernel.invoke("ai.routing@3", {

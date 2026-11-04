@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import {
   mkdtemp,
   readFile,
@@ -12,14 +13,15 @@ import { resolve, join } from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { Kernel } from "../packages/kernel/dist/index.js";
+
 const dir = await mkdtemp(join(tmpdir(), "pluhub-bench-"));
 const payload = Buffer.alloc(16384, 97);
 const upstream = createServer((_req, res) => {
   res.writeHead(200, { "content-type": "application/octet-stream" });
   res.end(payload);
 });
-await new Promise((resolve) => upstream.listen(0, "127.0.0.1", resolve));
-const target = "http://127.0.0.1:" + upstream.address().port;
+await new Promise<void>((done) => upstream.listen(0, "127.0.0.1", done));
+const target = "http://127.0.0.1:" + (upstream.address() as AddressInfo).port;
 const kernel = new Kernel(join(dir, "data"), 1000);
 try {
   for (const name of ["listener", "http-transport"]) {
@@ -39,23 +41,25 @@ try {
       id: "bench.plugin",
       version: "1.0.0",
       host: ">=0.1.0-alpha.1",
-      runtime: { kind: "native", entry: "index.mjs" },
+      runtime: { kind: "native", entry: "index.js" },
       provides: [],
       requires: ["http.transport@1"],
       permissions: ["http.route"],
     }),
   );
   await writeFile(
-    join(plugin, "index.mjs"),
+    join(plugin, "index.js"),
     "export default {setup(h){for(const path of ['/raw','/native'])h.route({method:'GET',path,access:'public',handle:async(r,c)=>{const response=await h.call('http.transport@1',{url:'" +
       target +
       "',method:'GET'},c.signal);if(path==='/raw')return response;return new Response(response.body.pipeThrough(new TransformStream({transform(chunk,c){c.enqueue(chunk.map(v=>v===97?65:v))}})),{headers:response.headers})}});}}",
   );
   await kernel.add(plugin, { grants: ["http.route"] });
   await kernel.start();
-  const address = await kernel.invoke("listener.address@1");
+  const address = (await kernel.invoke("listener.address@1")) as {
+    port: number;
+  };
   const gateway = "http://127.0.0.1:" + address.port;
-  const percentile = (values, p) =>
+  const percentile = (values: number[], p: number) =>
     values.slice().sort((a, b) => a - b)[
       Math.min(values.length - 1, Math.floor(values.length * p))
     ];
@@ -64,14 +68,14 @@ try {
     ["direct", target],
     ["raw", gateway + "/raw"],
     ["native", gateway + "/native"],
-  ]) {
-    const latency = [],
-      ttfb = [];
+  ] as const) {
+    const latency: number[] = [];
+    const ttfb: number[] = [];
     async function once(record = true) {
       const start = performance.now();
       const response = await fetch(url);
       if (response.status !== 200) throw new Error("Benchmark HTTP error");
-      const reader = response.body.getReader();
+      const reader = response.body!.getReader();
       let first = true;
       while (true) {
         const { done } = await reader.read();
@@ -113,12 +117,12 @@ try {
     });
   }
   const hash = createHash("sha256");
-  async function sources(dir) {
-    for (const e of (await readdir(dir, { withFileTypes: true })).sort((a, b) =>
-      a.name.localeCompare(b.name),
+  async function sources(directory: string) {
+    for (const e of (await readdir(directory, { withFileTypes: true })).sort(
+      (a, b) => a.name.localeCompare(b.name),
     )) {
       if (["node_modules", "dist"].includes(e.name)) continue;
-      const file = join(dir, e.name);
+      const file = join(directory, e.name);
       if (e.isDirectory()) await sources(file);
       else if (/\.(ts|tsx|json)$/.test(file)) {
         hash.update(
@@ -133,9 +137,7 @@ try {
   await sources(resolve("packages"));
   await sources(resolve("../PluHub-Plugins/plugins"));
   await sources(resolve("../PluHub-Plugins/lib"));
-  // Release archives and slim build images need not contain Git or a checkout.
-  // Preserve unavailable metadata as null; sourceHash still identifies tested code.
-  function git(args) {
+  function git(args: string[]) {
     const result = spawnSync("git", args, { encoding: "utf8" });
     return result.status === 0 ? result.stdout.trim() : null;
   }
@@ -161,6 +163,6 @@ try {
   console.log(JSON.stringify(report, null, 2));
 } finally {
   await kernel.shutdown();
-  await new Promise((resolve) => upstream.close(() => resolve()));
+  await new Promise<void>((done) => upstream.close(() => done()));
   await rm(dir, { recursive: true, force: true, maxRetries: 5 });
 }

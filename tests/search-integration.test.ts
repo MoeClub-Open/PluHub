@@ -5,14 +5,12 @@ import { fixture } from "./helpers.js";
 it("rejects unsupported Codex CLI tool-call bounds before reserving funds or contacting the provider", async () => {
   const f = await fixture(
     [
-      "users",
       "auth",
       "billing",
       "ai-router",
       "http-transport",
-      "upstream-codex",
+      "subscriptions",
       "rate-limit",
-      "ingress-openai-responses",
     ],
     {
       billing: { enabled: true },
@@ -153,15 +151,12 @@ it("settles native search once for JSON and split SSE, preserving references and
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const f = await fixture(
     [
-      "users",
       "auth",
       "billing",
       "ai-router",
       "observability",
       "http-transport",
-      "upstream-openai-responses",
       "rate-limit",
-      "ingress-openai-responses",
     ],
     {
       billing: { enabled: true },
@@ -171,16 +166,15 @@ it("settles native search once for JSON and split SSE, preserving references and
             protocol: "openai-responses",
             baseUrl: `http://127.0.0.1:${(server.address() as any).port}`,
             keyRef: "env:PLUHUB_TEST_UPSTREAM_KEY",
-            consumptionMultiplier: 0.2,
           },
         },
         models: {
           search: {
             upstream: "1",
             model: "upstream-model",
-            inputPrice: 2,
-            outputPrice: 4,
-            pricing: { webSearch: 0.01 },
+            inputPrice: 0.4,
+            outputPrice: 0.8,
+            pricing: { webSearch: 0.002 },
           },
         },
       },
@@ -252,7 +246,7 @@ it("settles native search once for JSON and split SSE, preserving references and
       expect(receipt).toMatchObject({
         amount: 2012,
         usage: { webSearch: 1 },
-        pricing: { webSearch: 0.01, multiplier: 0.2 },
+        pricing: { webSearch: 0.002 },
       });
       expect(
         receipt.lines.find((line: any) => line.kind === "webSearch").quantity,

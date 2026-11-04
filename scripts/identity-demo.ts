@@ -1,20 +1,21 @@
 // Optional loopback-only inbox for exercising registration. No real email is sent.
-import { createServer } from "node:net";
-const sockets = new Set();
+import { createServer, type AddressInfo, type Socket } from "node:net";
+
+const sockets = new Set<Socket>();
 const server = createServer((socket) => {
   sockets.add(socket);
   socket.on("close", () => sockets.delete(socket));
   socket.setEncoding("utf8");
   socket.write("220 localhost PluHub demo SMTP\r\n");
-  let buffer = "",
-    inData = false,
-    message = "",
-    recipient = "";
-  socket.on("data", (chunk) => {
+  let buffer = "";
+  let inData = false;
+  let message = "";
+  let recipient = "";
+  socket.on("data", (chunk: string) => {
     buffer += chunk;
     while (buffer.includes("\r\n")) {
-      const at = buffer.indexOf("\r\n"),
-        line = buffer.slice(0, at);
+      const at = buffer.indexOf("\r\n");
+      const line = buffer.slice(0, at);
       buffer = buffer.slice(at + 2);
       if (inData) {
         if (line !== ".") {
@@ -28,7 +29,7 @@ const server = createServer((socket) => {
           : Buffer.from(
               body
                 .replace(/=\r\n/g, "")
-                .replace(/=([0-9A-F]{2})/gi, (_, h) =>
+                .replace(/=([0-9A-F]{2})/gi, (_, h: string) =>
                   String.fromCharCode(parseInt(h, 16)),
                 ),
               "latin1",
@@ -58,8 +59,10 @@ const server = createServer((socket) => {
     }
   });
 });
-await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-process.env.PLUHUB_DEMO_SMTP_PORT = String(server.address().port);
+await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+process.env.PLUHUB_DEMO_SMTP_PORT = String(
+  (server.address() as AddressInfo).port,
+);
 process.env.PLUHUB_DEMO_IDENTITY = "1";
 console.log(
   "Identity demo uses localhost and a synthetic inbox; use addresses ending in @example.test. OTPs appear only in this terminal.",
@@ -71,7 +74,7 @@ function close() {
 process.once("SIGINT", close);
 process.once("SIGTERM", close);
 try {
-  await import("./demo.mjs");
+  await import("./demo.ts");
 } catch (error) {
   close();
   throw error;

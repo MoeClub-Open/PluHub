@@ -76,9 +76,7 @@ async function main() {
               }
             : name === "ai-router"
               ? { upstreams: {}, models: {} }
-              : name.startsWith("upstream-")
-                ? { secretRefs: [] }
-                : {},
+              : {},
       });
     }
     await mkdir(dirname(file), { recursive: true });

@@ -2,39 +2,36 @@ import { expect, it } from "vitest";
 import { fixture } from "./helpers.js";
 
 it("uses payment history rather than gifts for HTTP model listings while retaining direct routing", async () => {
-  const f = await fixture(
-    ["users", "auth", "ai-router", "billing", "model-catalog"],
-    {
-      billing: { enabled: true },
-      "ai-router": {
-        upstreams: {
-          c: {
-            flow: {
-              entry: "s",
-              nodes: [
-                { id: "s", type: "start", next: ["answer"] },
-                { id: "answer", type: "response", text: "ok" },
-              ],
-            },
-          },
-        },
-        models: {
-          open: { upstream: "c", model: "open" },
-          signed: {
-            upstream: "c",
-            model: "signed",
-            visibility: "authenticated",
-          },
-          "gpt-test": { upstream: "c", model: "gpt-test", visibility: "paid" },
-          "gemini-test": {
-            upstream: "c",
-            model: "gemini-test",
-            visibility: "paid",
+  const f = await fixture(["auth", "ai-router", "billing", "model-catalog"], {
+    billing: { enabled: true },
+    "ai-router": {
+      upstreams: {
+        c: {
+          flow: {
+            entry: "s",
+            nodes: [
+              { id: "s", type: "start", next: ["answer"] },
+              { id: "answer", type: "response", text: "ok" },
+            ],
           },
         },
       },
+      models: {
+        open: { upstream: "c", model: "open" },
+        signed: {
+          upstream: "c",
+          model: "signed",
+          visibility: "authenticated",
+        },
+        "gpt-test": { upstream: "c", model: "gpt-test", visibility: "paid" },
+        "gemini-test": {
+          upstream: "c",
+          model: "gemini-test",
+          visibility: "paid",
+        },
+      },
     },
-  );
+  });
   try {
     const admin = await f.admin();
     const user = await (

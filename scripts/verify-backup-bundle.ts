@@ -9,13 +9,20 @@ export async function verifyBackupBundle({
   dataVolume,
   cookie,
   apiKey,
+}: {
+  docker: string;
+  image: string;
+  container: string;
+  dataVolume: string;
+  cookie: string;
+  apiKey: string;
 }) {
   const id =
     "pluhub-backup-verify-" + Date.now() + "-" + randomBytes(4).toString("hex");
-  const metadataVolume = id + "-metadata",
-    backupVolume = id + "-archive",
-    restoredVolume = id + "-restore",
-    restored = id + "-app";
+  const metadataVolume = id + "-metadata";
+  const backupVolume = id + "-archive";
+  const restoredVolume = id + "-restore";
+  const restored = id + "-app";
   const key = randomBytes(32);
   const security = [
     "--read-only",
@@ -23,7 +30,7 @@ export async function verifyBackupBundle({
     "--security-opt=no-new-privileges",
     "--tmpfs=/tmp:rw,noexec,nosuid,size=64m,uid=1000,gid=1000",
   ];
-  const run = (args, input) =>
+  const run = (args: string[], input?: string) =>
     execFileSync(docker, args, {
       encoding: "utf8",
       ...(input === undefined ? {} : { input }),
@@ -31,7 +38,7 @@ export async function verifyBackupBundle({
       timeout: 60000,
       maxBuffer: 64 * 1024 * 1024,
     }).trim();
-  const mount = (source, target, readonly = false) => [
+  const mount = (source: string, target: string, readonly = false) => [
     "--mount",
     "type=volume,source=" +
       source +
@@ -64,7 +71,7 @@ export async function verifyBackupBundle({
     "--deployment",
     "/deployment",
   ];
-  const decrypt = (output) => [
+  const decrypt = (output: string) => [
     "run",
     "--rm",
     "-i",
@@ -79,7 +86,7 @@ export async function verifyBackupBundle({
     "--output",
     "/backups/" + output,
   ];
-  const archiveMember = (path) =>
+  const archiveMember = (path: string) =>
     run([
       "run",
       "--rm",
@@ -124,7 +131,7 @@ export async function verifyBackupBundle({
     try {
       run(bundle, JSON.stringify(packet));
     } catch (error) {
-      refused = error.status === 75;
+      refused = (error as { status?: number }).status === 75;
     }
     assert.equal(
       refused,
@@ -133,7 +140,7 @@ export async function verifyBackupBundle({
     );
     run(["stop", "--time", "40", container]);
     paused = true;
-    let receipt;
+    let receipt: { encrypted: boolean; imageId: string; sha256: string };
     try {
       receipt = JSON.parse(run(bundle, JSON.stringify(packet)));
     } finally {
@@ -150,7 +157,7 @@ export async function verifyBackupBundle({
         JSON.stringify({ key: randomBytes(32).toString("base64") }),
       );
     } catch (error) {
-      rejected = error.status === 1;
+      rejected = (error as { status?: number }).status === 1;
     }
     assert.equal(
       rejected,
@@ -210,7 +217,7 @@ export async function verifyBackupBundle({
         "-e",
         "const fs=require('node:fs');console.log(JSON.stringify(fs.readdirSync('/backups').map(name=>({name,mode:fs.statSync('/backups/'+name).mode&63}))))",
       ]),
-    );
+    ) as Array<{ name: string; mode: number }>;
     assert.ok(privateFiles.every((file) => file.mode === 0));
     assert.deepEqual(privateFiles.map((file) => file.name).sort(), [
       "authenticated.tar.gz",

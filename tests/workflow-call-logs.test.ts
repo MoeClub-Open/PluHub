@@ -6,7 +6,7 @@ import { fixture } from "./helpers.js";
 
 it("records the host-created parent and node identity for an actual child dispatch", async () => {
   const f = await fixture(
-    ["users", "auth", "observability"],
+    ["auth", "observability"],
     {},
     async (kernel, directory) => {
       const path = join(directory, "workflow-caller");
@@ -95,7 +95,7 @@ it("records the host-created parent and node identity for an actual child dispat
 });
 
 it("keeps workflow call logs scoped to their owner and includes nested costs without counting extra requests", async () => {
-  const f = await fixture(["users", "auth", "billing", "observability"]);
+  const f = await fixture(["auth", "billing", "observability"]);
   const api = "/api/plugins/official.observability";
   try {
     const admin = await f.admin();
@@ -211,8 +211,8 @@ it("keeps workflow call logs scoped to their owner and includes nested costs wit
       join(f.config.dataDir, "official.observability/requests.sqlite"),
     );
     const insert = logs.prepare(`INSERT INTO requests
-      (id,user_id,created_at,model,upstream,protocol,status,http_status,latency_ms,input_tokens,output_tokens,cost_micro_usd,stream,billing_mode,consumption_source,parent_request_id,workflow_node_id,error_code)
-      VALUES(?,?,?,?,?,'openai-chat',?,?,10,?,?,?,0,?,'platform',?,?,?)`);
+      (id,user_id,created_at,model,upstream,protocol,status,http_status,latency_ms,input_tokens,output_tokens,cost_micro_usd,charged_micro_usd,billing_status,stream,billing_mode,consumption_source,parent_request_id,workflow_node_id,error_code)
+      VALUES(?,?,?,?,?,'openai-chat',?,?,10,?,?,?,?,?,0,?,'platform',?,?,?)`);
     for (const [i, row] of records.entries())
       insert.run(
         row.id,
@@ -225,6 +225,8 @@ it("keeps workflow call logs scoped to their owner and includes nested costs wit
         row.input,
         row.output,
         row.cost,
+        row.mode === "workflow" ? null : row.cost,
+        row.mode === "workflow" ? null : "settled",
         row.mode ?? "platform",
         row.parent,
         row.node,

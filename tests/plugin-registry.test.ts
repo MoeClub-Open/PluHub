@@ -1,15 +1,9 @@
 import { it, expect, vi, afterEach } from "vitest";
-import {
-  mkdtemp,
-  mkdir,
-  writeFile,
-  readFile,
-  rm,
-  utimes,
-} from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
+import { removeTempDir } from "./helpers.js";
 import { createServer } from "node:http";
 import { fixture } from "./helpers.js";
 import {
@@ -102,7 +96,7 @@ async function harness() {
     index,
     service,
     config,
-    close: () => rm(directory, { recursive: true, force: true }),
+    close: () => removeTempDir(directory),
   };
 }
 it("plans remote dependency closure with locked origins and never grants permissions", async () => {
@@ -329,7 +323,7 @@ it("blocks unsafe networks, credentials, insecure public HTTP and oversized down
 it("requires an administrator session and explicit permission review for online installation", async () => {
   const r = await harness();
   vi.stubEnv("PLUHUB_PLUGIN_CATALOG", r.catalog);
-  const f = await fixture(["users", "auth", "ai-router"]);
+  const f = await fixture(["auth", "ai-router"]);
   try {
     await r.add("test.online", "1.0.0", { permissions: ["secrets.read"] });
     vi.stubEnv("PLUHUB_PLUGIN_CATALOG", r.catalog);
@@ -402,7 +396,7 @@ it("requires an administrator session and explicit permission review for online 
 it("detects changed registry plans and hot-updates an eligible plugin", async () => {
   const r = await harness();
   vi.stubEnv("PLUHUB_PLUGIN_CATALOG", r.catalog);
-  const f = await fixture(["users", "auth", "ai-router"]);
+  const f = await fixture(["auth", "ai-router"]);
   try {
     await r.add("test.online", "1.0.0", {
       codeReload: "parallel",
@@ -543,7 +537,7 @@ it("recovers interrupted updates and refuses stale pending configurations", asyn
 it("stages restart updates without changing live code or exposing configuration, and supports cancellation", async () => {
   const r = await harness();
   vi.stubEnv("PLUHUB_PLUGIN_CATALOG", r.catalog);
-  const f = await fixture(["users", "auth", "ai-router"]);
+  const f = await fixture(["auth", "ai-router"]);
   try {
     const admin = await f.admin();
     for (const version of ["1.0.0", "1.1.0"])

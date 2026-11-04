@@ -1,4 +1,4 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, type Stats } from "node:fs";
 import {
   copyFile,
   lstat,
@@ -16,24 +16,35 @@ import {
 import { tmpdir } from "node:os";
 import { resolve, relative, dirname, join, isAbsolute } from "node:path";
 import { randomBytes, createHash } from "node:crypto";
-import { spawn } from "node:child_process";
-import { encryptBackup, decryptBackupFile } from "./backup-format.mjs";
+import { spawn, type ChildProcessByStdio } from "node:child_process";
+import type { Readable } from "node:stream";
+import { encryptBackup, decryptBackupFile } from "./backup-format.ts";
 
-export function backupPacket(value) {
+export function backupPacket(value: unknown): {
+  key: Buffer;
+  imageId?: string;
+  environment?: unknown;
+  output?: undefined;
+} {
   if (
     !value ||
     typeof value !== "object" ||
     Array.isArray(value) ||
-    typeof value.key !== "string"
+    typeof (value as { key?: unknown }).key !== "string"
   )
     throw Error("Invalid backup request");
-  const key = Buffer.from(value.key, "base64");
-  if (key.toString("base64") !== value.key || key.length !== 32)
+  const record = value as {
+    key: string;
+    imageId?: string;
+    environment?: unknown;
+  };
+  const key = Buffer.from(record.key, "base64");
+  if (key.toString("base64") !== record.key || key.length !== 32)
     throw Error("Invalid backup key");
-  return { key, imageId: value.imageId, environment: value.environment };
+  return { key, imageId: record.imageId, environment: record.environment };
 }
 
-export async function sourceVerification(directory, imageId) {
+export async function sourceVerification(directory: string, imageId?: string) {
   const file = join(directory, "source-verification.json");
   if (!(await regular(file, true))) return undefined;
   const value = JSON.parse(await readFile(file, "utf8"));
@@ -49,19 +60,25 @@ export async function sourceVerification(directory, imageId) {
   return value;
 }
 
-async function regular(file, optional = false) {
-  let info;
+async function regular(file: string, optional = false) {
+  let info: Stats;
   try {
     info = await lstat(file);
   } catch (error) {
-    if (optional && error.code === "ENOENT") return false;
+    if (optional && (error as NodeJS.ErrnoException).code === "ENOENT")
+      return false;
     throw error;
   }
   if (!info.isFile()) throw Error("Backup refuses non-regular files");
   return true;
 }
 
-async function tree(directory, excluded, outputDirectory, base = directory) {
+async function tree(
+  directory: string,
+  excluded: Set<string>,
+  outputDirectory: Stats,
+  base = directory,
+) {
   const directoryInfo = await stat(directory);
   if (
     directoryInfo.dev === outputDirectory.dev &&
@@ -77,10 +94,10 @@ async function tree(directory, excluded, outputDirectory, base = directory) {
   }
 }
 
-function environmentValues(values) {
+function environmentValues(values: unknown): string[] {
   if (!Array.isArray(values) || values.length > 1024)
     throw Error("Invalid backup environment");
-  const names = new Set();
+  const names = new Set<string>();
   for (const value of values) {
     if (
       typeof value !== "string" ||
@@ -88,8 +105,8 @@ function environmentValues(values) {
       value.length > 131072
     )
       throw Error("Invalid backup environment");
-    const at = value.indexOf("="),
-      name = value.slice(0, at);
+    const at = value.indexOf("=");
+    const name = value.slice(0, at);
     if (at < 1 || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || names.has(name))
       throw Error("Invalid backup environment");
     names.add(name);
@@ -106,12 +123,21 @@ export async function createBackupBundle({
   imageId,
   environment,
   signal,
+}: {
+  dataDirectory: string;
+  configFile: string;
+  deploymentDirectory: string;
+  output: string;
+  key: Buffer;
+  imageId?: string;
+  environment?: unknown;
+  signal?: AbortSignal;
 }) {
   if (!/^sha256:[a-f0-9]{64}$/.test(imageId ?? ""))
     throw Error("Backup requires an immutable image ID");
-  environment = environmentValues(environment);
-  const root = resolve(dataDirectory),
-    configPath = relative(root, resolve(configFile));
+  const checkedEnvironment = environmentValues(environment);
+  const root = resolve(dataDirectory);
+  const configPath = relative(root, resolve(configFile));
   if (!configPath || configPath.startsWith("..") || isAbsolute(configPath))
     throw Error("Backup config must be inside the data directory");
   const config = JSON.parse(await readFile(configFile, "utf8"));
@@ -131,10 +157,10 @@ export async function createBackupBundle({
     dirname(output),
     ".pluhub-bundle-" + randomBytes(16).toString("hex"),
   );
-  let child,
-    complete,
-    encrypted,
-    stagingCreated = false;
+  let child: ChildProcessByStdio<null, Readable, null> | undefined;
+  let complete: Promise<void> | undefined;
+  let encrypted: Promise<void> | undefined;
+  let stagingCreated = false;
   try {
     const metadata = join(temporary, "deployment");
     await mkdir(metadata, { mode: 0o700 });
@@ -152,7 +178,7 @@ export async function createBackupBundle({
       );
     await writeFile(
       join(metadata, "runtime-environment.json"),
-      JSON.stringify(environment) + "\n",
+      JSON.stringify(checkedEnvironment) + "\n",
       { mode: 0o600 },
     );
     await writeFile(
@@ -188,9 +214,9 @@ export async function createBackupBundle({
       ],
       { stdio: ["ignore", "pipe", "ignore"], signal },
     );
-    complete = new Promise((done, reject) => {
-      child.once("error", reject);
-      child.once("close", (code) =>
+    complete = new Promise<void>((done, reject) => {
+      child!.once("error", reject);
+      child!.once("close", (code) =>
         code === 0 ? done() : reject(Error("Backup archive creation failed")),
       );
     });
@@ -224,7 +250,7 @@ export async function createBackupBundle({
     await complete?.catch(() => {});
     await encrypted?.catch(() => {});
     if (stagingCreated)
-      await unlink(staging).catch((error) => {
+      await unlink(staging).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== "ENOENT") throw error;
       });
     await rm(temporary, { recursive: true, force: true });
@@ -233,11 +259,11 @@ export async function createBackupBundle({
 
 async function packet() {
   let size = 0;
-  const chunks = [];
+  const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) {
     size += chunk.length;
     if (size > 2 * 1024 * 1024) throw Error("Backup request is too large");
-    chunks.push(chunk);
+    chunks.push(Buffer.from(chunk));
   }
   const bytes = Buffer.concat(chunks);
   try {
@@ -247,16 +273,20 @@ async function packet() {
   }
 }
 
-export async function runBackupCommand(command, args, configFile) {
-  const values = new Map();
+export async function runBackupCommand(
+  command: string,
+  args: string[],
+  configFile: string,
+) {
+  const values = new Map<string, string>();
   for (let n = 0; n < args.length; n += 2) {
     if (
-      !["--output", "--input", "--deployment"].includes(args[n]) ||
+      !["--output", "--input", "--deployment"].includes(args[n]!) ||
       !args[n + 1] ||
-      values.has(args[n])
+      values.has(args[n]!)
     )
       throw Error("Invalid backup arguments");
-    values.set(args[n], args[n + 1]);
+    values.set(args[n]!, args[n + 1]!);
   }
   const output = values.get("--output");
   if (!output || dirname(resolve(output)) !== "/backups")
@@ -264,29 +294,30 @@ export async function runBackupCommand(command, args, configFile) {
   const input = await packet();
   const controller = new AbortController();
   const cancel = () => controller.abort();
-  for (const signal of ["SIGTERM", "SIGINT"]) process.once(signal, cancel);
+  for (const signal of ["SIGTERM", "SIGINT"] as const)
+    process.once(signal, cancel);
   try {
-    let result;
+    let result: unknown;
     if (command === "backup-decrypt") {
       if (!values.get("--input") || values.has("--deployment"))
         throw Error("Invalid backup arguments");
       await decryptBackupFile(
-        values.get("--input"),
+        values.get("--input")!,
         output,
         input.key,
         controller.signal,
       );
       result = { authenticated: true };
     } else {
-      if (!values.get("--deployment") || values.has("--input"))
+      const deploymentDirectory = values.get("--deployment");
+      if (!deploymentDirectory || values.has("--input"))
         throw Error("Invalid backup arguments");
-      // The host controller validates stopped data using the exact source image.
-      // Its mounted record avoids binding old plugin locks to tool-image artifacts.
-      if (
-        !(await sourceVerification(values.get("--deployment"), input.imageId))
-      ) {
-        const { verifyData } =
-          await import("/opt/pluhub/node_modules/@pluhub/cli/dist/verify-data.js");
+      if (!(await sourceVerification(deploymentDirectory, input.imageId))) {
+        const cliVerify =
+          "/opt/pluhub/node_modules/@pluhub/cli/dist/verify-data.js";
+        const { verifyData } = (await import(cliVerify)) as {
+          verifyData: (config: unknown) => Promise<unknown>;
+        };
         const config = JSON.parse(await readFile(configFile, "utf8"));
         config.dataDir = resolve(dirname(configFile), config.dataDir);
         await verifyData(config);
@@ -294,7 +325,7 @@ export async function runBackupCommand(command, args, configFile) {
       result = await createBackupBundle({
         dataDirectory: "/data",
         configFile,
-        deploymentDirectory: values.get("--deployment"),
+        deploymentDirectory,
         output,
         ...input,
         signal: controller.signal,
@@ -303,6 +334,7 @@ export async function runBackupCommand(command, args, configFile) {
     process.stdout.write(JSON.stringify(result) + "\n");
   } finally {
     input.key.fill(0);
-    for (const signal of ["SIGTERM", "SIGINT"]) process.off(signal, cancel);
+    for (const signal of ["SIGTERM", "SIGINT"] as const)
+      process.off(signal, cancel);
   }
 }

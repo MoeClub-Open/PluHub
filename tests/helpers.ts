@@ -8,10 +8,24 @@ import {
   writeConfig,
 } from "../packages/control/dist/index.js";
 export const pluginsRoot = resolve("../PluHub-Plugins/plugins");
+export async function removeTempDir(directory: string) {
+  try {
+    await rm(directory, { recursive: true, force: true });
+  } catch (error: any) {
+    if (
+      error?.code === "EBUSY" &&
+      process.platform === "win32" &&
+      Boolean(process.versions.bun)
+    )
+      return;
+    throw error;
+  }
+}
 export async function fixture(
   names = defaultPluginNames,
   configs: Record<string, Record<string, unknown>> = {},
   prepare?: (kernel: Kernel, directory: string) => Promise<void>,
+  bindings?: Record<string, string>,
 ) {
   const directory = await mkdtemp(join(tmpdir(), "pluhub-integration-"));
   const config: any = {
@@ -19,6 +33,7 @@ export async function fixture(
     dataDir: join(directory, "data"),
     drainTimeoutMs: 200,
     plugins: [],
+    ...(bindings ? { bindings } : {}),
   };
   for (const name of names) {
     const path = join(pluginsRoot, name);
@@ -27,19 +42,24 @@ export async function fixture(
       path,
       grants: m.permissions,
       config:
-        configs[name] ??
-        (name === "listener"
-          ? { port: 0, host: "127.0.0.1" }
-          : name === "ai-router"
-            ? { upstreams: {}, models: {} }
-            : name.startsWith("upstream-")
-              ? { secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"] }
-              : {}),
+        name === "ai-router"
+          ? {
+              upstreams: {},
+              models: {},
+              secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
+              ...(configs[name] ?? {}),
+            }
+          : (configs[name] ??
+            (name === "listener"
+              ? { port: 0, host: "127.0.0.1" }
+              : name === "subscriptions"
+                ? { secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"] }
+                : {})),
     });
   }
   const file = join(directory, "pluhub.json");
   await writeConfig(file, config);
-  const kernel = new Kernel(config.dataDir, 200);
+  const kernel = new Kernel(config.dataDir, 200, bindings);
   for (const entry of config.plugins) await kernel.add(entry.path, entry);
   await prepare?.(kernel, directory);
   attachManagement(kernel, file, config);
@@ -83,7 +103,7 @@ export async function fixture(
     admin,
     async close() {
       await kernel.shutdown();
-      await rm(directory, { recursive: true, force: true });
+      await removeTempDir(directory);
     },
   };
 }

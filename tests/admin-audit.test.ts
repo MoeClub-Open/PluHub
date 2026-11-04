@@ -1,10 +1,10 @@
 import { it, expect, vi } from "vitest";
-import { mkdtemp, rm, mkdir, rename, rmdir } from "node:fs/promises";
+import { mkdtemp, mkdir, rename, rmdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { auditStore } from "../packages/control/dist/audit.js";
-import { fixture } from "./helpers.js";
+import { fixture, removeTempDir } from "./helpers.js";
 import { mockHost } from "../packages/testkit/dist/index.js";
 
 it("uses each plugin's route declaration to distinguish previews from changes", async () => {
@@ -76,12 +76,12 @@ it("hides historical read-only requests without deleting them or hiding changes"
       db.close();
     }
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    await removeTempDir(directory);
   }
 });
 
 it("records management changes but not read-only POST requests", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   try {
     const admin = await f.admin();
     const quote = await f.request(
@@ -254,7 +254,7 @@ it("filters audit results, methods, request IDs, inclusive dates and literal sea
       writeFailures: 0,
     });
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    await removeTempDir(directory);
   }
 });
 
@@ -309,7 +309,7 @@ it("migrates legacy audit rows, retains unresolved outcomes and prunes expired r
     db.close();
   } finally {
     clock.mockRestore();
-    await rm(directory, { recursive: true, force: true });
+    await removeTempDir(directory);
   }
 });
 
@@ -357,14 +357,15 @@ it("reports storage faults safely, distinguishes write failures and recovers wit
     });
     expect(store.read(new URLSearchParams()).total).toBe(1);
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    await removeTempDir(directory);
   }
 });
 
 it("rejects management mutations before execution when the audit intent cannot be stored, and exposes degradation", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   const file = join(f.directory, "data", "admin-audit.sqlite");
-  let displaced = false;
+  let displaced: "fs" | "sql" | false = false;
+  let db: DatabaseSync | undefined;
   try {
     const admin = await f.admin();
     const user = await f.kernel.invoke<any>("users.manage@1", {
@@ -374,11 +375,19 @@ it("rejects management mutations before execution when the audit intent cannot b
     expect(
       (await f.request("/api/host/status", "GET", undefined, admin)).status,
     ).toBe(200);
-    await rename(file, file + ".saved");
-    displaced = true;
-    await mkdir(file);
+    if (process.platform === "win32" && Boolean(process.versions.bun)) {
+      db = new DatabaseSync(file);
+      db.exec(
+        "ALTER TABLE admin_audit RENAME TO admin_audit_saved; CREATE VIEW admin_audit AS SELECT 1 AS created_at;",
+      );
+      displaced = "sql";
+    } else {
+      await rename(file, file + ".saved");
+      displaced = "fs";
+      await mkdir(file);
+    }
     const rejected = await f.request(
-      "/api/plugins/official.users/users",
+      "/api/plugins/official.auth/users",
       "PATCH",
       { id: user.id, enabled: false },
       admin,
@@ -406,11 +415,17 @@ it("rejects management mutations before execution when the audit intent cannot b
     );
     expect(unavailable.status).toBe(503);
     expect(await unavailable.text()).not.toContain(f.directory);
-    await rmdir(file);
-    await rename(file + ".saved", file);
+    if (displaced === "sql") {
+      db!.exec(
+        "DROP VIEW admin_audit; ALTER TABLE admin_audit_saved RENAME TO admin_audit;",
+      );
+    } else {
+      await rmdir(file);
+      await rename(file + ".saved", file);
+    }
     displaced = false;
     const retried = await f.request(
-      "/api/plugins/official.users/users",
+      "/api/plugins/official.auth/users",
       "PATCH",
       { id: user.id, enabled: false },
       admin,
@@ -438,16 +453,21 @@ it("rejects management mutations before execution when the audit intent cannot b
           .status,
       ).toBe(400);
   } finally {
-    if (displaced) {
+    if (displaced === "sql") {
+      db?.exec(
+        "DROP VIEW IF EXISTS admin_audit; ALTER TABLE admin_audit_saved RENAME TO admin_audit;",
+      );
+    } else if (displaced === "fs") {
       await rmdir(file);
       await rename(file + ".saved", file);
     }
+    db?.close();
     await f.close();
   }
 });
 
 it("keeps the pending intent when a committed management mutation cannot finalize its audit result", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   let db: DatabaseSync | undefined;
   const clock = vi.spyOn(Date, "now");
   try {
@@ -464,7 +484,7 @@ it("keeps the pending intent when a committed management mutation cannot finaliz
       "CREATE TRIGGER fail_audit_result BEFORE UPDATE OF status ON admin_audit WHEN NEW.status IS NOT NULL BEGIN SELECT RAISE(ABORT,'fixture audit result unavailable'); END;",
     );
     const result = await f.request(
-      "/api/plugins/official.users/users",
+      "/api/plugins/official.auth/users",
       "PATCH",
       { id: user.id, enabled: false },
       admin,

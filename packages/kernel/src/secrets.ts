@@ -99,4 +99,23 @@ export class SecretVault {
     this.register(value);
     return value;
   }
+  prune(keep: ReadonlySet<string>) {
+    const records = this.records();
+    let changed = false;
+    for (const key of Object.keys(records)) {
+      if (key.startsWith("secret:") && !keep.has(key)) {
+        delete records[key];
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    const file = join(this.directory, "secrets.json");
+    const temporary = file + "." + randomUUID();
+    writeFileSync(temporary, JSON.stringify(records) + "\n", {
+      flag: "wx",
+      mode: 0o600,
+    });
+    renameSync(temporary, file);
+    chmodSync(file, 0o600);
+  }
 }

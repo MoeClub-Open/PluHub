@@ -1,10 +1,10 @@
 # 登录、注册与账号安全
 
-`official.mailer`、`official.turnstile` 分别提供发件和人机验证能力。Auth 负责邮箱登录凭据、TOTP、恢复码、WebAuthn 公钥和会话；Users 继续提供账号、角色与启用状态，通过公开 Capability 协作。验证码、邮件服务由独立插件提供，公共类型位于 Spec 的 `@pluhub/contracts/security`，Kernel 不包含认证方式的实现。
+`official.mailer`、`official.turnstile` 分别提供发件和人机验证能力。`official.auth` 统一维护用户账号、角色、组织归属、密码、邮箱登录凭据、TOTP、恢复码、WebAuthn 公钥和会话，并通过公开 Capability 提供用户目录与范围查询。验证码、邮件服务由独立插件提供，公共类型位于 Spec 的 `@pluhub/contracts/security`，Kernel 不包含认证方式的实现。
 
 默认保留密码登录；邮箱注册、邮箱登录、人机验证和 WebAuthn 均需管理员启用。个人账号设置通过侧栏底部账号入口或 `#/account` 访问，旧的 `#/auth?tab=security` 仍可使用。API 密钥列表独立于账号安全，创建和撤销在弹窗中完成。站点配置统一位于管理员的「安全与验证 → 登录与验证」，在同一页面管理登录注册、邮件、人机验证、Passkey 与两步验证。
 
-管理员创建用户使用 Auth 的 `POST /api/plugins/official.auth/users`：要求管理员会话及近期身份确认，先校验并哈希初始密码，再通过 Users 能力创建用户事实。无效密码不再留下无法登录的账号；Users 不依赖 Auth。
+管理员创建用户使用 Auth 的 `POST /api/plugins/official.auth/users`：要求管理员会话及近期身份确认，先校验并哈希初始密码，再在同一事务中写入用户与密码凭据，避免无效密码留下无法登录的账号。
 
 用户登录地址为 `#/login`，注册地址为 `#/register`。全新站点先经 OOBE 保存站点设置并创建管理员；在此之前公开注册不可用。门户和登录页提供注册链接；注册页支持邮箱验证码、用户名、密码确认、重发倒计时及错误重试，成功后以普通用户身份进入控制台。未开放注册或邮件服务不可用时显示相应状态。公开页面不显示管理员初始化命令；CLI 创建和恢复方法保留在部署文档中。
 
@@ -156,7 +156,7 @@ bun apps/cli/dist/index.js call auth.reset-factors@1 '{"username":"admin"}' --co
 
 Auth 自己维护 `security_events`，默认保留 90 天、最多 100,000 条；配置项 `securityHistoryRetentionDays`（1–3650）、`securityHistoryMaxRows`（1000–1,000,000）。保存固定事件名、结果、验证方式、服务端请求 ID、经过验证的来源 IP、浏览器和系统类别，以及必要的资源 ID。Key 使用内部 ID，Passkey 使用凭据 ID 的 SHA-256 指纹；不保存邮箱、密码、验证码、恢复码、完整 Cookie、凭据内容或原始 User-Agent。
 
-安全历史尽力写入，故障不会使已成功的认证或密码修改失败；故障及未保存条数通过状态接口显示，无法读取时返回 503。`auth.security-history@1` 仅提供 `available/dropped/failures/retentionDays/maxRows` 状态元数据，不返回事件。失败计数属于当前进程，丢失记录不能补写；此规则不改变管理员业务写入前必须成功留痕的审计要求。用户角色和企业归属修改仍由 Users 与宿主管理审计记录，Users 不反向依赖 Auth。
+安全历史尽力写入，故障不会使已成功的认证或密码修改失败；故障及未保存条数通过状态接口显示，无法读取时返回 503。`auth.security-history@1` 仅提供 `available/dropped/failures/retentionDays/maxRows` 状态元数据，不返回事件。失败计数属于当前进程，丢失记录不能补写；此规则不改变管理员业务写入前必须成功留痕的审计要求。用户角色和企业归属修改同步进入宿主管理审计。
 
 账号设置中的「登录设备」显示本人有效会话的设备、IP、认证方式和活动时间，支持退出指定设备或其他全部设备。撤销其他设备要求近期认证，退出当前设备清除 Cookie。列表不返回令牌或其哈希；已有会话迁移后保持可用，新登录最多允许 50 个有效设备。
 
@@ -167,12 +167,12 @@ Auth 自己维护 `security_events`，默认保留 90 天、最多 100,000 条�
 ```sh
 pnpm build:all
 pnpm test:all
-node scripts/identity-demo.mjs
+bun scripts/identity-demo.ts
 ```
 
 演示打开 `http://localhost:18181`，只允许向 `@example.test` 测试地址发信；验证码显示在终端，SMTP 服务完全在本机，不会发送真实邮件。演示启用邮箱注册、登录与 localhost WebAuthn，其他演示说明与 `pnpm demo` 相同。浏览器的虚拟 FIDO2 认证器仅用于自动化测试，不是产品内置的认证绕过。
 
-`pnpm pack:all` 后可运行 `node scripts/verify-identity-packages.mjs`，在临时目录安装分发归档，验证密码会话、TOTP 二维码、WebAuthn 选项及本地 SMTP，再清理临时目录。分发物与校验和位于 `output/packages`。
+`pnpm pack:all` 后可运行 `node scripts/verify-identity-packages.ts`，在临时目录安装分发归档，验证密码会话、TOTP 二维码、WebAuthn 选项及本地 SMTP，再清理临时目录。分发物与校验和位于 `output/packages`。
 
 已验证：RFC TOTP 样例、加密与重启保留、SMTP 实际会话、邮件码猜测/过期/换绑、角色限制、TOTP 与恢复码重放、真实 WebAuthn 签名及 Origin/RP/UV/计数器错误、账号禁用、撤销会话与旧数据库迁移。浏览器验证邮箱注册、TOTP 绑定、恢复码完成两步登录及 Passkey 绑定/登录/撤销。
 

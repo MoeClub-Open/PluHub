@@ -1,6 +1,6 @@
-import { migrateLegacyChannels } from "../deploy/migrations/channel-graphs.ts";
 import { it, expect } from "vitest";
 import { fixture } from "./helpers.js";
+import { defaultChannelFlow } from "../../PluHub-Plugins/lib/ai/channel-config.js";
 
 const publicPath = "/api/plugins/official.model-catalog/public";
 const config = {
@@ -9,12 +9,28 @@ const config = {
       protocol: "openai-chat",
       baseUrl: "https://private-upstream.example",
       keyRef: "env:PRIVATE_UPSTREAM_KEY",
+      flow: defaultChannelFlow(),
     },
     disabled: {
       protocol: "openai-chat",
       baseUrl: "https://disabled.example",
       keyRef: "env:PRIVATE_UPSTREAM_KEY",
       enabled: false,
+      flow: defaultChannelFlow(),
+    },
+    aliasChannel: {
+      flow: {
+        entry: "start",
+        nodes: [
+          { id: "start", type: "start" as const, next: ["redirect"] },
+          {
+            id: "redirect",
+            type: "upstream" as const,
+            target: "standard",
+            mode: "implicit" as const,
+          },
+        ],
+      },
     },
   },
   models: {
@@ -30,22 +46,13 @@ const config = {
     },
     hidden: { upstream: "live", model: "hidden-target", enabled: false },
     offline: { upstream: "disabled", model: "offline-target" },
+    alias: { upstream: "aliasChannel", model: "standard" },
   },
-  redirects: { alias: { target: "standard", mode: "implicit" } },
 };
-
-migrateLegacyChannels({ plugins: [{ path: "/ai-router", config: config }] });
 
 it("publishes active platform model aliases and original prices without credentials or private bindings", async () => {
   const f = await fixture(
-    [
-      "http-transport",
-      "users",
-      "auth",
-      "ai-router",
-      "model-catalog",
-      "upstream-openai-chat",
-    ],
+    ["http-transport", "auth", "ai-router", "model-catalog"],
     { "ai-router": config },
   );
   try {
@@ -65,11 +72,6 @@ it("publishes active platform model aliases and original prices without credenti
       outputPrice: 4,
       contextWindow: 128000,
       channel: { id: "live", name: "live", scope: "platform" },
-      consumptionMultiplier: 1,
-      billing: {
-        input: 2,
-        output: 4,
-      },
       features: ["text", "tools", "stream", "usage"],
     });
     expect(JSON.stringify(models)).not.toMatch(
@@ -100,15 +102,7 @@ it("publishes active platform model aliases and original prices without credenti
 
 it("keeps personal channels out of public listings even with an authenticated owner or a channel-bound key", async () => {
   const f = await fixture(
-    [
-      "http-transport",
-      "users",
-      "auth",
-      "ai-router",
-      "model-catalog",
-      "byok",
-      "upstream-openai-chat",
-    ],
+    ["http-transport", "auth", "ai-router", "model-catalog", "byok"],
     { "ai-router": config },
   );
   try {

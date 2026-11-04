@@ -54,13 +54,13 @@ Chat 入口接受 `web_search_options`，也可接收上述搜索工具声明并
 
 搜索活动是服务端工具事件，不转成待客户端执行的函数调用。普通响应保留 `web_search_call` 和 URL 引用；SSE 保留搜索状态、完成快照与引用事件。增量、结束项和最终完整快照按调用 ID / 引用去重；多个文本部分的引用偏移映射到客户端聚合正文。Responses 多轮输入可包含搜索调用项及带 URL 引用的 assistant 消息。Chat 返回标准 `annotations`，搜索活动放在 `extra_content.web_search_calls`，可重新作为对话历史接入 Responses。Playground 将 URL 引用渲染为可点击链接。
 
-工具分支将搜索视为有工具请求，自动路由排除不支持相应控制或接口的候选。调用元数据只记录搜索次数，不记录查询词和检索正文。模型价格可配置 `pricing.webSearch`（USD / 次）；按已完成的搜索调用 ID 去重结算，计入价格、用量及账单快照，并应用渠道倍率。未配置时不追加搜索费。Responses API 的 `max_tool_calls` 原样传递；Codex CLI 当前不接受该参数，网关在资金预留及上游调用前明确拒绝，需省略该参数或选择 Responses API 上游；预留使用该上限，未指定时按 3 次估算。原生 Chat 无法报告工具次数，配置独立搜索费时要求改用 Responses 上游。
+工具分支将搜索视为有工具请求，自动路由排除不支持相应控制或接口的候选。调用元数据只记录搜索次数，不记录查询词和检索正文。模型价格可配置 `pricing.webSearch`（USD / 次）；按已完成的搜索调用 ID 去重结算，计入价格、用量及账单快照。未配置时不追加搜索费。Responses API 的 `max_tool_calls` 原样传递；Codex CLI 当前不接受该参数，网关在资金预留及上游调用前明确拒绝，需省略该参数或选择 Responses API 上游；预留使用该上限，未指定时按 3 次估算。原生 Chat 无法报告工具次数，配置独立搜索费时要求改用 Responses 上游。
 
 参考：[OpenAI Web search](https://developers.openai.com/api/docs/guides/tools-web-search)、[Responses streaming events](https://developers.openai.com/api/reference/resources/responses/streaming-events)。
 
 ## 图片、视频、向量与音频
 
-`official.ingress-openai-media` 和 `official.upstream-openai-media` 独立安装与启停；新站点预装但默认停用。媒体上游复用 OpenAI Chat / Responses 连接的凭证、认证及公网上游策略。Codex 图片通过其订阅插件声明的 `ai.media.codex@1` 调用；Claude 与 Antigravity 当前不提供媒体生成端点。
+标准媒体入口与 OpenAI 媒体上游适配器内置于 `official.ai-router`，复用 OpenAI Chat / Responses 连接的凭证、认证及公网上游策略。Codex 图片通过 `official.subscriptions` 声明的 `ai.media.codex@1` 调用；Claude 与 Antigravity 当前不提供媒体生成端点。
 
 | 入口                            | 请求                                   | 响应                                   |
 | ------------------------------- | -------------------------------------- | -------------------------------------- |
@@ -78,7 +78,7 @@ Chat 入口接受 `web_search_options`，也可接收上述搜索工具声明并
 
 媒体请求体最多 32 MiB，JSON 响应及单个媒体 SSE 事件最多 64 MiB；Listener 的请求体上限也需满足实际上传大小。重复文件和表单字段保持顺序，模型选择字段不得重复。音频采用拉取和背压，取消会中断上游连接；SSE 必须出现对应完成事件。中断、错误和取消不记为成功调用，已经派发的请求仍按 [结算规则](PRICING.md#取消中断与重启结算) 收费。请求日志保留操作、状态、耗时及可核实用量，不保存图片、音频、提示词或搜索正文。
 
-Embeddings 以提供商输入 Token 计费。图片和音频使用明确的按次价格或固定金额表达式，不把媒体 Token 当作普通文本 Token，也不根据文件体积猜测音频时长；上游提供的 Token 总量仍可记录。平台计费启用时，媒体未配置固定价格会在调用前拒绝；个人上游成本与平台请求手续费按 [个人渠道规则](PERSONAL_CHANNELS.md#原价与消耗倍率) 分开处理。
+Embeddings 以提供商输入 Token 计费。图片和音频使用明确的按次价格或固定金额表达式，不把媒体 Token 当作普通文本 Token，也不根据文件体积猜测音频时长；上游提供的 Token 总量仍可记录。平台计费启用时，媒体未配置固定价格会在调用前拒绝；个人上游成本与平台请求手续费按 [个人渠道规则](PERSONAL_CHANNELS.md#模型价格与请求手续费) 分开处理。
 
 ### Codex 图片
 

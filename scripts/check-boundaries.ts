@@ -1,16 +1,18 @@
 import { readdir, readFile } from "node:fs/promises";
 import { resolve, relative, dirname, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
+
 const root = fileURLToPath(new URL("..", import.meta.url));
 const pluginRoot = resolve(root, "../PluHub-Plugins");
 const plugins = resolve(pluginRoot, "plugins");
-const inside = (parent, file) => {
+const inside = (parent: string, file: string) => {
   const path = relative(parent, file);
   return path !== ".." && !path.startsWith(".." + sep) && !isAbsolute(path);
 };
-const owner = (file) =>
+const owner = (file: string) =>
   inside(plugins, file) ? relative(plugins, file).split(sep)[0] : undefined;
-async function walk(dir) {
+
+async function walk(dir: string) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     if (["node_modules", "dist", ".git"].includes(e.name)) continue;
     const file = resolve(dir, e.name);
@@ -20,7 +22,7 @@ async function walk(dir) {
       for (const match of source.matchAll(
         /(?:from\s*|import\s*|import\s*\(\s*)['"]([^'"]+)['"]/g,
       )) {
-        const specifier = match[1];
+        const specifier = match[1]!;
         if (
           /^@pluhub\/(?:kernel|runtime|control|engine)(?:\/|$)/.test(specifier)
         )
@@ -35,12 +37,11 @@ async function walk(dir) {
     }
   }
 }
+
 await walk(plugins);
 await walk(resolve(pluginRoot, "lib"));
-for (const pkg of ["kernel", "engine", "runtime"]) {
-  await checkGeneric(resolve(root, "packages", pkg, "src"));
-}
-async function checkGeneric(dir) {
+
+async function checkGeneric(dir: string) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     const file = resolve(dir, e.name);
     if (e.isDirectory()) await checkGeneric(file);
@@ -55,5 +56,9 @@ async function checkGeneric(dir) {
     }
   }
 }
+
+for (const pkg of ["kernel", "engine", "runtime"]) {
+  await checkGeneric(resolve(root, "packages", pkg, "src"));
+}
 console.log("Plugin and shared-library boundaries verified");
-await import("./check-plugin-dependencies.mjs");
+await import("./check-plugin-dependencies.ts");

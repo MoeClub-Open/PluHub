@@ -186,7 +186,7 @@ def create_offline(args):
         tool_image = json.loads(docker("image", "inspect", args.tool_image or item["Image"]))[0]["Id"]
         if not re.fullmatch(r"sha256:[a-f0-9]{64}", tool_image):
             raise BackupError("A local immutable tool image is required")
-        docker("run", "--rm", "--network", "none", "--read-only", "--cap-drop=ALL", "--entrypoint", "node", tool_image, "-e", "require('node:fs').accessSync('/opt/pluhub/deploy/docker/backup-bundle.mjs')")
+        docker("run", "--rm", "--network", "none", "--read-only", "--cap-drop=ALL", "--entrypoint", "node", tool_image, "-e", "require('node:fs').accessSync('/opt/pluhub/deploy/docker/backup-bundle.ts')")
         args.destination.mkdir(mode=0o700, parents=True, exist_ok=True)
         record = args.destination.resolve() / ("backup-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + uuid.uuid4().hex[:8])
         record.mkdir(mode=0o700); os.chown(record, 1000, 1000)

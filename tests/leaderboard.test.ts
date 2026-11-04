@@ -14,13 +14,11 @@ const schema = `CREATE TABLE requests (
   input_tokens INTEGER,output_tokens INTEGER,cost_micro_usd INTEGER,stream INTEGER NOT NULL,error_code TEXT,routing TEXT
 ); PRAGMA user_version=2;`;
 const names = [
-  "users",
   "auth",
   "ai-router",
   "observability",
   "leaderboard",
   "http-transport",
-  "upstream-openai-chat",
 ];
 const configs = {
   "ai-router": {
@@ -51,13 +49,13 @@ const configs = {
 async function setup() {
   const now = Date.now();
   const f = await fixture(names, configs, async (_kernel, directory) => {
-    const userDir = join(directory, "data", "official.users");
+    const userDir = join(directory, "data", "official.auth");
     const observationDir = join(directory, "data", "official.observability");
     await mkdir(userDir, { recursive: true });
     await mkdir(observationDir, { recursive: true });
-    const users = new DatabaseSync(join(userDir, "users.sqlite"));
+    const users = new DatabaseSync(join(userDir, "auth.sqlite"));
     users.exec(
-      "CREATE TABLE users(id TEXT PRIMARY KEY,username TEXT UNIQUE NOT NULL,role TEXT NOT NULL,enabled INTEGER NOT NULL,created_at TEXT NOT NULL); PRAGMA user_version=1;",
+      "CREATE TABLE users(id TEXT PRIMARY KEY,username TEXT UNIQUE NOT NULL,role TEXT NOT NULL,enabled INTEGER NOT NULL,created_at TEXT NOT NULL,language TEXT CHECK(language IN ('zh-CN','en-US')),account_type TEXT NOT NULL DEFAULT 'personal' CHECK(account_type IN ('personal','enterprise')),parent_id TEXT REFERENCES users(id));",
     );
     for (const [id, name, enabled] of [
       ["alice-id", "alice", 1],
@@ -66,7 +64,9 @@ async function setup() {
       ["empty-id", "emptyuser", 1],
     ] as const)
       users
-        .prepare("INSERT INTO users VALUES(?,?,?,?,?)")
+        .prepare(
+          "INSERT INTO users(id,username,role,enabled,created_at) VALUES(?,?,?,?,?)",
+        )
         .run(id, name, "user", enabled, new Date(now).toISOString());
     users.close();
     const db = new DatabaseSync(join(observationDir, "requests.sqlite"));
@@ -279,12 +279,12 @@ it("backfills once before pruning, preserves cumulative aggregates across restar
   }
 });
 
-it("rejects anonymous or invalid requests and removes disabled users from all public ranks", async () => {
+it("serves public rankings without viewer identity, rejects invalid filters and removes disabled users", async () => {
   const f = await setup();
   try {
-    expect(
-      (await f.request("/api/plugins/official.leaderboard/rankings")).status,
-    ).toBe(401);
+    const anon = await f.request("/api/plugins/official.leaderboard/rankings");
+    expect(anon.status).toBe(200);
+    expect((await anon.json()).me).toBeUndefined();
     for (const query of [
       "range=365d",
       "kind=channels",
@@ -369,11 +369,12 @@ it("records real non-streaming and streaming calls once, while excluding failure
     );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const f = await fixture([...names, "rate-limit", "ingress-openai-chat"]);
+  const f = await fixture([...names, "rate-limit"]);
   try {
     process.env.PLUHUB_TEST_UPSTREAM_KEY = "local-leaderboard-test-secret";
     f.kernel.configure({
       "official.ai-router": {
+        secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
         upstreams: {
           primary: {
             protocol: "openai-chat",

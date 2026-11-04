@@ -3,26 +3,27 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, relative, isAbsolute } from "node:path";
-import { createServer } from "node:net";
+import { createServer, type AddressInfo, type Socket } from "node:net";
 import { install, createKernel } from "../packages/control/dist/index.js";
-import { releasePackage } from "./release-package.mjs";
-const parent = resolve(tmpdir()),
-  directory = await mkdtemp(join(parent, "pluhub-identity-package-"));
-const sockets = new Set();
-let delivered = false,
-  kernel;
+import { releasePackage } from "./release-package.ts";
+
+const parent = resolve(tmpdir());
+const directory = await mkdtemp(join(parent, "pluhub-identity-package-"));
+const sockets = new Set<Socket>();
+let delivered = false;
+let kernel: Awaited<ReturnType<typeof createKernel>> | undefined;
 const server = createServer((socket) => {
   sockets.add(socket);
   socket.on("close", () => sockets.delete(socket));
   socket.setEncoding("utf8");
   socket.write("220 local SMTP\r\n");
-  let buffer = "",
-    data = false;
-  socket.on("data", (chunk) => {
+  let buffer = "";
+  let data = false;
+  socket.on("data", (chunk: string) => {
     buffer += chunk;
     while (buffer.includes("\r\n")) {
-      const at = buffer.indexOf("\r\n"),
-        line = buffer.slice(0, at);
+      const at = buffer.indexOf("\r\n");
+      const line = buffer.slice(0, at);
       buffer = buffer.slice(at + 2);
       if (data) {
         if (line === ".") {
@@ -40,10 +41,9 @@ const server = createServer((socket) => {
   });
 });
 try {
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
   const plugins = [];
   for (const name of [
-    "users",
     "auth",
     "mailer",
     "turnstile",
@@ -66,7 +66,7 @@ try {
           ? {
               enabled: true,
               host: "127.0.0.1",
-              port: server.address().port,
+              port: (server.address() as AddressInfo).port,
               from: "sender@example.test",
               allowInsecure: true,
             }
@@ -91,8 +91,8 @@ try {
     username: "admin",
     password: "package-test-password",
   });
-  const request = (path, body, cookie) =>
-    kernel.fetch(
+  const request = (path: string, body: unknown, cookie?: string) =>
+    kernel!.fetch(
       new Request("http://localhost/api/plugins/official.auth" + path, {
         method: "POST",
         headers: {
@@ -107,7 +107,7 @@ try {
     password: "package-test-password",
   });
   assert.equal(login.status, 200);
-  const cookie = login.headers.get("set-cookie").split(";")[0];
+  const cookie = login.headers.get("set-cookie")!.split(";")[0]!;
   await login.json();
   const setup = await request("/totp/setup", {}, cookie);
   assert.equal(setup.status, 200);
@@ -131,9 +131,9 @@ try {
 } finally {
   await kernel?.shutdown();
   for (const socket of sockets) socket.destroy();
-  await new Promise((resolve) => server.close(() => resolve()));
-  const target = resolve(directory),
-    child = relative(parent, target);
+  await new Promise<void>((done) => server.close(() => done()));
+  const target = resolve(directory);
+  const child = relative(parent, target);
   assert.ok(
     child &&
       !child.startsWith("..") &&

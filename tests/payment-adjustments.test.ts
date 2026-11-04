@@ -47,7 +47,7 @@ async function setup() {
     return Response.json(value);
   };
   const f = await fixture(
-    ["users", "auth", "billing", "commerce", "payments-stripe"],
+    ["auth", "billing", "commerce", "payments-stripe"],
     {
       commerce: {
         publicUrl: "http://localhost",

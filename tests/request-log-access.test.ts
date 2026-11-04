@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fixture } from "./helpers.js";
 
 it("isolates personal and enterprise request logs, aggregates and filter options using current membership", async () => {
-  const f = await fixture(["users", "auth", "ai-router", "observability"]);
+  const f = await fixture(["auth", "ai-router", "observability"]);
   const api = "/api/plugins/official.observability";
   try {
     const admin = await f.admin();
@@ -151,7 +151,7 @@ it("isolates personal and enterprise request logs, aggregates and filter options
       expect(
         (
           await f.request(
-            "/api/plugins/official.users/users",
+            "/api/plugins/official.auth/users",
             "PATCH",
             update,
             admin,
@@ -161,7 +161,7 @@ it("isolates personal and enterprise request logs, aggregates and filter options
     expect(
       (
         await f.request(
-          "/api/plugins/official.users/users",
+          "/api/plugins/official.auth/users",
           "PATCH",
           { id: outsider.id, parentId: enterprise.id },
           outsider.headers,
@@ -169,7 +169,7 @@ it("isolates personal and enterprise request logs, aggregates and filter options
       ).status,
     ).toBe(403);
     const changed = await f.request(
-      "/api/plugins/official.users/users",
+      "/api/plugins/official.auth/users",
       "PATCH",
       {
         id: child.id,

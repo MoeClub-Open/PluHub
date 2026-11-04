@@ -40,6 +40,7 @@ export async function serveAsset(
   base: string,
   manifest: Manifest,
   name: string,
+  immutable = false,
 ): Promise<Response> {
   if (!manifest.ui || !/^[-a-zA-Z0-9_.]+\.(js|css)$/.test(name))
     return new Response("Not found", { status: 404 });
@@ -50,7 +51,9 @@ export async function serveAsset(
   return new Response(await readFile(file), {
     headers: {
       "content-type": name.endsWith(".css") ? "text/css" : "text/javascript",
-      "cache-control": "no-cache",
+      "cache-control": immutable
+        ? "public, max-age=31536000, immutable"
+        : "no-cache",
       "x-content-type-options": "nosniff",
     },
   });

@@ -3,17 +3,8 @@ import { fixture } from "./helpers.js";
 
 it("keeps default platform keys out of personal channels and allows explicit owned-channel bindings", async () => {
   const f = await fixture(
-    [
-      "users",
-      "auth",
-      "ai-router",
-      "byok",
-      "rate-limit",
-      "http-transport",
-      "upstream-openai-chat",
-      "ingress-openai-chat",
-    ],
-    { "upstream-openai-chat": { secretRefs: [] } },
+    ["auth", "ai-router", "byok", "rate-limit", "http-transport"],
+    { "ai-router": { secretRefs: [] } },
   );
   try {
     const admin = await f.admin();

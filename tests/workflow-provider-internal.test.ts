@@ -7,7 +7,7 @@ import { fixture, pluginsRoot } from "./helpers.js";
 
 it("keeps internal provider calls private and settles each child independently", async () => {
   const f = await fixture(
-    ["users", "auth", "billing", "rate-limit", "observability"],
+    ["auth", "billing", "rate-limit", "observability"],
     { billing: { enabled: true, reserveOutputTokens: 64 } },
     async (kernel, directory) => {
       const router = join(directory, "router");
@@ -106,6 +106,7 @@ it("keeps internal provider calls private and settles each child independently",
       );
       await kernel.add(mock, { grants: [] });
     },
+    { "ai.upstream.openai-chat@1": "test.workflow-provider" },
   );
   try {
     const admin = await f.admin();

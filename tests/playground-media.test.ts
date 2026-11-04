@@ -63,16 +63,12 @@ it("keeps media selection scoped and settles Codex images and completed video jo
   const baseUrl = `http://127.0.0.1:${(server.address() as any).port}/v1`;
   const f = await fixture(
     [
-      "users",
       "auth",
       "billing",
       "ai-router",
       "rate-limit",
       "http-transport",
-      "upstream-openai-chat",
-      "upstream-openai-media",
-      "upstream-codex",
-      "ingress-openai-media",
+      "subscriptions",
       "playground",
     ],
     {

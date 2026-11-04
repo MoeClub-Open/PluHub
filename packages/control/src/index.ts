@@ -188,6 +188,53 @@ export function attachManagement(
     }
     config = next;
     configRevision = randomUUID();
+    kernel.pruneSecrets();
+  };
+  const verifyAdminSession = async (request: Request, context: any) => {
+    if (!context.principal?.session) return;
+    if (!context.principal.permissions.includes("*"))
+      throw new HostError("forbidden", "Administrator session required", 403);
+    if (
+      kernel
+        .list()
+        .some(
+          (plugin) =>
+            plugin.state === "Active" &&
+            plugin.manifest.provides.includes("auth.admin@1"),
+        )
+    ) {
+      const token = /(?:^|;\s*)pluhub_session=([a-zA-Z0-9_-]+)/.exec(
+        request.headers.get("cookie") ?? "",
+      )?.[1];
+      await kernel.invoke(
+        "auth.admin@1",
+        { userId: context.principal.id, token },
+        context.signal,
+      );
+    }
+  };
+  const findPluginIndex = async (id: string) => {
+    const active = kernel.list().find((p) => p.id === id);
+    if (active) {
+      const idx = config.plugins.findIndex(
+        (p) =>
+          resolve(dirname(file), p.path) === active.path ||
+          resolve(p.path) === active.path,
+      );
+      if (idx >= 0) return idx;
+    }
+    for (let i = 0; i < config.plugins.length; i++) {
+      const m = validateManifest(
+        JSON.parse(
+          await readFile(
+            resolve(config.plugins[i]!.path, "manifest.json"),
+            "utf8",
+          ),
+        ),
+      );
+      if (m.id === id) return i;
+    }
+    return -1;
   };
   const setup = setupHandler(kernel, () => config, commit);
   const registry = registryManagement(
@@ -220,24 +267,7 @@ export function attachManagement(
             "Administrator session required",
             403,
           );
-        if (
-          kernel
-            .list()
-            .some(
-              (plugin) =>
-                plugin.state === "Active" &&
-                plugin.manifest.provides.includes("auth.admin@1"),
-            )
-        ) {
-          const token = /(?:^|;\s*)pluhub_session=([a-zA-Z0-9_-]+)/.exec(
-            request.headers.get("cookie") ?? "",
-          )?.[1];
-          await kernel.invoke(
-            "auth.admin@1",
-            { userId: context.principal.id, token },
-            context.signal,
-          );
-        }
+        await verifyAdminSession(request, context);
       }
       if (
         path.startsWith("/api/host/registry") ||
@@ -307,6 +337,7 @@ export function attachManagement(
           headers: { etag: configRevision, "cache-control": "no-store" },
         });
       if (path === "/api/host/config" && request.method === "PUT") {
+        await verifyAdminSession(request, context);
         const expected = request.headers.get("if-match");
         if (expected && expected !== configRevision)
           throw new HostError(
@@ -322,6 +353,44 @@ export function attachManagement(
           revision: configRevision,
         });
       }
+      const pluginConfigMatch =
+        /^\/api\/host\/plugins\/([a-z0-9.-]+)\/config$/.exec(path);
+      if (pluginConfigMatch) {
+        const pluginId = pluginConfigMatch[1]!;
+        const found = await findPluginIndex(pluginId);
+        if (found < 0)
+          throw new HostError("unknown_plugin", "Unknown plugin", 404);
+        if (request.method === "GET")
+          return Response.json(config.plugins[found]!.config ?? {}, {
+            headers: { etag: configRevision, "cache-control": "no-store" },
+          });
+        if (request.method === "PUT") {
+          await verifyAdminSession(request, context);
+          const expected = request.headers.get("if-match");
+          if (!expected || expected !== configRevision)
+            throw new HostError(
+              "config_conflict",
+              "配置已更新，请刷新后重试",
+              409,
+            );
+          context.state.set("admin.resourceId", pluginId);
+          const next = structuredClone(config);
+          next.plugins[found] = {
+            ...next.plugins[found]!,
+            config: await readObject(request),
+          };
+          await commit(next);
+          return Response.json(
+            {
+              ok: true,
+              graphVersion: kernel.graphVersion,
+              revision: configRevision,
+              config: config.plugins[found]!.config ?? {},
+            },
+            { headers: { etag: configRevision, "cache-control": "no-store" } },
+          );
+        }
+      }
       if (path === "/api/host/plugin-state" && request.method === "POST") {
         const body = await readObject(request);
         if (typeof body.enabled !== "boolean")
@@ -331,21 +400,7 @@ export function attachManagement(
         if (!plugin)
           throw new HostError("unknown_plugin", "Unknown plugin", 404);
         if (!body.enabled) kernel.assertRemovable(plugin.id);
-        let found = -1;
-        for (let i = 0; i < config.plugins.length; i++) {
-          const m = validateManifest(
-            JSON.parse(
-              await readFile(
-                resolve(config.plugins[i]!.path, "manifest.json"),
-                "utf8",
-              ),
-            ),
-          );
-          if (m.id === body.id) {
-            found = i;
-            break;
-          }
-        }
+        const found = await findPluginIndex(body.id);
         if (found < 0)
           throw new HostError(
             "unknown_plugin",
@@ -406,23 +461,7 @@ export function attachManagement(
             "插件版本已变化，请刷新后重试",
             409,
           );
-        if (
-          kernel
-            .list()
-            .some(
-              (p) =>
-                p.state === "Active" &&
-                p.manifest.provides.includes("auth.admin@1"),
-            )
-        ) {
-          const token = /(?:^|;\s*)pluhub_session=([a-zA-Z0-9_-]+)/.exec(
-            request.headers.get("cookie") ?? "",
-          )?.[1];
-          await kernel.invoke("auth.admin@1", {
-            userId: context.principal?.id,
-            token,
-          });
-        }
+        await verifyAdminSession(request, context);
         const index = config.plugins.findIndex(
           (p) => resolve(p.path) === current.path,
         );

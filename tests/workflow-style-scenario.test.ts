@@ -31,7 +31,6 @@ it("rewrites the normal answer with a style prompt and routes a specific questio
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const f = await fixture(
     [
-      "users",
       "auth",
       "ai-router",
       "rate-limit",
@@ -39,10 +38,8 @@ it("rewrites the normal answer with a style prompt and routes a specific questio
       "billing",
       "observability",
       "http-transport",
-      "upstream-openai-chat",
-      "ingress-openai-chat",
     ],
-    { "upstream-openai-chat": { secretRefs: [] }, billing: { enabled: true } },
+    { "ai-router": { secretRefs: [] }, billing: { enabled: true } },
   );
   try {
     const admin = await f.admin();

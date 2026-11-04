@@ -53,7 +53,6 @@ async function gateway(forceParallel = false) {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const f = await fixture(
     [
-      "users",
       "auth",
       "ai-router",
       "rate-limit",
@@ -61,12 +60,8 @@ async function gateway(forceParallel = false) {
       "billing",
       "observability",
       "http-transport",
-      "upstream-openai-chat",
-      "ingress-openai-chat",
-      "ingress-openai-responses",
-      "ingress-anthropic",
     ],
-    { "upstream-openai-chat": { secretRefs: [] }, billing: { enabled: true } },
+    { "ai-router": { secretRefs: [] }, billing: { enabled: true } },
   );
   const admin = await f.admin();
   const me = await (

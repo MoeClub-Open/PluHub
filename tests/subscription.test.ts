@@ -137,16 +137,7 @@ it("runs subscription adapters through the compatible ingress matrix and omits C
   };
   process.env.PLUHUB_TEST_UPSTREAM_KEY = "subscription-token";
   const f = await fixture(
-    [
-      "users",
-      "auth",
-      "ai-router",
-      "rate-limit",
-      ...protocols.map((p) => "ingress-" + p),
-      "upstream-codex",
-      "upstream-claude-subscription",
-      "upstream-antigravity",
-    ],
+    ["auth", "ai-router", "rate-limit", "subscriptions"],
     {},
     async (kernel, dir) => {
       const path = join(dir, "transport");

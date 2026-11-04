@@ -49,7 +49,7 @@ async function create(f: any, extra = {}) {
   );
 }
 it("saves site and portal before the first administrator, closes setup permanently and supports normal login", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     expect(await state(f)).toMatchObject({
       required: true,
@@ -111,7 +111,7 @@ it("saves site and portal before the first administrator, closes setup permanent
   }
 });
 it("keeps host APIs private and rejects cross-site, stale, unsafe or unbounded initialization writes", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     const before = await readFile(f.file, "utf8"),
       version = f.kernel.graphVersion;
@@ -171,7 +171,7 @@ it("keeps host APIs private and rejects cross-site, stale, unsafe or unbounded i
   }
 });
 it("accepts only one concurrent initial administrator and never promotes an existing ordinary user", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     await f.kernel.invoke("users.manage@1", {
       action: "create",
@@ -209,7 +209,7 @@ it("accepts only one concurrent initial administrator and never promotes an exis
   }
 });
 it("resumes saved first-install steps across restart and preserves existing legacy administrator sites", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     await save(f, 0);
     const saved = await state(f);
@@ -243,7 +243,7 @@ it("resumes saved first-install steps across restart and preserves existing lega
   }
 });
 it("recovers an interrupted cross-plugin administrator creation", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     const id = randomUUID(),
       salt = "setup-test-salt";
@@ -301,7 +301,7 @@ it("recovers an interrupted cross-plugin administrator creation", async () => {
   }
 });
 it("enforces deployment origin and secure cookies before site confirmation", async () => {
-  const f = await fixture(["listener", "console", "users", "auth"], {
+  const f = await fixture(["listener", "console", "auth"], {
     listener: {
       port: 0,
       host: "127.0.0.1",
@@ -338,7 +338,7 @@ it("enforces deployment origin and secure cookies before site confirmation", asy
   }
 });
 it("does not overwrite a repaired password or reopen setup when an administrator is disabled", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     await f.admin();
     const admin: any = await f.kernel.invoke("users.lookup@1", {
@@ -372,7 +372,7 @@ it("does not overwrite a repaired password or reopen setup when an administrator
       expect(login.status).toBe(200);
       await login.json();
       const users = new DatabaseSync(
-        join(f.config.dataDir, "official.users", "users.sqlite"),
+        join(f.config.dataDir, "official.auth", "auth.sqlite"),
       );
       users.prepare("UPDATE users SET enabled=0 WHERE id=?").run(admin.id);
       users.close();
@@ -389,7 +389,7 @@ it("does not overwrite a repaired password or reopen setup when an administrator
   }
 });
 it("keeps public registration disabled until an initial administrator exists", async () => {
-  const f = await fixture(["console", "users", "auth", "mailer"], {
+  const f = await fixture(["console", "auth", "mailer"], {
     auth: { registrationEnabled: true },
   });
   try {

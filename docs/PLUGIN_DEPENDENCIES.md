@@ -11,7 +11,7 @@
 }
 ```
 
-宿主在启动、启用、配置变更和在线替换时校验必需插件、实现版本范围、能力绑定和环路。依赖者仍在运行时不能停止其必需提供者。可选能力不构成强制启动边，避免 Users/Auth、Router/BYOK 等协作形成硬循环；插件仍需在使用可选能力之前检查其可用性。
+宿主在启动、启用、配置变更和在线替换时校验必需插件、实现版本范围、能力绑定和环路。依赖者仍在运行时不能停止其必需提供者。可选能力不构成强制启动边，避免 Auth/Console、Router/BYOK 等协作形成硬循环；插件仍需在使用可选能力之前检查其可用性。
 
 ## 自动安装
 
@@ -51,4 +51,4 @@ pluhub plugin install /srv/packages/example --grant api.register \
 
 依赖库通过固定版本与 pnpm lockfile 维护；`pack:all` 按实际公共包版本替换开发用 `link:` / `workspace:`，输出 `SHA256SUMS` 与 `RELEASE_LOCK.json`，列出每个产物的版本和摘要。安装包集成验证从锁清单读取实际版本并核对摘要，不再将所有插件的安装包名写死为同一个版本。
 
-`node scripts/check-boundaries.mjs` 同时检查私有导入和 35 个官方插件的编译产物：字面量 Capability 调用/探测与注册必须在 Manifest 中声明，Manifest/package 版本必须一致。动态能力名仍由宿主的依赖授权校验与集成测试覆盖。Go SDK 保留 `dependencies` 和 `optionalRequires` 元数据；npm SemVer 范围的最终解释由宿主统一执行。
+`bun scripts/check-boundaries.ts` 与 `bun scripts/check-plugin-dependencies.ts` 同时检查公开包边界、私有导入和 21 个官方插件的编译产物：字面量 Capability 调用/探测与注册必须在 Manifest 中声明，Manifest/package 版本必须一致。动态能力名仍由宿主的依赖授权校验与集成测试覆盖。Go SDK 保留 `dependencies` 和 `optionalRequires` 元数据；npm SemVer 范围的最终解释由宿主统一执行。

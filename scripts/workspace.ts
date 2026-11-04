@@ -1,25 +1,27 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 const root = fileURLToPath(new URL("../", import.meta.url));
 const parent = resolve(root, "..");
 const pnpm = process.env.npm_execpath;
-function run(dir, args) {
+
+function run(dir: string, args: string[]) {
   const result = spawnSync(
+    pnpm ? process.execPath : process.platform === "win32" ? "cmd.exe" : "pnpm",
     pnpm
-      ? process.execPath
+      ? [pnpm, ...args]
       : process.platform === "win32"
-        ? "pnpm.cmd"
-        : "pnpm",
-    pnpm ? [pnpm, ...args] : args,
+        ? ["/d", "/s", "/c", "pnpm", ...args]
+        : args,
     {
       cwd: dir,
       stdio: "inherit",
-      shell: !pnpm && process.platform === "win32",
     },
   );
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
+
 const dirs = [
   resolve(parent, "PluHub-Spec"),
   root,

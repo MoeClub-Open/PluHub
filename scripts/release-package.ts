@@ -3,15 +3,18 @@ import { resolve, basename } from "node:path";
 import { createHash } from "node:crypto";
 
 /** Select the exact artifact from this release, not a stale file sharing its name prefix. */
-export async function releasePackage(id) {
+export async function releasePackage(id: string) {
   const directory = resolve("output/packages");
   const lock = JSON.parse(
     await readFile(resolve(directory, "RELEASE_LOCK.json"), "utf8"),
-  );
+  ) as {
+    schemaVersion: number;
+    packages: Array<{ id: string; file: string; sha256: string }>;
+  };
   const matches = lock.packages.filter((entry) => entry.id === id);
   if (lock.schemaVersion !== 1 || matches.length !== 1)
     throw Error("Missing/ambiguous release artifact: " + id);
-  const entry = matches[0];
+  const entry = matches[0]!;
   if (
     basename(entry.file) !== entry.file ||
     !/^[a-f0-9]{64}$/.test(entry.sha256)

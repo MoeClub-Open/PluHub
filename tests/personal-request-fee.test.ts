@@ -7,7 +7,6 @@ it("charges only the frozen personal handling fee, releases rejected attempts an
   let calls = 0;
   const f = await fixture(
     [
-      "users",
       "auth",
       "ai-router",
       "billing",
@@ -15,8 +14,6 @@ it("charges only the frozen personal handling fee, releases rejected attempts an
       "observability",
       "model-catalog",
       "rate-limit",
-      "ingress-openai-chat",
-      "upstream-openai-chat",
     ],
     { billing: { enabled: true, personalRequestFee: 0.002 } },
     async (kernel, directory) => {

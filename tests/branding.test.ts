@@ -4,7 +4,7 @@ import { fixture } from "./helpers.js";
 import { createKernel, readConfig } from "../packages/control/dist/index.js";
 
 it("applies branding live using existing grants, escapes HTML and persists it across restart", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     const admin = await f.admin();
     const initial = await f.request("/console/branding");
@@ -61,7 +61,7 @@ it("applies branding live using existing grants, escapes HTML and persists it ac
 });
 
 it("rejects invalid or unauthorized brand updates without changing the live snapshot or persisted config", async () => {
-  const f = await fixture(["console", "users", "auth"]);
+  const f = await fixture(["console", "auth"]);
   try {
     const admin = await f.admin();
     const before = await readFile(f.file, "utf8"),

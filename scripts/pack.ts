@@ -13,11 +13,19 @@ import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { packPlugin } from "../packages/control/dist/index.js";
+
 const out = resolve("output/packages");
+const registryRoot = resolve("output/registry");
+await rm(out, { recursive: true, force: true, maxRetries: 5 });
+await rm(registryRoot, { recursive: true, force: true, maxRetries: 5 });
 await mkdir(out, { recursive: true });
-const artifacts = [];
-const metadata = new Map();
-const registry = [];
+const artifacts: string[] = [];
+const metadata = new Map<string, Record<string, unknown>>();
+const registry: Array<{
+  manifest: { id: string; version: string };
+  archive: string;
+  sha256: string;
+}> = [];
 const packages = [
   resolve("../PluHub-Spec"),
   ...[
@@ -32,9 +40,9 @@ const packages = [
   ].map((name) => resolve("packages", name)),
   resolve("apps/cli"),
 ];
-const packageVersions = new Map(
+const packageVersions = new Map<string, string>(
   await Promise.all(
-    packages.map(async (path) => {
+    packages.map(async (path): Promise<[string, string]> => {
       const manifest = JSON.parse(
         await readFile(join(path, "package.json"), "utf8"),
       );
@@ -48,7 +56,9 @@ for (const path of packages) {
     const manifest = JSON.parse(
       await readFile(join(path, "package.json"), "utf8"),
     );
-    for (const [name, value] of Object.entries(manifest.dependencies ?? {}))
+    for (const [name, value] of Object.entries(
+      (manifest.dependencies ?? {}) as Record<string, string>,
+    ))
       if (value.startsWith("link:") || value.startsWith("workspace:")) {
         const version = packageVersions.get(name);
         if (!version)
@@ -65,20 +75,30 @@ for (const path of packages) {
       join(temp, "package.json"),
       JSON.stringify(manifest, null, 2),
     );
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
     const result = spawnSync(
-      npm,
-      ["pack", "--ignore-scripts", "--pack-destination", out],
-      { cwd: temp, stdio: "inherit", shell: process.platform === "win32" },
+      process.platform === "win32" ? "cmd.exe" : "npm",
+      process.platform === "win32"
+        ? [
+            "/d",
+            "/s",
+            "/c",
+            "npm",
+            "pack",
+            "--ignore-scripts",
+            "--pack-destination",
+            out,
+          ]
+        : ["pack", "--ignore-scripts", "--pack-destination", out],
+      { cwd: temp, stdio: "inherit" },
     );
     if (result.status !== 0) throw new Error("npm pack failed");
-    artifacts.push(
+    const filename =
       manifest.name.replace(/^@/, "").replaceAll("/", "-") +
-        "-" +
-        manifest.version +
-        ".tgz",
-    );
-    metadata.set(artifacts.at(-1), {
+      "-" +
+      manifest.version +
+      ".tgz";
+    artifacts.push(filename);
+    metadata.set(filename, {
       id: manifest.name,
       version: manifest.version,
       dependencies: manifest.dependencies ?? {},
@@ -88,7 +108,6 @@ for (const path of packages) {
   }
 }
 for (const name of await readdir("../PluHub-Plugins/plugins")) {
-  if (name === "subscription-accounts") continue;
   const path = resolve("../PluHub-Plugins/plugins", name);
   if (!existsSync(join(path, "manifest.json"))) continue;
   const manifest = JSON.parse(
@@ -113,8 +132,8 @@ for (const name of await readdir("../PluHub-Plugins/plugins")) {
     dependencies: manifest.dependencies ?? {},
   });
 }
-const sums = [];
-const releasePackages = [];
+const sums: string[] = [];
+const releasePackages: Record<string, unknown>[] = [];
 for (const name of artifacts.sort()) {
   const hash = createHash("sha256")
     .update(await readFile(join(out, name)))
@@ -129,13 +148,13 @@ await writeFile(
     "\n",
 );
 console.log("Packages written to " + out);
-await mkdir(resolve("output/registry/packages"), { recursive: true });
+await mkdir(join(registryRoot, "packages"), { recursive: true });
 for (const entry of registry)
   await cp(
     join(out, entry.manifest.id + "-" + entry.manifest.version + ".tgz"),
-    resolve("output/registry/packages", entry.archive),
+    join(registryRoot, "packages", entry.archive),
   );
 await writeFile(
-  resolve("output/registry/index.json"),
+  join(registryRoot, "index.json"),
   JSON.stringify({ schemaVersion: 1, plugins: registry }, null, 2) + "\n",
 );

@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFile } from "node:child_process";
+import { removeTempDir } from "./helpers.js";
 import { promisify } from "node:util";
 import { Kernel, validateManifest } from "../packages/kernel/dist/index.js";
 import {
@@ -95,7 +96,7 @@ async function harness() {
           resolve(tmpdir(), "pluhub-dependencies-"),
         ),
       ).toBe(true);
-      await rm(directory, { recursive: true, force: true });
+      await removeTempDir(directory);
     },
   };
 }
@@ -634,7 +635,7 @@ it("CLI calls honor bindings, named dependencies and deliberately disabled optio
 });
 
 it("previews and atomically activates required dependencies through the administrator API", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   try {
     const packageAt = async (
       folder: string,

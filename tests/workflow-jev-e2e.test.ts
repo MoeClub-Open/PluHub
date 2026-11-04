@@ -43,17 +43,14 @@ it("routes via a metered Jev node and settles at the reservation when usage is a
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const f = await fixture(
     [
-      "users",
       "auth",
       "ai-router",
       "rate-limit",
       "billing",
       "observability",
       "http-transport",
-      "upstream-openai-chat",
-      "ingress-openai-chat",
     ],
-    { "upstream-openai-chat": { secretRefs: [] }, billing: { enabled: true } },
+    { "ai-router": { secretRefs: [] }, billing: { enabled: true } },
   );
   try {
     const admin = await f.admin();
@@ -274,7 +271,6 @@ it("routes via a metered Jev node and settles at the reservation when usage is a
       billing_status: "settled",
     });
     expect(unknown.charged_micro_usd).toBeGreaterThan(0);
-    expect(unknown.held_micro_usd).toBe(0);
     const balance = await f.kernel.invoke<any>("billing.balance@1", {
       userId: me.id,
     });

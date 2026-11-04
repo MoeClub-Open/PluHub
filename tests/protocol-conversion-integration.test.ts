@@ -241,6 +241,7 @@ it("runs image + schema + signed reasoning conversion over all HTTP entry/provid
     for (const p of protocols) {
       f.kernel.configure({
         "official.ai-router": {
+          secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
           upstreams: {
             primary: {
               protocol: p,
@@ -289,15 +290,7 @@ it("runs image + schema + signed reasoning conversion over all HTTP entry/provid
 
 it("records encoder failure after upstream finish and settles the completed provider call", async () => {
   const f = await fixture(
-    [
-      "users",
-      "auth",
-      "billing",
-      "observability",
-      "ai-router",
-      "rate-limit",
-      "ingress-openai-chat",
-    ],
+    ["auth", "billing", "observability", "ai-router", "rate-limit"],
     {
       billing: { enabled: true },
       "ai-router": {
@@ -339,6 +332,7 @@ it("records encoder failure after upstream finish and settles the completed prov
       );
       await kernel.add(provider);
     },
+    { "ai.upstream.openai-chat@1": "test.provider" },
   );
   try {
     const admin = await f.admin();
@@ -405,6 +399,7 @@ it("closes a pending HTTP upstream when the client cancels the converted stream"
     const admin = await f.admin();
     f.kernel.configure({
       "official.ai-router": {
+        secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
         upstreams: {
           test: {
             protocol: "openai-chat",

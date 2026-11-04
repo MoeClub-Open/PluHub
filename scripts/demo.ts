@@ -10,8 +10,8 @@ import {
   applyPendingPluginUpdate,
   writeConfig,
 } from "../packages/control/dist/index.js";
-import { migrateLegacyChannels } from "../deploy/migrations/channel-graphs.ts";
 import { defaultPluginNames } from "../apps/cli/dist/presets.js";
+
 const root = fileURLToPath(new URL("../", import.meta.url));
 const directory = resolve(
   process.env.PLUHUB_DEMO_DIR ?? resolve(root, ".pluhub/product-demo"),
@@ -37,8 +37,8 @@ const upstream = createServer(async (request, response) => {
     );
     return;
   }
-  const chunks = [];
-  for await (const chunk of request) chunks.push(chunk);
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) chunks.push(Buffer.from(chunk));
   const input = JSON.parse(Buffer.concat(chunks).toString());
   const content = input.messages?.at(-1)?.content ?? "";
   if (content === "/error") {
@@ -85,9 +85,9 @@ const upstream = createServer(async (request, response) => {
   }, 45);
   response.on("close", () => clearInterval(timer));
 });
-await new Promise((resolve, reject) => {
+await new Promise<void>((done, reject) => {
   upstream.once("error", reject);
-  upstream.listen(upstreamPort, "127.0.0.1", resolve);
+  upstream.listen(upstreamPort, "127.0.0.1", done);
 });
 process.env.PLUHUB_DEMO_UPSTREAM_KEY = randomBytes(24).toString("hex");
 const models = Object.fromEntries(
@@ -198,6 +198,7 @@ const plugins = await Promise.all(
                       }
                     : name === "ai-router"
                       ? {
+                          secretRefs: ["env:PLUHUB_DEMO_UPSTREAM_KEY"],
                           upstreams: {
                             workflow: {
                               name: "组合渠道 · 演示",
@@ -282,20 +283,8 @@ const plugins = await Promise.all(
                                 "规则决策演示：按任务难度选择本地模拟模型与思考强度。",
                             },
                           },
-                          redirects: {
-                            "demo/legacy": {
-                              target: "demo/chat",
-                              mode: "implicit",
-                            },
-                            "demo/latest": {
-                              target: "auto/smart",
-                              mode: "explicit",
-                            },
-                          },
                         }
-                      : name.startsWith("upstream-")
-                        ? { secretRefs: ["env:PLUHUB_DEMO_UPSTREAM_KEY"] }
-                        : {},
+                      : {},
     };
   }),
 );
@@ -306,11 +295,10 @@ const config = {
   plugins,
 };
 const file = resolve(directory, "config.json");
-migrateLegacyChannels(config);
 await writeConfig(file, config);
-let kernel = await createKernel(config),
-  restartTask;
-const restart = async () => {
+let kernel = await createKernel(config);
+let restartTask: Promise<void> | undefined;
+const restart = async (): Promise<void> => {
   if (restartTask) return restartTask;
   restartTask = applyPendingPluginUpdate(kernel, file, { restart }).then(
     (result) => {

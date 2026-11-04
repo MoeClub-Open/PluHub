@@ -28,7 +28,6 @@ async function setup(rpm = 1) {
   const f = await fixture(
     [
       "http-transport",
-      "users",
       "auth",
       "ai-router",
       "model-catalog",
@@ -37,8 +36,6 @@ async function setup(rpm = 1) {
       "billing",
       "rate-limit",
       "byok",
-      "ingress-openai-chat",
-      "upstream-openai-chat",
     ],
     {
       "ai-router": {

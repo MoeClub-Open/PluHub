@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, relative, isAbsolute } from "node:path";
 import { install, createKernel } from "../packages/control/dist/index.js";
-import { releasePackage } from "./release-package.mjs";
+import { releasePackage } from "./release-package.ts";
 const parent = resolve(tmpdir());
 const directory = await mkdtemp(join(parent, "pluhub-routing-package-"));
 let kernel;
@@ -12,7 +12,6 @@ try {
   const plugins = [];
   for (const name of [
     "http-transport",
-    "upstream-openai-chat",
     "ai-router",
     "auto-router",
     "token-speed",
@@ -31,6 +30,7 @@ try {
       config:
         name === "ai-router"
           ? {
+              secretRefs: ["env:PLUHUB_PACKAGE_KEY"],
               upstreams: {
                 p: {
                   protocol: "openai-chat",
@@ -135,7 +135,7 @@ try {
     if (event.type === "text") text += event.text;
   assert.equal(text, "hello");
   console.log(
-    "Installed unified channel graphs and tokenizer bundles verified without the legacy workflow plugin; no provider requests were sent.",
+    "Installed unified channel graphs and tokenizer bundles verified; no provider requests were sent.",
   );
 } finally {
   await kernel?.shutdown();

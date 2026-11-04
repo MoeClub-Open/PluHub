@@ -7,17 +7,7 @@ async function setup(credit = 1_000_000) {
   let personalCalls = 0,
     paidCalls = 0;
   const f = await fixture(
-    [
-      "users",
-      "auth",
-      "ai-router",
-      "billing",
-      "byok",
-      "rate-limit",
-      "observability",
-      "ingress-openai-chat",
-      "upstream-openai-chat",
-    ],
+    ["auth", "ai-router", "billing", "byok", "rate-limit", "observability"],
     { billing: { enabled: true } },
     async (kernel, directory) => {
       (globalThis as any).__fallbackTransport = (input: any) => {
@@ -72,20 +62,20 @@ async function setup(credit = 1_000_000) {
   ).json();
   process.env.PLUHUB_TEST_UPSTREAM_KEY = "platform-only";
   const config: any = {
+    secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
     upstreams: {
       paid: {
         protocol: "openai-chat",
         baseUrl: "https://paid.example/v1",
         keyRef: "env:PLUHUB_TEST_UPSTREAM_KEY",
-        consumptionMultiplier: 0.5,
       },
     },
     models: {
       "paid-model": {
         upstream: "paid",
         model: "vendor-paid",
-        inputPrice: 5,
-        outputPrice: 10,
+        inputPrice: 2.5,
+        outputPrice: 5,
       },
     },
   };

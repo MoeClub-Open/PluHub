@@ -3,7 +3,7 @@ import { fixture } from "./helpers.js";
 import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 it("supports sessions, users, own API keys, revocation, disabling and persistent data", async () => {
-  const f = await fixture(["users", "auth", "ai-router"]);
+  const f = await fixture(["auth", "ai-router"]);
   try {
     const admin = await f.admin();
     const malformed = await f.kernel.fetch(
@@ -23,7 +23,7 @@ it("supports sessions, users, own API keys, revocation, disabling and persistent
     expect(denied.status).toBe(401);
     await denied.json();
     const created = await f.request(
-      "/api/plugins/official.users/users",
+      "/api/plugins/official.auth/users",
       "POST",
       { username: "alice", role: "user" },
       admin,
@@ -98,7 +98,7 @@ it("supports sessions, users, own API keys, revocation, disabling and persistent
     );
     expect(cross.status).toBe(403);
     const disabled = await f.request(
-      "/api/plugins/official.users/users",
+      "/api/plugins/official.auth/users",
       "PATCH",
       { id: alice.id, enabled: false },
       admin,
@@ -127,7 +127,7 @@ it("supports sessions, users, own API keys, revocation, disabling and persistent
     ).toBe(401);
     await (
       await f.request(
-        "/api/plugins/official.users/users",
+        "/api/plugins/official.auth/users",
         "PATCH",
         { id: alice.id, enabled: true },
         admin,

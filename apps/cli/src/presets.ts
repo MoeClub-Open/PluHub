@@ -4,7 +4,6 @@ export const defaultPluginNames = [
   "listener",
   "http-transport",
   "console",
-  "users",
   "auth",
   "ai-router",
   "model-catalog",
@@ -22,15 +21,7 @@ export const defaultPluginNames = [
   "tickets",
   "mailer",
   "turnstile",
-  "upstream-codex",
-  "upstream-claude-subscription",
-  "upstream-antigravity",
-  "upstream-grok",
-  "ingress-openai-media",
-  "upstream-openai-media",
-  ...["openai-chat", "openai-responses", "anthropic", "gemini"].flatMap(
-    (protocol) => ["ingress-" + protocol, "upstream-" + protocol],
-  ),
+  "subscriptions",
 ];
 
 /** A fresh gateway exposes only its core product and standard protocols. */
@@ -38,14 +29,10 @@ export const defaultEnabledPluginNames = [
   "listener",
   "http-transport",
   "console",
-  "users",
   "auth",
   "rate-limit",
   "ai-router",
   "model-catalog",
   "observability",
   "playground",
-  ...["openai-chat", "openai-responses", "anthropic", "gemini"].flatMap(
-    (protocol) => ["ingress-" + protocol, "upstream-" + protocol],
-  ),
 ];

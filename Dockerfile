@@ -20,6 +20,6 @@ USER bun
 VOLUME ["/data"]
 EXPOSE 8080
 STOPSIGNAL SIGTERM
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["bun", "deploy/docker/healthcheck.mjs"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["bun", "deploy/docker/healthcheck.ts"]
 ENTRYPOINT ["sh", "deploy/docker/entrypoint.sh"]
 CMD ["start"]

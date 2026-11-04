@@ -31,17 +31,8 @@ it("records only explicitly enabled upstream response model IDs for both respons
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const f = await fixture(
-    [
-      "users",
-      "auth",
-      "ai-router",
-      "rate-limit",
-      "http-transport",
-      "upstream-openai-chat",
-      "ingress-openai-chat",
-      "observability",
-    ],
-    { "upstream-openai-chat": { secretRefs: [] } },
+    ["auth", "ai-router", "rate-limit", "http-transport", "observability"],
+    { "ai-router": { secretRefs: [] } },
   );
   try {
     const admin = await f.admin();

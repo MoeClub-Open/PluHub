@@ -1,64 +1,8 @@
 import { it, expect } from "vitest";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { SecretVault } from "../packages/kernel/dist/index.js";
-import { migrateManagedSecrets } from "../deploy/migrations/managed-secrets.ts";
 import { fixture } from "./helpers.js";
-
-it("imports old references into encrypted storage once and preserves a recoverable configuration", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pluhub-managed-migration-"));
-  const file = join(directory, "pluhub.json");
-  const variable = "PLUHUB_MIGRATION_FIXTURE";
-  const previous = process.env[variable];
-  try {
-    process.env[variable] = "offline-migration-only";
-    await writeFile(
-      file,
-      JSON.stringify({
-        dataDir: "state",
-        plugins: [
-          {
-            config: {
-              keyRef: "env:" + variable,
-              secretRefs: ["env:" + variable],
-            },
-          },
-        ],
-      }),
-    );
-    expect(migrateManagedSecrets(file, false)).toMatchObject({
-      changed: false,
-      references: 1,
-    });
-    expect(migrateManagedSecrets(file)).toMatchObject({
-      changed: true,
-      imported: 1,
-    });
-    expect(process.env[variable]).toBeUndefined();
-    const saved = JSON.parse(await readFile(file, "utf8"));
-    const vault = new SecretVault(join(directory, "state"));
-    expect(saved.plugins[0].config.keyRef).toBe("secret:" + variable);
-    expect(vault.get(saved.plugins[0].config.keyRef)).toBe(
-      "offline-migration-only",
-    );
-    expect(
-      await readFile(join(directory, "state", "secrets.json"), "utf8"),
-    ).not.toContain("offline-migration-only");
-    expect(migrateManagedSecrets(file)).toMatchObject({
-      changed: false,
-      references: 0,
-    });
-    expect(await readFile(file + ".before-managed-secrets", "utf8")).toContain(
-      "env:" + variable,
-    );
-  } finally {
-    if (previous === undefined) delete process.env[variable];
-    else process.env[variable] = previous;
-    await rm(directory, { recursive: true, force: true });
-  }
-});
 
 it("seals directly entered channel keys before saving and authorizes the text and media adapters", async () => {
   const authorizations: string[] = [];
@@ -83,20 +27,9 @@ it("seals directly entered channel keys before saving and authorizes the text an
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const f = await fixture(
-    [
-      "users",
-      "auth",
-      "ai-router",
-      "rate-limit",
-      "http-transport",
-      "upstream-openai-chat",
-      "upstream-openai-media",
-      "ingress-openai-chat",
-      "ingress-openai-media",
-    ],
+    ["auth", "ai-router", "rate-limit", "http-transport"],
     {
-      "upstream-openai-chat": { secretRefs: [] },
-      "upstream-openai-media": { secretRefs: [] },
+      "ai-router": { secretRefs: [] },
     },
   );
   try {
@@ -169,14 +102,19 @@ it("seals directly entered channel keys before saving and authorizes the text an
       original,
     );
     expect(intruder.status).toBe(401);
-    const restricted = await (
-      await f.request("/api/host/config", "GET", undefined, admin)
-    ).json();
+    const cfgRes = await f.request("/api/host/config", "GET", undefined, admin);
+    const etag = cfgRes.headers.get("etag")!;
+    const restricted = await cfgRes.json();
     restricted.plugins.find((plugin: any) =>
-      plugin.path.endsWith("upstream-openai-media"),
+      plugin.path.endsWith("ai-router"),
     ).config.secretRefs = [];
     expect(
-      (await f.request("/api/host/config", "PUT", restricted, admin)).status,
+      (
+        await f.request("/api/host/config", "PUT", restricted, {
+          ...admin,
+          "if-match": etag,
+        })
+      ).status,
     ).toBe(200);
     const denied = await f.request(
       "/v1/images/generations",
@@ -211,19 +149,9 @@ it("seals bound credential values and only grants them to the effective provider
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const f = await fixture(
-    [
-      "users",
-      "auth",
-      "ai-router",
-      "rate-limit",
-      "http-transport",
-      "upstream-openai-chat",
-      "upstream-anthropic",
-      "ingress-openai-chat",
-    ],
+    ["auth", "ai-router", "rate-limit", "http-transport"],
     {
-      "upstream-openai-chat": { secretRefs: [] },
-      "upstream-anthropic": { secretRefs: [] },
+      "ai-router": { secretRefs: [] },
     },
   );
   try {
@@ -300,8 +228,6 @@ it("seals bound credential values and only grants them to the effective provider
     const plugin = (name: string) =>
       host.plugins.find((item: any) => item.path.endsWith(name)).config;
     expect(plugin("ai-router").secretRefs).toContain(keyRef);
-    expect(plugin("upstream-openai-chat").secretRefs).toContain(keyRef);
-    expect(plugin("upstream-anthropic").secretRefs).not.toContain(keyRef);
     const unsafe = structuredClone(host);
     const unsafeKey = "plaintext-attempt-through-host-config";
     unsafe.plugins
@@ -331,11 +257,6 @@ it("seals bound credential values and only grants them to the effective provider
     ).upstream.keyRef = fallbackKey;
     const disconnected = await save(visible);
     expect(disconnected.status, await disconnected.clone().text()).toBe(200);
-    const disconnectedHost = await getHost();
-    const chatRefs = disconnectedHost.plugins.find((item: any) =>
-      item.path.endsWith("upstream-openai-chat"),
-    ).config.secretRefs;
-    expect(chatRefs).not.toContain(keyRef);
     const second = await request();
     expect(second.status, await second.clone().text()).toBe(200);
     await second.text();

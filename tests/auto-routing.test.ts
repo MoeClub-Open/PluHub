@@ -11,7 +11,6 @@ async function gateway() {
   const sent: any[] = [];
   const f = await fixture(
     [
-      "users",
       "auth",
       "ai-router",
       "auto-router",
@@ -19,8 +18,6 @@ async function gateway() {
       "billing",
       "observability",
       "rate-limit",
-      "ingress-openai-chat",
-      "upstream-openai-chat",
     ],
     {},
     async (kernel, directory) => {
@@ -93,6 +90,7 @@ async function gateway() {
     ],
   };
   const routing: any = {
+    secretRefs: ["env:PLUHUB_TEST_UPSTREAM_KEY"],
     upstreams: {
       primary: {
         protocol: "openai-chat",
@@ -443,7 +441,7 @@ it("loads an administrator-provided Hugging Face tokenizer with no automatic dow
 });
 it("migrates existing request logs without deleting previous rows", async () => {
   const f = await fixture(
-    ["users", "auth", "observability"],
+    ["auth", "observability"],
     {},
     async (_kernel, directory) => {
       const dir = join(directory, "data", "official.observability");

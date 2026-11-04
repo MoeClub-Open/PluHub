@@ -15,6 +15,16 @@ export interface UIHost {
   /** Current extension page path, including additional manifest UI pages. */
   page?: string;
   request<T = any>(path: string, init?: RequestInit): Promise<T>;
+  pluginConfig<T = Record<string, any>>(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<{ config: T; etag: string }>;
+  savePluginConfig<T = Record<string, any>>(
+    id: string,
+    config: T,
+    etag: string,
+    signal?: AbortSignal,
+  ): Promise<{ config: T; etag: string }>;
   navigate(path: string): void;
   refresh(): void;
 }
@@ -27,39 +37,72 @@ export function createClient(
   i18n?: UIInternationalization,
   confirmIdentity?: () => Promise<void>,
 ): UIHost {
+  async function requestRaw<T>(path: string, init: RequestInit = {}) {
+    const headers = new Headers(init.headers);
+    if (init.body) headers.set("content-type", "application/json");
+    const send = () =>
+      fetch(path, { ...init, headers, credentials: "same-origin" });
+    let r = await send();
+    let data = await r.json();
+    if (
+      r.status === 403 &&
+      data.error?.code === "reauth_required" &&
+      !["GET", "HEAD", "OPTIONS"].includes(
+        (init.method ?? "GET").toUpperCase(),
+      ) &&
+      confirmIdentity
+    ) {
+      await confirmIdentity();
+      init.signal?.throwIfAborted();
+      r = await send();
+      data = await r.json();
+    }
+    if (!r.ok) {
+      if (
+        r.status === 401 &&
+        data.error?.code === "unauthorized" &&
+        path !== "/api/plugins/official.auth/me"
+      )
+        sessionExpired?.();
+      const message = data.error?.message ?? "请求失败";
+      throw new Error(i18n?.t(message) ?? message);
+    }
+    return { data: data as T, headers: r.headers };
+  }
   return {
     i18n,
     async request<T>(path: string, init: RequestInit = {}) {
-      const headers = new Headers(init.headers);
-      if (init.body) headers.set("content-type", "application/json");
-      const send = () =>
-        fetch(path, { ...init, headers, credentials: "same-origin" });
-      let r = await send();
-      let data = await r.json();
-      if (
-        r.status === 403 &&
-        data.error?.code === "reauth_required" &&
-        !["GET", "HEAD", "OPTIONS"].includes(
-          (init.method ?? "GET").toUpperCase(),
-        ) &&
-        confirmIdentity
-      ) {
-        await confirmIdentity();
-        init.signal?.throwIfAborted();
-        r = await send();
-        data = await r.json();
-      }
-      if (!r.ok) {
-        if (
-          r.status === 401 &&
-          data.error?.code === "unauthorized" &&
-          path !== "/api/plugins/official.auth/me"
-        )
-          sessionExpired?.();
-        const message = data.error?.message ?? "请求失败";
-        throw new Error(i18n?.t(message) ?? message);
-      }
-      return data as T;
+      return (await requestRaw<T>(path, init)).data;
+    },
+    async pluginConfig<T = Record<string, any>>(
+      id: string,
+      signal?: AbortSignal,
+    ) {
+      const { data, headers } = await requestRaw<T>(
+        "/api/host/plugins/" + encodeURIComponent(id) + "/config",
+        { signal },
+      );
+      return { config: data, etag: headers.get("etag") ?? "" };
+    },
+    async savePluginConfig<T = Record<string, any>>(
+      id: string,
+      config: T,
+      etag: string,
+      signal?: AbortSignal,
+    ) {
+      const { data, headers } = await requestRaw<{
+        config: T;
+        revision: string;
+      }>("/api/host/plugins/" + encodeURIComponent(id) + "/config", {
+        method: "PUT",
+        headers: etag ? { "if-match": etag } : undefined,
+        body: JSON.stringify(config),
+        signal,
+      });
+      return {
+        config: data.config,
+        etag: headers.get("etag") ?? data.revision ?? "",
+      };
     },
     navigate(path) {
       location.hash = path;

@@ -1,12 +1,12 @@
 import { it, expect } from "vitest";
 import { fixture } from "./helpers.js";
 
-const users = "/api/plugins/official.users/users";
+const users = "/api/plugins/official.auth/users";
 const auth = "/api/plugins/official.auth";
 const billing = "/api/plugins/official.billing";
 
 it("does not expose retired platform credential endpoints", async () => {
-  const f = await fixture(["users", "auth", "byok", "http-transport"]);
+  const f = await fixture(["auth", "byok", "http-transport"]);
   try {
     const admin = await f.admin();
     for (const method of ["GET", "POST", "DELETE"]) {
@@ -25,7 +25,7 @@ it("does not expose retired platform credential endpoints", async () => {
 });
 
 it("preserves a last administrator and immediately removes elevated access from existing sessions after demotion", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   try {
     const admin = await f.admin();
     const first = await (
@@ -86,7 +86,7 @@ it("preserves a last administrator and immediately removes elevated access from 
 });
 
 it("invalidates all existing console sessions when an administrator resets a password", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   try {
     const admin = await f.admin();
     const user = await (
@@ -138,7 +138,7 @@ it("invalidates all existing console sessions when an administrator resets a pas
 });
 
 it("deduplicates concurrent credits, rejects conflicting and invalid money, and isolates public wallet queries", async () => {
-  const f = await fixture(["users", "auth", "billing"]);
+  const f = await fixture(["auth", "billing"]);
   try {
     const admin = await f.admin();
     const first = await (

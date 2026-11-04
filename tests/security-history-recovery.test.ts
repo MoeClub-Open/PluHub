@@ -5,7 +5,7 @@ import { fixture } from "./helpers.js";
 import { createKernel } from "../packages/control/dist/index.js";
 
 it("records a recovered setup intent only when it actually creates the administrator password", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   const db = new DatabaseSync(
     join(f.config.dataDir, "official.auth", "auth.sqlite"),
   );

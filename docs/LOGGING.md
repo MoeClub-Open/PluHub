@@ -45,9 +45,9 @@ Observability 调用日志可配置 `retentionDays`（默认 30 天）和 `maxRo
 筛选保存在页面地址中，刷新后保留。`GET /api/plugins/official.observability/requests/export` 按相同筛选和权限导出 CSV，最多 10,000 条，超出时要求缩小范围；同一用户每 5 秒允许一次导出。CSV 带 UTF-8 BOM，并防止单元格公式注入。
 
 - 普通用户和子账号仅能查看自己的请求；企业主账号的控制台会话可查看自身及直属子账号的请求；管理员会话可查看全站。
-- Users 插件维护 `accountType=personal|enterprise` 和 `parentId`，并通过 `users.log-scope@1` 提供允许查看的用户范围。Observability 不直接读取 Users 的数据库。
+- Auth 插件维护 `accountType=personal|enterprise` 和 `parentId`，并通过 `users.log-scope@1` 提供允许查看的用户范围。Observability 不直接读取 Auth 的数据库。
 - 管理员在「用户管理 → 用户详情 → 账号归属」指定企业主账号或所属企业；变更进入管理审计。子账号不能修改归属、查看同级账号或其他企业。角色与企业归属分开管理，不引入工作空间。
 - 首版为单层归属；企业主账号不能同时成为子账号，有子账号的企业必须先移交子账号再转换为个人账号。子账号不能直接授予管理员角色。
 - 每次请求重新校验归属，不缓存授权结果。关系转移后，旧企业立即失去该子账号历史日志的查看权，新企业取得查看权。API Key 仍只能读取其所属用户的记录。
 - `GET /api/plugins/official.observability/log-scope` 只返回当前身份可见的用户名称与 ID。`requests` 与 `summary` 使用同一权限约束；指定越权 `userId` 返回 403。
-- 没有 Users 范围能力时，Observability 保持个人隔离和现有管理员查询功能，不自动扩大普通用户范围。
+- 没有用户范围能力时，Observability 保持个人隔离和现有管理员查询功能，不自动扩大普通用户范围。

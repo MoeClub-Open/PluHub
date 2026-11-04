@@ -15,7 +15,7 @@ const args = process.argv.slice(2);
 if (!args.length) args.push("start");
 if (["backup-bundle", "backup-decrypt"].includes(args[0])) {
   try {
-    const { runBackupCommand } = await import("./backup-bundle.mjs");
+    const { runBackupCommand } = await import("./backup-bundle.ts");
     await runBackupCommand(args[0], args.slice(1), file);
   } catch {
     process.stderr.write(
@@ -87,11 +87,12 @@ if (!existsSync(file)) {
   config.dataDir = "/data/state";
   const origin = process.env.PLUHUB_PUBLIC_ORIGIN;
   if (origin) {
-    config.plugins.find((p) =>
+    config.plugins.find((p: { path: string }) =>
       p.path.endsWith("/listener"),
     ).config.publicOrigin = origin;
-    config.plugins.find((p) => p.path.endsWith("/auth")).config.secureCookie =
-      new URL(origin).protocol === "https:";
+    config.plugins.find((p: { path: string }) =>
+      p.path.endsWith("/auth"),
+    ).config.secureCookie = new URL(origin).protocol === "https:";
   }
   writeFileSync(file + ".init", JSON.stringify(config, null, 2) + "\n", {
     mode: 0o600,
@@ -99,20 +100,14 @@ if (!existsSync(file)) {
   renameSync(file + ".init", file);
 }
 if (args[0] === "start") {
-  const { migrateManagedSecrets } =
-    await import("../migrations/managed-secrets.ts");
-  migrateManagedSecrets(file);
-  const { migratePluginBoundaries } =
-    await import("../migrations/plugin-boundaries.ts");
-  await migratePluginBoundaries(file);
   await syncBundledPlugins(file);
 }
 // The shell entrypoint holds an exclusive flock across container PID namespaces.
 // A stale PID from a crashed container cannot identify a process in this namespace.
 try {
   unlinkSync(file + ".pid");
-} catch (error) {
-  if (error.code !== "ENOENT") throw error;
+} catch (error: unknown) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 }
 delete process.env.PLUHUB_ADMIN_PASSWORD;
 delete process.env.PLUHUB_ADMIN_PASSWORD_FILE;

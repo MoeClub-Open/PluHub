@@ -1,11 +1,11 @@
 import { it, expect } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { auditStore } from "../packages/control/dist/audit.js";
 import { createLogSanitizer } from "../packages/kernel/dist/logging.js";
-import { fixture } from "./helpers.js";
+import { fixture, removeTempDir } from "./helpers.js";
 
 it("redacts audit fields before truncation and persistence, and masks legacy reads without rewriting the original", async () => {
   const directory = await mkdtemp(join(tmpdir(), "pluhub-audit-privacy-"));
@@ -60,12 +60,12 @@ it("redacts audit fields before truncation and persistence, and masks legacy rea
       db.close();
     }
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    await removeTempDir(directory);
   }
 });
 
 it("applies the kernel secret scrubber to administrator operation reasons before truncation", async () => {
-  const f = await fixture(["users", "auth"]);
+  const f = await fixture(["auth"]);
   try {
     const admin = await f.admin();
     const user = await f.kernel.invoke<any>("users.manage@1", {

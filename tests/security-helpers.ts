@@ -113,7 +113,6 @@ export async function securityFixture(branding?: Record<string, unknown>) {
   let validations = 0;
   const f = await fixture(
     [
-      "users",
       "auth",
       "ai-router",
       "mailer",

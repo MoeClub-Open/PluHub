@@ -3,7 +3,7 @@ import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fixture } from "./helpers.js";
 import { createKernel } from "../packages/control/dist/index.js";
-const sub = "/api/plugins/official.upstream-codex",
+const sub = "/api/plugins/official.subscriptions/codex",
   own = sub + "/personal",
   byok = "/api/plugins/official.byok",
   auth = "/api/plugins/official.auth";
@@ -23,17 +23,13 @@ async function setup() {
     transport(input, signal);
   const f = await fixture(
     [
-      "users",
       "auth",
       "billing",
       "observability",
       "rate-limit",
       "ai-router",
       "byok",
-      ...["openai-chat", "openai-responses", "anthropic", "gemini"].flatMap(
-        (p) => ["ingress-" + p, "upstream-" + p],
-      ),
-      ...providers.map((p) => "upstream-" + p),
+      "subscriptions",
     ],
     {
       billing: { enabled: true },
@@ -110,7 +106,7 @@ async function setup() {
     override: any = {},
   ) {
     const r = await f.request(
-      "/api/plugins/official.upstream-" + provider + "/personal/accounts",
+      "/api/plugins/official.subscriptions/" + provider + "/personal/accounts",
       "POST",
       {
         provider,
@@ -164,7 +160,7 @@ async function setup() {
   }
   const action = (id: string, action: string, owner = alice, extra = {}) =>
     f.request(
-      "/api/plugins/official.upstream-" +
+      "/api/plugins/official.subscriptions/" +
         (accountProviders.get(id) ?? "codex") +
         "/personal/account",
       "POST",
@@ -316,7 +312,7 @@ it("isolates personal subscription management, platform accounts and bearer keys
         }),
       ).rejects.toMatchObject({ code: "subscription_not_found" });
     const db = await readFile(
-      join(f.config.dataDir, "official.upstream-codex/accounts.sqlite"),
+      join(f.config.dataDir, "official.subscriptions/accounts.sqlite"),
     );
     expect(db.includes(Buffer.from("personal-token"))).toBe(false);
   } finally {
@@ -402,7 +398,9 @@ it.each(providers)(
       ).toEqual(["demo"]);
       const accounts = await (
         await f.request(
-          "/api/plugins/official.upstream-" + provider + "/personal/accounts",
+          "/api/plugins/official.subscriptions/" +
+            provider +
+            "/personal/accounts",
           "GET",
           undefined,
           f.alice.headers,
