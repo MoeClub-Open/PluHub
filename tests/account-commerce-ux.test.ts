@@ -106,7 +106,11 @@ it("rejects unavailable payment methods and incompatible currencies before recor
     {
       commerce: {
         publicUrl: "http://localhost",
-        products: [product, { ...product, id: "credit-cny", currency: "cny" }],
+        products: [
+          product,
+          { ...product, id: "credit-gbp", currency: "gbp" },
+          { ...product, id: "credit-cny", currency: "cny" },
+        ],
       },
       "payments-epay": {
         enabled: true,
@@ -144,7 +148,7 @@ it("rejects unavailable payment methods and incompatible currencies before recor
       const result = await f.request(
         api + "/checkout",
         "POST",
-        { productId: "credit-usd", provider },
+        { productId: "credit-gbp", provider },
         admin,
       );
       expect(result.status).toBe(status);

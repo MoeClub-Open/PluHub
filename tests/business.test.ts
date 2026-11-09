@@ -328,6 +328,7 @@ it("supports all Epay version/signature combinations with signed V2 responses an
           method: "jump",
           clientip: "127.0.0.1",
           sign_type: algorithm,
+          money: "36.25",
         });
         const result: any = {
           code: 0,
@@ -346,6 +347,7 @@ it("supports all Epay version/signature combinations with signed V2 responses an
       };
       const config = {
         enabled: true,
+        usdToCny: 7.25,
         methods: [
           {
             id: "1",
@@ -372,7 +374,7 @@ it("supports all Epay version/signature combinations with signed V2 responses an
         {
           commerce: {
             publicUrl: "http://localhost",
-            products: [{ ...monthly, currency: "cny" }],
+            products: [monthly],
           },
           "payments-epay": config,
         },
@@ -391,15 +393,43 @@ it("supports all Epay version/signature combinations with signed V2 responses an
         if (version === "v1") {
           const url = new URL(order.url);
           expect(url.pathname).toBe("/submit.php");
-          expect(url.searchParams.get("money")).toBe("5.00");
+          expect(url.searchParams.get("money")).toBe("36.25");
         }
+        const orders = await (
+          await f.request(
+            "/api/plugins/official.commerce/orders",
+            "GET",
+            undefined,
+            admin,
+          )
+        ).json();
+        expect(orders[0].product).toMatchObject({
+          currency: "cny",
+          paymentMinor: 3625,
+          creditMicros: 5000000,
+        });
+        const ratePath = "/api/host/plugins/official.payments-epay/config";
+        const current = await (
+          await f.request(ratePath, "GET", undefined, admin)
+        ).json();
+        const updated = await f.request(
+          ratePath,
+          "PUT",
+          {
+            config: { ...current.config, usdToCny: 8 },
+            revision: current.revision,
+          },
+          admin,
+        );
+        expect(updated.status).toBe(200);
+        await updated.json();
         const fields: any = {
           pid: "123",
           type: "alipay",
           out_trade_no: order.id,
           trade_no: "unique-trade",
           trade_status: "TRADE_SUCCESS",
-          money: "5.00",
+          money: "36.25",
           sign_type: algorithm,
         };
         fields.sign = epaySign(
@@ -418,6 +448,13 @@ it("supports all Epay version/signature combinations with signed V2 responses an
           return response.status;
         }
         expect(await notify({ ...fields, money: "9.00" })).toBe(400);
+        const wrongAmount = { ...fields, money: "40.00" };
+        wrongAmount.sign = epaySign(
+          wrongAmount,
+          algorithm as any,
+          algorithm === "MD5" ? "md5-test-only" : pair.privateKey,
+        );
+        expect(await notify(wrongAmount)).toBe(400);
         expect(await notify(fields)).toBe(200);
         expect(await notify(fields)).toBe(200);
         const wallet = await (
