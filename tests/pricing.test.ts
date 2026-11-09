@@ -256,13 +256,22 @@ it("resolves quotes and execution through the same conditional route", async () 
 it("charges cache-aware usage and exposes an immutable own receipt", async () => {
   const f = await setup();
   try {
+    f.kernel.configure({
+      "official.ai-router": {
+        ...router,
+        models: {
+          ...router.models,
+          demo: { ...route, pricing: { ...route.pricing, multiplier: 0.5 } },
+        },
+      },
+    });
     const response = await f.invoke("alias");
     expect(response.status).toBe(200);
     expect(
       (await response.json()).usage.prompt_tokens_details.cached_tokens,
     ).toBe(600);
-    // 400*3 + 100*15 + 600*.3 = 2880.
-    expect(await f.balance()).toMatchObject({ balance: 997120, held: 0 });
+    // (400*3 + 100*15 + 600*.3) * 0.5 = 1440 micro-USD.
+    expect(await f.balance()).toMatchObject({ balance: 998560, held: 0 });
     const ledger = await (
       await f.request(
         "/api/plugins/official.billing/ledger",
@@ -273,7 +282,8 @@ it("charges cache-aware usage and exposes an immutable own receipt", async () =>
     ).json();
     const receipt = JSON.parse(ledger[0].receipt);
     expect(receipt).toMatchObject({
-      amount: 2880,
+      amount: 1440,
+      pricing: { multiplier: 0.5 },
       usage: { cacheRead: 600, reasoning: 40 },
     });
     const requests = await (
@@ -284,7 +294,7 @@ it("charges cache-aware usage and exposes an immutable own receipt", async () =>
         f.admin,
       )
     ).json();
-    expect(requests.data[0].cost_micro_usd).toBe(2880);
+    expect(requests.data[0].cost_micro_usd).toBe(1440);
     expect(JSON.parse(requests.data[0].usage_json)).toMatchObject({
       cacheRead: 600,
       reasoning: 40,
@@ -299,7 +309,7 @@ it("charges cache-aware usage and exposes an immutable own receipt", async () =>
       { model: "demo", usage: { input: 1000, output: 100, cacheRead: 600 } },
       f.admin,
     );
-    expect((await quote.json()).amount).toBe(2880);
+    expect((await quote.json()).amount).toBe(1440);
   } finally {
     await f.close();
   }
@@ -439,6 +449,15 @@ it("settles request prices without usage or output limits and settles unknown to
 it("snapshots prices and billing policy before a streamed request executes", async () => {
   const f = await setup();
   try {
+    f.kernel.configure({
+      "official.ai-router": {
+        ...router,
+        models: {
+          ...router.models,
+          demo: { ...route, pricing: { ...route.pricing, multiplier: 0.5 } },
+        },
+      },
+    });
     respond = () => {
       f.kernel.configure({
         "official.billing": {
@@ -446,7 +465,14 @@ it("snapshots prices and billing policy before a streamed request executes", asy
         },
         "official.ai-router": {
           ...router,
-          models: { ...router.models, demo: { ...route, inputPrice: 300 } },
+          models: {
+            ...router.models,
+            demo: {
+              ...route,
+              inputPrice: 300,
+              pricing: { ...route.pricing, multiplier: 2 },
+            },
+          },
         },
       });
       return new Response(
@@ -457,7 +483,7 @@ it("snapshots prices and billing policy before a streamed request executes", asy
     const r = await f.invoke("demo", true);
     expect(r.status).toBe(200);
     await r.text();
-    expect(await f.balance()).toMatchObject({ balance: 997120, held: 0 });
+    expect(await f.balance()).toMatchObject({ balance: 998560, held: 0 });
   } finally {
     await f.close();
   }
