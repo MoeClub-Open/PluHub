@@ -31,6 +31,8 @@
 
 商品在「商品与订阅」配置：名称、支付币种和金额、到账 USD 额度，以及单次支付或月/年订阅。当前 Checkout 使用本站商品价格生成 `price_data`，因此不需要提前创建或填写 Stripe `prod_…`、`price_…`。`bpc_…` 是账单门户配置编号。商品支付金额决定 Stripe 收款金额，到账额度决定本站钱包增加的 USD 额度，二者分别配置。本站公开地址用于付款成功、取消和账单门户的返回地址，应填写实际 HTTPS 域名。
 
+Stripe 收款币种与余额、银行结算币种分别管理。例如商品标价和用户付款为 USD、本站钱包记入 USD 额度，Stripe 可按商户账户设置自动换为 GBP 结算。结算币种与对应银行账户在 [Stripe 结算设置](https://dashboard.stripe.com/settings/money-management) 配置，实际汇率及换汇费用由 Stripe 处理，本站无需配置美元兑英镑比例；付款核账仍使用原订单的 USD 金额。易支付的人民币转换比例独立配置。详见 [Stripe 币种与结算说明](https://docs.stripe.com/currencies#currency-presentment-and-settlement)。
+
 在 Stripe 的 Webhook 设置中添加以下回调端点，并将该端点的签名密钥填回本站：
 
 ```text
