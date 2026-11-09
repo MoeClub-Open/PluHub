@@ -18,13 +18,13 @@ export interface UIHost {
   pluginConfig<T = Record<string, any>>(
     id: string,
     signal?: AbortSignal,
-  ): Promise<{ config: T; etag: string }>;
+  ): Promise<{ config: T; revision: string }>;
   savePluginConfig<T = Record<string, any>>(
     id: string,
     config: T,
-    etag: string,
+    revision: string,
     signal?: AbortSignal,
-  ): Promise<{ config: T; etag: string }>;
+  ): Promise<{ config: T; revision: string }>;
   navigate(path: string): void;
   refresh(): void;
 }
@@ -67,42 +67,36 @@ export function createClient(
       const message = data.error?.message ?? "请求失败";
       throw new Error(i18n?.t(message) ?? message);
     }
-    return { data: data as T, headers: r.headers };
+    return data as T;
   }
   return {
     i18n,
     async request<T>(path: string, init: RequestInit = {}) {
-      return (await requestRaw<T>(path, init)).data;
+      return requestRaw<T>(path, init);
     },
     async pluginConfig<T = Record<string, any>>(
       id: string,
       signal?: AbortSignal,
     ) {
-      const { data, headers } = await requestRaw<T>(
+      return requestRaw<{ config: T; revision: string }>(
         "/api/host/plugins/" + encodeURIComponent(id) + "/config",
         { signal },
       );
-      return { config: data, etag: headers.get("etag") ?? "" };
     },
     async savePluginConfig<T = Record<string, any>>(
       id: string,
       config: T,
-      etag: string,
+      revision: string,
       signal?: AbortSignal,
     ) {
-      const { data, headers } = await requestRaw<{
+      return requestRaw<{
         config: T;
         revision: string;
       }>("/api/host/plugins/" + encodeURIComponent(id) + "/config", {
         method: "PUT",
-        headers: etag ? { "if-match": etag } : undefined,
-        body: JSON.stringify(config),
+        body: JSON.stringify({ config, revision }),
         signal,
       });
-      return {
-        config: data.config,
-        etag: headers.get("etag") ?? data.revision ?? "",
-      };
     },
     navigate(path) {
       location.hash = path;

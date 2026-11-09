@@ -361,23 +361,33 @@ export function attachManagement(
         if (found < 0)
           throw new HostError("unknown_plugin", "Unknown plugin", 404);
         if (request.method === "GET")
-          return Response.json(config.plugins[found]!.config ?? {}, {
-            headers: { etag: configRevision, "cache-control": "no-store" },
-          });
+          return Response.json(
+            {
+              config: config.plugins[found]!.config ?? {},
+              revision: configRevision,
+            },
+            { headers: { "cache-control": "no-store" } },
+          );
         if (request.method === "PUT") {
           await verifyAdminSession(request, context);
-          const expected = request.headers.get("if-match");
-          if (!expected || expected !== configRevision)
+          const body = await readObject(request);
+          if (body.revision !== configRevision)
             throw new HostError(
               "config_conflict",
               "配置已更新，请刷新后重试",
               409,
             );
+          if (
+            !body.config ||
+            typeof body.config !== "object" ||
+            Array.isArray(body.config)
+          )
+            throw new HostError("invalid_config", "Invalid plugin config");
           context.state.set("admin.resourceId", pluginId);
           const next = structuredClone(config);
           next.plugins[found] = {
             ...next.plugins[found]!,
-            config: await readObject(request),
+            config: body.config as Record<string, unknown>,
           };
           await commit(next);
           return Response.json(
@@ -387,7 +397,7 @@ export function attachManagement(
               revision: configRevision,
               config: config.plugins[found]!.config ?? {},
             },
-            { headers: { etag: configRevision, "cache-control": "no-store" } },
+            { headers: { "cache-control": "no-store" } },
           );
         }
       }

@@ -10,7 +10,7 @@ Manifest 可填写 `name`（最多 80 字符）和 `description`（最多 400 �
 
 配置与代码更新独立声明：`configReload: "snapshot"` 的配置通过控制面立即发布，新旧请求持有各自配置。`codeReload: "parallel"` 表示作者确认新旧实例可同时运行：无共享可变状态迁移、无独占监听或数据资源，所有资源在 cleanup 中释放，所有请求遵循 AbortSignal。缺省 `codeReload: "restart"`；数据库插件、认证、Listener 和 Console 使用重启升级。
 
-单个插件的管理设置页面优先使用 `GET /api/host/plugins/:id/config` 与 `PUT /api/host/plugins/:id/config` 读取和保存本插件配置（携带 `If-Match` 修订号），无需读写整站完整配置。
+单个插件的管理设置页面使用 `GET /api/host/plugins/:id/config` 与 `PUT /api/host/plugins/:id/config`，无需读写整站完整配置。GET 返回 `{ config, revision }`，PUT 将修改后的 `{ config, revision }` 作为 JSON 正文提交，成功后返回新配置和新修订号；缺失或过期的修订号返回 409。前端可直接调用 `UIHost.pluginConfig(id)` 与 `UIHost.savePluginConfig(id, config, revision)`。修订号随正文传输，避免代理移除缓存响应头后导致设置无法保存。
 
 管理员可在插件管理中为支持的插件选择宿主可读目录或 .tgz 包，调用 `POST /api/host/update`，字段为 `id`、当前 `revision`、`path`、`reason`。要求近期管理员会话和 CSRF，沿用已有权限授权，不自动扩大权限；插件 ID、对外能力集合、平台、宿主版本、配置及全局执行图须通过校验。新包复制到独立版本目录，启动完成、配置保存成功后原子切换，新请求进入新实例，旧请求按排空超时完成或取消；后台释放旧实例，避免更新请求等待自身排空。前端扩展 URL 携带实例 revision，管理页面更新后重新获取注册表；其他浏览器刷新页面后加载新模块。
 

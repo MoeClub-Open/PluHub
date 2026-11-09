@@ -18,13 +18,26 @@
 
 ### Stripe
 
-在 Stripe 支付页面直接填写商户密钥与 Webhook 签名密钥，并选择测试/正式模式；保存到支付插件的加密存储。留空保留已保存凭据。Webhook 地址：
+在「支付方式 → Stripe」填写以下配置。密钥加密保存在支付插件中，再次编辑时留空保留原值：
+
+| 配置 | 要求 |
+| --- | --- |
+| Stripe Secret Key | 必填，使用商户后台的 `sk_test_…` 或 `sk_live_…` 服务端密钥 |
+| Webhook 签名密钥 | 必填，使用本回调端点对应的 `whsec_…`，与 API Key 用途不同 |
+| 运行模式 | 必填，测试/正式须与 API Key、Webhook 端点的数据模式一致 |
+| Stripe 账单门户 | 可选，用于管理自动续费；需先在 Stripe 后台配置客户门户 |
+| 账单门户配置 ID | 可选，`bpc_…`；留空使用 Stripe 默认门户配置 |
+| 轮换期间的旧签名密钥 | 可选，仅用于 Webhook 密钥轮换过渡 |
+
+商品在「商品与订阅」配置：名称、支付币种和金额、到账 USD 额度，以及单次支付或月/年订阅。当前 Checkout 使用本站商品价格生成 `price_data`，因此不需要提前创建或填写 Stripe `prod_…`、`price_…`。`bpc_…` 是账单门户配置编号。商品支付金额决定 Stripe 收款金额，到账额度决定本站钱包增加的 USD 额度，二者分别配置。本站公开地址用于付款成功、取消和账单门户的返回地址，应填写实际 HTTPS 域名。
+
+在 Stripe 的 Webhook 设置中添加以下回调端点，并将该端点的签名密钥填回本站：
 
 ```text
 https://你的域名/api/plugins/official.payments-stripe/webhook
 ```
 
-订阅事件：`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`invoice.paid`、`invoice.payment_failed`、`customer.subscription.updated`、`customer.subscription.deleted`。
+收款与订阅事件：`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`、`checkout.session.expired`、`invoice.paid`、`invoice.payment_failed`、`customer.subscription.updated`、`customer.subscription.deleted`。退款与争议事件见下节。
 
 请求固定使用 Stripe API `2025-03-31.basil`；验签基于原始字节、HMAC-SHA256、300 秒时效和常量时间比较，支持多个 v1 签名。关键事件再次查询 Stripe 对象。兼容 Invoice 旧 `subscription` 及新 `parent.subscription_details.subscription` 字段。
 
